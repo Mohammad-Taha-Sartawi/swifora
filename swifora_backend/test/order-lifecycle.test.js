@@ -920,6 +920,19 @@ test('cancelOrder enforces customer ownership and pre-acceptance states in one t
   }
 });
 
+// Order.find(...).select(...).session(...).lean() returning [orders].
+function mockActiveOrders(orders, onFilter = () => {}) {
+  return (filter) => {
+    onFilter(filter);
+    const chain = {
+      select: () => chain,
+      session: () => chain,
+      lean: async () => orders,
+    };
+    return chain;
+  };
+}
+
 test('transitionOrder requires provider ownership and exact source state', async () => {
   const session = {
     withTransaction: async (work) => work(session),
@@ -929,10 +942,14 @@ test('transitionOrder requires provider ownership and exact source state', async
   const original = {
     startSession: mongoose.startSession,
     orderFindOneAndUpdate: Order.findOneAndUpdate,
+    orderFind: Order.find,
+    userUpdateOne: User.updateOne,
     notificationCreate: Notification.create,
   };
 
   let notificationSession;
+  let holdUpdate;
+  const startedAt = new Date();
 
   try {
     mongoose.startSession = async () => session;
@@ -960,6 +977,17 @@ test('transitionOrder requires provider ownership and exact source state', async
       };
     };
 
+    // Starting the delivery holds the driver for 15 minutes from the start.
+    Order.find = mockActiveOrders([
+      { status: 'fulfilling', fulfillingAt: startedAt },
+    ]);
+    User.updateOne = (filter, update, options) => {
+      assert.deepEqual(filter, { _id: 'provider-1' });
+      assert.equal(options.session, session);
+      holdUpdate = update;
+      return Promise.resolve({ modifiedCount: 1 });
+    };
+
     Notification.create = (documents, options) => {
       assert.equal(documents.length, 1);
       assert.equal(documents[0].userId, 'customer-1');
@@ -976,9 +1004,15 @@ test('transitionOrder requires provider ownership and exact source state', async
     });
 
     assert.equal(result.status, 'fulfilling');
+    assert.equal(
+      holdUpdate.$set.blockedUntil.getTime(),
+      startedAt.getTime() + lifecycle.PROVIDER_ACCEPTANCE_BLOCK_MS,
+    );
   } finally {
     mongoose.startSession = original.startSession;
     Order.findOneAndUpdate = original.orderFindOneAndUpdate;
+    Order.find = original.orderFind;
+    User.updateOne = original.userUpdateOne;
     Notification.create = original.notificationCreate;
   }
 });
@@ -992,11 +1026,19 @@ test('completing an order releases the provider busy block inside the transactio
   const original = {
     startSession: mongoose.startSession,
     orderFindOneAndUpdate: Order.findOneAndUpdate,
+    orderFind: Order.find,
     userUpdateOne: User.updateOne,
     notificationCreate: Notification.create,
   };
 
   let releaseSession;
+  // No other active order: the driver is released.
+  Order.find = mockActiveOrders([], (filter) => {
+    assert.deepEqual(filter, {
+      providerId: 'provider-1',
+      status: { $in: ['accepted', 'fulfilling'] },
+    });
+  });
 
   try {
     mongoose.startSession = async () => session;
@@ -1056,6 +1098,7 @@ test('completing an order releases the provider busy block inside the transactio
   } finally {
     mongoose.startSession = original.startSession;
     Order.findOneAndUpdate = original.orderFindOneAndUpdate;
+    Order.find = original.orderFind;
     User.updateOne = original.userUpdateOne;
     Notification.create = original.notificationCreate;
   }
