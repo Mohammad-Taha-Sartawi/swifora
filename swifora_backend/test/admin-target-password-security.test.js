@@ -353,7 +353,7 @@ test(
 
       assert.match(
         reset,
-        /alert\(data\.message \|\|/,
+        /adminAlert\(data\.message \|\|/,
       );
 
       const failureIndex =

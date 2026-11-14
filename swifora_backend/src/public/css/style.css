@@ -663,3 +663,16 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
   .chat-msg { max-width: 92%; }
   .chat-input-area { flex-wrap: wrap; }
 }
+
+/* In-page dialogs (replace blocked browser confirm/alert/prompt) */
+.admin-dialog-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5, 8, 14, 0.72); }
+.admin-dialog { width: min(440px, 100%); background: #121925; border: 1px solid #263244; border-radius: 16px; padding: 22px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45); color: #e8edf5; }
+.admin-dialog.danger { border-color: #e74c3c; }
+.admin-dialog-message { margin: 0 0 16px; line-height: 1.8; white-space: pre-line; font-size: 15px; }
+.admin-dialog-input { width: 100%; box-sizing: border-box; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; border: 1px solid #263244; background: #0b0e14; color: #e8edf5; font: inherit; }
+.admin-dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-dialog-actions button { flex: 1 1 120px; min-height: 44px; border-radius: 10px; border: none; font: inherit; font-weight: 700; cursor: pointer; }
+.admin-dialog-ok { background: #00d4ff; color: #0b0e14; }
+.admin-dialog-ok.danger { background: #e74c3c; color: #fff; }
+.admin-dialog-cancel { background: #1e2733; color: #e8edf5; }
+.admin-dialog-actions button:focus-visible, .admin-dialog-input:focus-visible { outline: 2px solid #00d4ff; outline-offset: 2px; }

@@ -1,3 +1,108 @@
+// ================================================
+// In-page dialogs
+// ================================================
+// Some browsers block window.confirm / alert / prompt without showing
+// anything (pages opened inside WhatsApp, Telegram or other apps, or a site
+// set to "block dialogs"). A blocked confirm() returns false, so a
+// destructive action such as "delete driver" was silently cancelled and
+// never reached the server. These dialogs are part of the page instead.
+function adminDialog({ message, kind, danger = false, password = false }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'admin-dialog-overlay';
+
+    const box = document.createElement('div');
+    box.className = `admin-dialog${danger ? ' danger' : ''}`;
+    box.setAttribute('role', kind === 'alert' ? 'alertdialog' : 'dialog');
+    box.setAttribute('aria-modal', 'true');
+
+    const text = document.createElement('p');
+    text.className = 'admin-dialog-message';
+    text.textContent = String(message ?? '');
+    text.id = `admin-dialog-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    box.setAttribute('aria-describedby', text.id);
+    box.append(text);
+
+    let input = null;
+    if (kind === 'prompt') {
+      input = document.createElement('input');
+      input.type = password ? 'password' : 'text';
+      input.className = 'admin-dialog-input';
+      input.autocomplete = password ? 'new-password' : 'off';
+      input.setAttribute('aria-label', String(message ?? ''));
+      box.append(input);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'admin-dialog-actions';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = `admin-dialog-ok${danger ? ' danger' : ''}`;
+    ok.textContent = kind === 'alert' ? 'حسناً' : 'تأكيد';
+    actions.append(ok);
+
+    let cancel = null;
+    if (kind !== 'alert') {
+      cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'admin-dialog-cancel';
+      cancel.textContent = 'إلغاء';
+      actions.append(cancel);
+    }
+
+    box.append(actions);
+    overlay.append(box);
+    document.body.append(overlay);
+
+    const previousFocus = document.activeElement;
+    const okValue = () => {
+      if (kind === 'prompt') return input.value;
+      if (kind === 'confirm') return true;
+      return undefined;
+    };
+    const cancelValue = kind === 'prompt' ? null : kind === 'confirm' ? false : undefined;
+
+    function close(value) {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (previousFocus && typeof previousFocus.focus === 'function') {
+        previousFocus.focus();
+      }
+      resolve(value);
+    }
+
+    function onKey(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close(cancelValue);
+      } else if (event.key === 'Enter' && document.activeElement !== cancel) {
+        event.preventDefault();
+        close(okValue());
+      }
+    }
+
+    ok.addEventListener('click', () => close(okValue()));
+    if (cancel) cancel.addEventListener('click', () => close(cancelValue));
+    document.addEventListener('keydown', onKey, true);
+
+    // Destructive confirmations start on "Cancel" so Enter cannot delete.
+    (input || (danger && cancel) || ok).focus();
+  });
+}
+
+function adminConfirm(message) {
+  const danger = /حذف|رفض|إلغاء|تصفير/.test(String(message));
+  return adminDialog({ message, kind: 'confirm', danger });
+}
+
+function adminAlert(message) {
+  return adminDialog({ message, kind: 'alert' });
+}
+
+function adminPrompt(message, { password = false } = {}) {
+  return adminDialog({ message, kind: 'prompt', password });
+}
+
 const adminCsrfToken =
   document
     .querySelector(
@@ -629,7 +734,7 @@ document.getElementById('driverSearchInput').addEventListener('keypress', e => {
 async function searchDriver() {
   const input = document.getElementById('driverSearchInput');
   const raw = input.value.trim();
-  if (!raw) return alert('الرجاء إدخال ID السائق أو الاسم');
+  if (!raw) return adminAlert('الرجاء إدخال ID السائق أو الاسم');
 
   const resultElement = document.getElementById('driverResult');
   resultElement.removeAttribute('data-driver-id');
@@ -710,7 +815,7 @@ async function openEditDriver(driverId) {
     );
     const data = await res.json();
     if (data.error || !data.driver) {
-      alert(data.error || 'تعذر تحميل بيانات السائق.');
+      adminAlert(data.error || 'تعذر تحميل بيانات السائق.');
       return;
     }
 
@@ -766,7 +871,7 @@ async function openEditDriver(driverId) {
     msg.className = 'msg';
     document.getElementById('driverEditModal').classList.add('show');
   } catch (err) {
-    alert('تعذر تحميل بيانات السائق.');
+    adminAlert('تعذر تحميل بيانات السائق.');
   }
 }
 
@@ -818,14 +923,14 @@ async function openInlineDriverEdit(driverId) {
     );
     const data = await res.json();
     if (data.error || !data.driver) {
-      alert(data.error || 'تعذر تحميل بيانات السائق.');
+      adminAlert(data.error || 'تعذر تحميل بيانات السائق.');
       return;
     }
 
     await ensureAdminAreasLoaded();
     renderInlineDriverEditor(data.driver, data.commission);
   } catch (err) {
-    alert('تعذر تحميل بيانات السائق.');
+    adminAlert('تعذر تحميل بيانات السائق.');
   }
 }
 
@@ -1157,7 +1262,7 @@ document.getElementById('userSearchInput').addEventListener('keypress', e => { i
 async function searchUser() {
   const input = document.getElementById('userSearchInput');
   const raw = input.value.trim();
-  if (!raw) return alert('الرجاء إدخال ID المستخدم أو الاسم');
+  if (!raw) return adminAlert('الرجاء إدخال ID المستخدم أو الاسم');
 
   try {
     const res = await adminFetch(`/admin/users/search?id=${encodeURIComponent(raw)}`);
@@ -1220,7 +1325,7 @@ async function openChat(type, id) {
   try {
     const res = await adminFetch(`/admin/chat/messages/${type}/${id}`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { adminAlert(data.error); return; }
 
     currentChatName = data.name || '';
     document.getElementById('chatTitle').textContent = `محادثة مع ${data.name}`;
@@ -1231,7 +1336,7 @@ async function openChat(type, id) {
     document.getElementById('chatInput').focus();
     startLegacyChatPolling();
   } catch (err) {
-    alert('حدث خطأ في فتح المحادثة');
+    adminAlert('حدث خطأ في فتح المحادثة');
   }
 }
 
@@ -1288,8 +1393,8 @@ function renderChatMessages(messages, name) {
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
-  if (!text) { alert('الرجاء كتابة رسالة.'); return; }
-  if (!currentChatTarget) { alert('لا يوجد محادثة مفتوحة!'); return; }
+  if (!text) { adminAlert('الرجاء كتابة رسالة.'); return; }
+  if (!currentChatTarget) { adminAlert('لا يوجد محادثة مفتوحة!'); return; }
 
   try {
     const res = await adminFetch(`/admin/chat/send/${currentChatTarget.type}/${currentChatTarget.id}`, {
@@ -1303,10 +1408,10 @@ async function sendChatMessage() {
       renderChatMessages(data.messages, currentChatName);
       input.value = '';
     } else {
-      alert(data.message);
+      adminAlert(data.message);
     }
   } catch (err) {
-    alert('حدث خطأ في إرسال الرسالة');
+    adminAlert('حدث خطأ في إرسال الرسالة');
   }
 }
 
@@ -1507,12 +1612,12 @@ async function loadCommissions() {
 }
 
 async function markPaid(driverId) {
-  if (!confirm('هل أنت متأكد من تحديد السائق كمدفوع؟')) return;
+  if (!await adminConfirm('هل أنت متأكد من تحديد السائق كمدفوع؟')) return;
   try {
     const res = await adminFetch(`/admin/commissions/pay/${driverId}`, { method: 'PUT' });
     const data = await res.json();
     if (data.success) {
-      alert(data.message);
+      adminAlert(data.message);
       loadCommissions();
       loadDashboardStats();
 
@@ -1531,16 +1636,16 @@ async function markPaid(driverId) {
         openListModal('payouts', 'unpaid', 'السائقون المستحقون للدفع');
       }
     } else {
-      alert(data.message);
+      adminAlert(data.message);
     }
   } catch (err) {
-    alert('حدث خطأ في تحديث حالة الدفع');
+    adminAlert('حدث خطأ في تحديث حالة الدفع');
   }
 }
 
 async function resetDriverCommission(driverId) {
   if (
-    !confirm(
+    !await adminConfirm(
       'سيتم تصفير عداد عمولة السائق وإرجاع العمولة له. هل تريد المتابعة؟',
     )
   ) {
@@ -1553,11 +1658,11 @@ async function resetDriverCommission(driverId) {
     });
     const data = await res.json();
     if (!data.success) {
-      alert(data.message || 'تعذر تصفير عداد العمولة');
+      adminAlert(data.message || 'تعذر تصفير عداد العمولة');
       return;
     }
 
-    alert(
+    adminAlert(
       'تم تصفير عداد العمولة' +
         (Number(data.amount) > 0
           ? ` وإرجاع ${data.amount} شيكل للسائق.`
@@ -1573,13 +1678,13 @@ async function resetDriverCommission(driverId) {
 
     refreshPayoutsModal();
   } catch (err) {
-    alert('حدث خطأ في تصفير عداد العمولة');
+    adminAlert('حدث خطأ في تصفير عداد العمولة');
   }
 }
 
 async function resetAllCommissions() {
   if (
-    !confirm(
+    !await adminConfirm(
       'سيتم تصفير عدادات عمولات جميع السائقين وإرجاع العمولة لهم. هل تريد المتابعة؟',
     )
   ) {
@@ -1592,18 +1697,18 @@ async function resetAllCommissions() {
     });
     const data = await res.json();
     if (!data.success) {
-      alert(data.message || 'تعذر تصفير عدادات العمولات');
+      adminAlert(data.message || 'تعذر تصفير عدادات العمولات');
       return;
     }
 
-    alert(
+    adminAlert(
       `تم تصفير ${data.drivers} سائق وإرجاع ${data.amount} شيكل لهم.`,
     );
     loadCommissions();
     loadDashboardStats();
     refreshPayoutsModal();
   } catch (err) {
-    alert('حدث خطأ في تصفير عدادات العمولات');
+    adminAlert('حدث خطأ في تصفير عدادات العمولات');
   }
 }
 
@@ -1723,7 +1828,7 @@ async function openReplyModal(type, reportId) {
   try {
     const res = await adminFetch(`/admin/reports/detail/${reportId}`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { adminAlert(data.error); return; }
     const report = data.report;
 
     document.getElementById('reportDetailTitle').textContent = `إبلاغ رقم ${report.reportId} - ${report.category}`;
@@ -1731,7 +1836,7 @@ async function openReplyModal(type, reportId) {
     renderChatThread(report);
     document.getElementById('reportDetailModal').classList.add('show');
     document.getElementById('replyInput').value = '';
-  } catch (err) { alert('حدث خطأ في فتح الإبلاغ'); }
+  } catch (err) { adminAlert('حدث خطأ في فتح الإبلاغ'); }
 }
 
 function viewReportDetail(type, reportId) { openReplyModal(type, reportId); }
@@ -1754,10 +1859,10 @@ function renderChatThread(report) {
 }
 
 async function sendReply() {
-  if (!currentReportType || !currentReportId) { alert('لا يوجد إبلاغ مفتوح!'); return; }
+  if (!currentReportType || !currentReportId) { adminAlert('لا يوجد إبلاغ مفتوح!'); return; }
   const input = document.getElementById('replyInput');
   const text = input.value.trim();
-  if (!text) { alert('الرجاء كتابة رد.'); return; }
+  if (!text) { adminAlert('الرجاء كتابة رد.'); return; }
 
   try {
     const res = await adminFetch(`/admin/reports/reply/${currentReportId}`, {
@@ -1770,31 +1875,31 @@ async function sendReply() {
       renderChatThread(data.report);
       input.value = '';
       loadDashboardStats();
-      alert('تم إرسال الرد بنجاح.');
+      adminAlert('تم إرسال الرد بنجاح.');
     } else {
-      alert(data.message);
+      adminAlert(data.message);
     }
-  } catch (err) { alert('حدث خطأ في إرسال الرد'); }
+  } catch (err) { adminAlert('حدث خطأ في إرسال الرد'); }
 }
 
 async function resolveReport(type, reportId) {
-  if (!confirm('هل أنت متأكد من تغيير الحالة إلى "تم الحل"؟')) return;
+  if (!await adminConfirm('هل أنت متأكد من تغيير الحالة إلى "تم الحل"؟')) return;
   try {
     await adminFetch(`/admin/reports/${reportId}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'resolved' }) });
     if (type === 'driver') loadDriverReports(); else loadUserReports();
     loadDashboardStats();
-    alert('تم تغيير الحالة بنجاح.');
-  } catch (err) { alert('حدث خطأ'); }
+    adminAlert('تم تغيير الحالة بنجاح.');
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 async function deleteReport(type, reportId) {
-  if (!confirm('هل أنت متأكد من حذف هذا الإبلاغ نهائياً؟')) return;
+  if (!await adminConfirm('هل أنت متأكد من حذف هذا الإبلاغ نهائياً؟')) return;
   try {
     await adminFetch(`/admin/reports/${reportId}`, { method: 'DELETE' });
     if (type === 'driver') loadDriverReports(); else loadUserReports();
     loadDashboardStats();
-    alert('تم حذف الإبلاغ بنجاح.');
-  } catch (err) { alert('حدث خطأ'); }
+    adminAlert('تم حذف الإبلاغ بنجاح.');
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 // ================================================
@@ -1877,19 +1982,19 @@ async function loadBroadcastArchive(target) {
 async function freezeDriver(id) {
   try {
     await adminFetch(`/admin/drivers/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'inactive' }) });
-    alert('تم تجميد حساب السائق بنجاح.');
+    adminAlert('تم تجميد حساب السائق بنجاح.');
     searchDriverById(id);
     loadDashboardStats();
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 async function activateDriver(id) {
   try {
     await adminFetch(`/admin/drivers/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
-    alert('تم تفعيل حساب السائق بنجاح.');
+    adminAlert('تم تفعيل حساب السائق بنجاح.');
     searchDriverById(id);
     loadDashboardStats();
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 const PERMANENT_DELETE_WARNING =
@@ -1897,23 +2002,23 @@ const PERMANENT_DELETE_WARNING =
   + 'تبقى الطلبات السابقة وسجل العمولات كسجلات مالية.\n\nهل تريد المتابعة؟';
 
 async function deleteDriver(id) {
-  if (!confirm(PERMANENT_DELETE_WARNING)) return;
+  if (!await adminConfirm(PERMANENT_DELETE_WARNING)) return;
   try {
     const res = await adminFetch(`/admin/drivers/${id}`, { method: 'DELETE' });
     const data = await res.json();
-    alert(data.message);
+    adminAlert(data.message);
     if (!data.success) return;
     document.getElementById('driverResult').classList.remove('show');
     loadDriversList();
     loadDashboardStats();
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 async function changeDriverPassword(driverId) {
-  const newPassword = prompt('أدخل كلمة المرور الجديدة للسائق:', '');
-  if (!newPassword || newPassword.trim() === '') { alert('كلمة المرور لا يمكن أن تكون فارغة.'); return; }
-  const confirmPassword = prompt('أعد إدخال كلمة المرور الجديدة للتأكيد:', '');
-  if (!confirmPassword || newPassword !== confirmPassword) { alert('كلمة المرور وتأكيدها غير متطابقين.'); return; }
+  const newPassword = await adminPrompt('أدخل كلمة المرور الجديدة للسائق:', { password: true });
+  if (!newPassword || newPassword.trim() === '') { adminAlert('كلمة المرور لا يمكن أن تكون فارغة.'); return; }
+  const confirmPassword = await adminPrompt('أعد إدخال كلمة المرور الجديدة للتأكيد:', { password: true });
+  if (!confirmPassword || newPassword !== confirmPassword) { adminAlert('كلمة المرور وتأكيدها غير متطابقين.'); return; }
   try {
     const res = await adminFetch(`/admin/drivers/${driverId}/password`, {
       method: 'PUT',
@@ -1925,42 +2030,42 @@ async function changeDriverPassword(driverId) {
     });
     const data = await res.json();
     if (!data.success) {
-      alert(data.message || 'تعذر تغيير كلمة المرور.');
+      adminAlert(data.message || 'تعذر تغيير كلمة المرور.');
       return;
     }
-    alert(data.message || 'تم تغيير كلمة المرور بنجاح.');
+    adminAlert(data.message || 'تم تغيير كلمة المرور بنجاح.');
     searchDriverById(driverId);
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 async function freezeUser(id) {
   try {
     await adminFetch(`/admin/users/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'inactive' }) });
-    alert('تم تجميد حساب المستخدم بنجاح.');
+    adminAlert('تم تجميد حساب المستخدم بنجاح.');
     searchUserById(id);
     loadDashboardStats();
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 async function activateUser(id) {
   try {
     await adminFetch(`/admin/users/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
-    alert('تم تفعيل حساب المستخدم بنجاح.');
+    adminAlert('تم تفعيل حساب المستخدم بنجاح.');
     searchUserById(id);
     loadDashboardStats();
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 async function deleteUser(id) {
-  if (!confirm(PERMANENT_DELETE_WARNING)) return;
+  if (!await adminConfirm(PERMANENT_DELETE_WARNING)) return;
   try {
     const res = await adminFetch(`/admin/users/${id}`, { method: 'DELETE' });
     const data = await res.json();
-    alert(data.message);
+    adminAlert(data.message);
     if (!data.success) return;
     document.getElementById('userResult').classList.remove('show');
     loadDashboardStats();
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 // ---- Customer details editor (same fields as the driver editor) ----
@@ -1969,7 +2074,7 @@ async function openEditUser(userId) {
     const res = await adminFetch(`/admin/users/search?id=${encodeURIComponent(userId)}`);
     const data = await res.json();
     if (data.error || !data.user) {
-      alert(data.error || 'تعذر تحميل بيانات المستخدم.');
+      adminAlert(data.error || 'تعذر تحميل بيانات المستخدم.');
       return;
     }
     await ensureAdminAreasLoaded();
@@ -1991,7 +2096,7 @@ async function openEditUser(userId) {
     msg.className = 'msg';
     document.getElementById('userEditModal').classList.add('show');
   } catch (err) {
-    alert('تعذر تحميل بيانات المستخدم.');
+    adminAlert('تعذر تحميل بيانات المستخدم.');
   }
 }
 
@@ -2054,10 +2159,10 @@ if (userEditModal) {
 }
 
 async function changeUserPassword(userId) {
-  const newPassword = prompt('أدخل كلمة المرور الجديدة للمستخدم:', '');
-  if (!newPassword || newPassword.trim() === '') { alert('كلمة المرور لا يمكن أن تكون فارغة.'); return; }
-  const confirmPassword = prompt('أعد إدخال كلمة المرور الجديدة للتأكيد:', '');
-  if (!confirmPassword || newPassword !== confirmPassword) { alert('كلمة المرور وتأكيدها غير متطابقين.'); return; }
+  const newPassword = await adminPrompt('أدخل كلمة المرور الجديدة للمستخدم:', { password: true });
+  if (!newPassword || newPassword.trim() === '') { adminAlert('كلمة المرور لا يمكن أن تكون فارغة.'); return; }
+  const confirmPassword = await adminPrompt('أعد إدخال كلمة المرور الجديدة للتأكيد:', { password: true });
+  if (!confirmPassword || newPassword !== confirmPassword) { adminAlert('كلمة المرور وتأكيدها غير متطابقين.'); return; }
   try {
     const res = await adminFetch(`/admin/users/${userId}/password`, {
       method: 'PUT',
@@ -2069,12 +2174,12 @@ async function changeUserPassword(userId) {
     });
     const data = await res.json();
     if (!data.success) {
-      alert(data.message || 'تعذر تغيير كلمة المرور.');
+      adminAlert(data.message || 'تعذر تغيير كلمة المرور.');
       return;
     }
-    alert(data.message || 'تم تغيير كلمة المرور بنجاح.');
+    adminAlert(data.message || 'تم تغيير كلمة المرور بنجاح.');
     searchUserById(userId);
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 function searchDriverById(id) {
@@ -2318,7 +2423,7 @@ async function openProviderDocuments(
       await res.json();
 
     if (!res.ok) {
-      alert(
+      adminAlert(
         data.error
         || 'تعذر تحميل وثائق المزود',
       );
@@ -2348,7 +2453,7 @@ async function openProviderDocuments(
         'show',
       );
   } catch (_) {
-    alert(
+    adminAlert(
       'حدث خطأ في تحميل الوثائق',
     );
   }
@@ -2380,7 +2485,7 @@ async function viewDriverOrdersViaDB(driverId) {
   try {
     const res = await adminFetch(`/admin/drivers/search?id=${driverId}`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { adminAlert(data.error); return; }
     const { driver, netProfit, last30Profit, totalCommission } = data;
     document.getElementById('reportDriverName').textContent = `اسم السائق: ${driver.name} (${driver.driverId})`;
     const content = document.getElementById('reportContent');
@@ -2399,14 +2504,14 @@ async function viewDriverOrdersViaDB(driverId) {
       content.innerHTML = '<p data-presentation="p030">لا توجد معاملات مسجلة.</p>';
     }
     document.getElementById('reportModal').classList.add('show');
-  } catch (err) { alert('حدث خطأ في تحميل التقرير'); }
+  } catch (err) { adminAlert('حدث خطأ في تحميل التقرير'); }
 }
 
 async function viewUserOrdersViaDB(userId) {
   try {
     const res = await adminFetch(`/admin/users/search?id=${userId}`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { adminAlert(data.error); return; }
     const user = data.user;
     document.getElementById('userOrdersName').textContent = `اسم المستخدم: ${user.name} (${user.userId})`;
     const content = document.getElementById('userOrdersContent');
@@ -2420,7 +2525,7 @@ async function viewUserOrdersViaDB(userId) {
       content.innerHTML = '<p data-presentation="p030">لا توجد طلبات مسجلة.</p>';
     }
     document.getElementById('userOrdersModal').classList.add('show');
-  } catch (err) { alert('حدث خطأ في تحميل الطلبات'); }
+  } catch (err) { adminAlert('حدث خطأ في تحميل الطلبات'); }
 }
 
 // ================================================
@@ -2558,7 +2663,7 @@ async function openOrderDetails(orderId) {
   try {
     const res = await adminFetch(`/admin/orders/${encodeURIComponent(orderId)}`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { adminAlert(data.error); return; }
 
     const { order, offers, rejections } = data;
     const customer = adminOrderCustomer(order);
@@ -2615,22 +2720,22 @@ async function openOrderDetails(orderId) {
     document.getElementById('orderDetailsContent').innerHTML = html;
     document.getElementById('orderDetailsModal').classList.add('show');
   } catch (err) {
-    alert('حدث خطأ في تحميل تفاصيل الطلب');
+    adminAlert('حدث خطأ في تحميل تفاصيل الطلب');
   }
 }
 
 async function adminCancelOrder(orderId) {
-  if (!confirm('هل تريد إلغاء هذا الطلب نهائياً؟')) return;
+  if (!await adminConfirm('هل تريد إلغاء هذا الطلب نهائياً؟')) return;
   await runOrderAction(orderId, 'cancel');
 }
 
 async function adminResendOrder(orderId) {
-  if (!confirm('هل تريد إعادة إرسال الطلب للسائقين؟')) return;
+  if (!await adminConfirm('هل تريد إعادة إرسال الطلب للسائقين؟')) return;
   await runOrderAction(orderId, 'resend');
 }
 
 async function adminEndSuspension(orderId) {
-  if (!confirm('هل تريد إنهاء تعليق الطلب ونقله إلى التقارير؟')) return;
+  if (!await adminConfirm('هل تريد إنهاء تعليق الطلب ونقله إلى التقارير؟')) return;
   await runOrderAction(orderId, 'end-suspension');
 }
 
@@ -2638,26 +2743,26 @@ async function runOrderAction(orderId, action) {
   try {
     const res = await adminFetch(`/admin/orders/${encodeURIComponent(orderId)}/${action}`, { method: 'POST' });
     const data = await res.json();
-    alert(data.message || data.error || 'تم تنفيذ الإجراء');
+    adminAlert(data.message || data.error || 'تم تنفيذ الإجراء');
     loadOrders();
     if (document.getElementById('orderDetailsModal').classList.contains('show')) {
       openOrderDetails(orderId);
     }
   } catch (err) {
-    alert('تعذر تنفيذ الإجراء');
+    adminAlert('تعذر تنفيذ الإجراء');
   }
 }
 
 async function adminRejectOffer(orderId, offerId) {
-  if (!confirm('هل تريد رفض عرض السعر هذا؟')) return;
+  if (!await adminConfirm('هل تريد رفض عرض السعر هذا؟')) return;
   try {
     const res = await adminFetch(`/admin/orders/${encodeURIComponent(orderId)}/offers/${encodeURIComponent(offerId)}/reject`, { method: 'POST' });
     const data = await res.json();
-    alert(data.message || data.error || 'تم رفض العرض');
+    adminAlert(data.message || data.error || 'تم رفض العرض');
     loadOrders();
     openOrderDetails(orderId);
   } catch (err) {
-    alert('تعذر رفض العرض');
+    adminAlert('تعذر رفض العرض');
   }
 }
 
@@ -2669,7 +2774,7 @@ async function openDriverReports(driverId) {
   try {
     const res = await adminFetch(`/admin/drivers/${encodeURIComponent(driverId)}/reports`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { adminAlert(data.error); return; }
 
     let html = '';
     if (!data.report || data.report.length === 0) {
@@ -2695,7 +2800,7 @@ async function openDriverReports(driverId) {
     document.getElementById('driverReportContent').innerHTML = html;
     document.getElementById('driverReportModal').classList.add('show');
   } catch (err) {
-    alert('حدث خطأ في تحميل تقرير السائق');
+    adminAlert('حدث خطأ في تحميل تقرير السائق');
   }
 }
 
@@ -2712,11 +2817,11 @@ async function toggleDriverAvailability(driverId, currentAvailability) {
       body: JSON.stringify({ available: nextAvailability }),
     });
     const data = await res.json();
-    alert(data.success ? (nextAvailability ? 'تم جعل السائق متاحاً' : 'تم جعل السائق غير متاح') : (data.message || 'تعذر تحديث حالة التوفر'));
+    adminAlert(data.success ? (nextAvailability ? 'تم جعل السائق متاحاً' : 'تم جعل السائق غير متاح') : (data.message || 'تعذر تحديث حالة التوفر'));
     searchDriver();
     loadDriversList();
   } catch (err) {
-    alert('تعذر تحديث حالة التوفر');
+    adminAlert('تعذر تحديث حالة التوفر');
   }
 }
 
@@ -3171,16 +3276,16 @@ async function manageTwoFactor() {
     const status = await statusResponse.json();
 
     if (!status.success) {
-      alert(status.message || 'تعذر قراءة حالة المصادقة الثنائية');
+      adminAlert(status.message || 'تعذر قراءة حالة المصادقة الثنائية');
       return;
     }
 
     if (status.enabled) {
-      const password = prompt('أدخل كلمة مرور المدير لتعطيل المصادقة الثنائية:');
+      const password = await adminPrompt('أدخل كلمة مرور المدير لتعطيل المصادقة الثنائية:', { password: true });
 
       if (password === null) return;
 
-      const code = prompt('أدخل رمز المصادقة أو رمز استرداد:');
+      const code = await adminPrompt('أدخل رمز المصادقة أو رمز استرداد:');
 
       if (code === null) return;
 
@@ -3191,7 +3296,7 @@ async function manageTwoFactor() {
       });
       const result = await response.json();
 
-      alert(result.message || (result.success ? 'تم التعطيل' : 'تعذر التعطيل'));
+      adminAlert(result.message || (result.success ? 'تم التعطيل' : 'تعذر التعطيل'));
       return;
     }
 
@@ -3201,18 +3306,18 @@ async function manageTwoFactor() {
     const setup = await setupResponse.json();
 
     if (!setup.success) {
-      alert(setup.message || 'تعذر بدء إعداد المصادقة الثنائية');
+      adminAlert(setup.message || 'تعذر بدء إعداد المصادقة الثنائية');
       return;
     }
 
-    alert(
+    adminAlert(
       'أضف الحساب في تطبيق المصادقة باستخدام الرابط التالي:\n\n'
       + setup.otpauthUri
       + '\n\nأو أدخل السر يدوياً:\n'
       + setup.secret,
     );
 
-    const code = prompt('أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة:');
+    const code = await adminPrompt('أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة:');
 
     if (code === null) return;
 
@@ -3224,16 +3329,16 @@ async function manageTwoFactor() {
     const enabled = await enableResponse.json();
 
     if (!enabled.success) {
-      alert(enabled.message || 'تعذر تفعيل المصادقة الثنائية');
+      adminAlert(enabled.message || 'تعذر تفعيل المصادقة الثنائية');
       return;
     }
 
-    alert(
+    adminAlert(
       'تم تفعيل المصادقة الثنائية.\n\nاحفظ رموز الاسترداد في مكان آمن:\n\n'
       + (enabled.recoveryCodes || []).join('\n'),
     );
   } catch (err) {
-    alert('حدث خطأ في الاتصال');
+    adminAlert('حدث خطأ في الاتصال');
   }
 }
 
@@ -3393,7 +3498,7 @@ function editAd(id) {
 }
 
 async function deleteAd(id) {
-  if (!confirm('هل تريد حذف هذا الإعلان نهائياً؟')) return;
+  if (!await adminConfirm('هل تريد حذف هذا الإعلان نهائياً؟')) return;
 
   try {
     const response = await adminFetch(`/admin/ads/${encodeURIComponent(id)}`, {
@@ -3402,14 +3507,14 @@ async function deleteAd(id) {
     const data = await response.json();
 
     if (!data.success) {
-      alert(data.message || 'تعذر حذف الإعلان');
+      adminAlert(data.message || 'تعذر حذف الإعلان');
       return;
     }
 
     resetAdForm();
     loadAds();
   } catch (err) {
-    alert('حدث خطأ في الاتصال');
+    adminAlert('حدث خطأ في الاتصال');
   }
 }
 
@@ -3426,13 +3531,13 @@ async function toggleAd(id) {
     const data = await response.json();
 
     if (!data.success) {
-      alert(data.message || 'تعذر تغيير حالة الإعلان');
+      adminAlert(data.message || 'تعذر تغيير حالة الإعلان');
       return;
     }
 
     loadAds();
   } catch (err) {
-    alert('حدث خطأ في الاتصال');
+    adminAlert('حدث خطأ في الاتصال');
   }
 }
 
@@ -3855,7 +3960,7 @@ async function sendAdminReply() {
 }
 
 async function resolveChat(userId) {
-  if (!confirm('هل أنت متأكد من حل هذه المشكلة؟ سيتم حذف جميع رسائل هذه المحادثة.')) return;
+  if (!await adminConfirm('هل أنت متأكد من حل هذه المشكلة؟ سيتم حذف جميع رسائل هذه المحادثة.')) return;
   try {
     await adminFetch(`/api/chat/admin/resolve/${userId}`, { method: 'DELETE' });
     activeChatUserId = null;
@@ -4111,7 +4216,7 @@ async function approveProvider(id) {
     // "Approve". Documents of older applicants can still be opened from the
     // review button; they no longer gate approval.
     if (
-      !confirm(
+      !await adminConfirm(
         'هل أنت متأكد من قبول طلب هذا السائق؟',
       )
     ) {
@@ -4130,32 +4235,32 @@ async function approveProvider(id) {
       await res.json();
 
     if (data.success) {
-      alert(data.message);
+      adminAlert(data.message);
       loadPendingProviders();
       loadDashboardStats();
     } else {
-      alert(
+      adminAlert(
         data.message
         || 'تعذر قبول المزود',
       );
     }
   } catch (_) {
-    alert('حدث خطأ');
+    adminAlert('حدث خطأ');
   }
 }
 
 async function rejectProvider(id) {
-  if (!confirm('هل أنت متأكد من رفض طلب هذا السائق؟')) return;
+  if (!await adminConfirm('هل أنت متأكد من رفض طلب هذا السائق؟')) return;
   try {
     const res = await adminFetch(`/admin/drivers/pending/${id}/reject`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
-      alert(data.message);
+      adminAlert(data.message);
       loadPendingProviders();
     } else {
-      alert(data.message);
+      adminAlert(data.message);
     }
-  } catch (err) { alert('حدث خطأ'); }
+  } catch (err) { adminAlert('حدث خطأ'); }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
