@@ -35,6 +35,11 @@ const adSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Show the "ends in" countdown on the banner (chosen per ad).
+    showCountdown: {
+      type: Boolean,
+      default: false,
+    },
     // '' | 'app:<screen>' | 'https://...' (see services/adPayload.js).
     link: {
       type: String,

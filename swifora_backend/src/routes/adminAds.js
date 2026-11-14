@@ -31,6 +31,7 @@ function serializeAd(ad) {
     endsAt: ad.endsAt || null,
     sortOrder: ad.sortOrder || 0,
     link: ad.link || '',
+    showCountdown: ad.showCountdown === true,
     createdAt: ad.createdAt || null,
     updatedAt: ad.updatedAt || null,
   };
@@ -219,6 +220,34 @@ router.put('/:id', uploadMiddleware, async (req, res) => {
     });
   } catch (err) {
     await cleanupRequestFiles(req);
+    return sendInternalServerFailure(res);
+  }
+});
+
+// Quick show/hide of the banner countdown from the ads list.
+router.put('/:id/countdown', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'الإعلان غير موجود.' });
+    }
+    const showCountdown = req.body?.showCountdown;
+    if (typeof showCountdown !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'قيمة العدّاد غير صالحة.' });
+    }
+    const ad = await Ad.findByIdAndUpdate(
+      req.params.id,
+      { $set: { showCountdown } },
+      { new: true },
+    ).lean();
+    if (!ad) {
+      return res.status(404).json({ success: false, message: 'الإعلان غير موجود.' });
+    }
+    return res.json({
+      success: true,
+      message: showCountdown ? 'سيظهر العدّاد التنازلي على الإعلان.' : 'تم إخفاء العدّاد التنازلي.',
+      ad: serializeAd(ad),
+    });
+  } catch (err) {
     return sendInternalServerFailure(res);
   }
 });

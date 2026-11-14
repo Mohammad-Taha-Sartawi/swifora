@@ -62,6 +62,8 @@ function normalizeAdPayload(body = {}, { imageCount = 0 } = {}) {
     : Number(rawSortOrder);
   const startsAt = parseOptionalDate(body.startsAt);
   const endsAt = parseOptionalDate(body.endsAt);
+  const showCountdown = body.showCountdown === true
+    || body.showCountdown === 'true';
   const isActive = body.isActive === undefined
     ? true
     : body.isActive === true || body.isActive === 'true';
@@ -150,6 +152,7 @@ function normalizeAdPayload(body = {}, { imageCount = 0 } = {}) {
       endsAt,
       sortOrder,
       link,
+      showCountdown,
     },
   };
 }
@@ -163,6 +166,7 @@ function publicAd(ad) {
     startsAt: ad.startsAt || null,
     endsAt: ad.endsAt || null,
     link: ad.link || '',
+    showCountdown: ad.showCountdown === true,
   };
 }
 

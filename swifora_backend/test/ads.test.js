@@ -80,6 +80,20 @@ test('ad payload allows optional title and requires some content', () => {
   );
 });
 
+test('the countdown is hidden unless chosen', () => {
+  const ends = '2026-11-20T10:00:00.000Z';
+  const of = (showCountdown) => normalizeAdPayload(
+    { title: 'Ad', endsAt: ends, showCountdown },
+    { imageCount: 1 },
+  ).value.showCountdown;
+  assert.equal(of(undefined), false);
+  assert.equal(of('false'), false);
+  assert.equal(of('true'), true);
+  assert.equal(of(true), true);
+  assert.equal(publicAd({ _id: 'x', images: [], showCountdown: true }).showCountdown, true);
+  assert.equal(publicAd({ _id: 'x', images: [] }).showCountdown, false);
+});
+
 test('every ad needs an expiry date', () => {
   const withoutEnd = normalizeAdPayload({ title: 'Ad' }, { imageCount: 1 });
   assert.equal(withoutEnd.ok, false);

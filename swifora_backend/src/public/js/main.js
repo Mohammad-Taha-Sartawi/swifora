@@ -415,6 +415,7 @@ const adminActionHandlers = Object.freeze({
   deleteAd,
   editAd,
   showAdTab,
+  toggleAdCountdown,
   loadAdStats,
   showAdDaily,
   freezeDriver,
@@ -3414,6 +3415,7 @@ function resetAdForm() {
   document.getElementById('adSortOrder').value = '0';
   document.getElementById('adAudience').value = 'all';
   document.getElementById('adIsActive').value = 'true';
+  document.getElementById('adShowCountdown').value = 'false';
   setAdLinkForm('');
   setAdFormMessage('');
 }
@@ -3539,12 +3541,13 @@ async function loadAds() {
         <td>${firstImage ? `<img class="ad-thumb" src="${escapeHtml(firstImage)}" alt="">` : ''}<strong>${escapeHtml(ad.title || 'بدون عنوان')}</strong><br><small>${escapeHtml(ad.body || '')}</small></td>
         <td>${escapeHtml(adAudienceLabel(ad.audience))}</td>
         <td>${adStatusBadge(ad.isActive)}</td>
-        <td>${escapeHtml(formatAdDate(ad.startsAt))}<br><small>${escapeHtml(formatAdDate(ad.endsAt))}</small>${ad.endsAt ? '' : '<br><span class="ad-ends-warning">بدون تاريخ نهاية — عدّله وأضف تاريخاً</span>'}<br><small>عند الضغط: ${escapeHtml(adLinkLabel(ad.link))}</small></td>
+        <td>${escapeHtml(formatAdDate(ad.startsAt))}<br><small>${escapeHtml(formatAdDate(ad.endsAt))}</small>${ad.endsAt ? '' : '<br><span class="ad-ends-warning">بدون تاريخ نهاية — عدّله وأضف تاريخاً</span>'}<br><small>عند الضغط: ${escapeHtml(adLinkLabel(ad.link))}</small><br><small>العدّاد: ${ad.showCountdown ? 'ظاهر' : 'مخفي'}</small></td>
         <td>${escapeHtml(String(ad.sortOrder))}</td>
         <td>
           <div class="table-actions">
             <button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="editAd" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(ad._id))}">تعديل</button>
             <button class="action-btn ${ad.isActive ? 'warning' : 'success'}" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="toggleAd" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(ad._id))}">${ad.isActive ? 'إيقاف' : 'تفعيل'}</button>
+            <button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="toggleAdCountdown" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(ad._id))}">${ad.showCountdown ? 'إخفاء العدّاد' : 'إظهار العدّاد'}</button>
             <button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteAd" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(ad._id))}">حذف</button>
           </div>
         </td>
@@ -3586,6 +3589,7 @@ function editAd(id) {
   document.getElementById('adEndsAt').value = toDateTimeLocal(ad.endsAt);
   document.getElementById('adSortOrder').value = String(ad.sortOrder || 0);
   document.getElementById('adIsActive').value = ad.isActive ? 'true' : 'false';
+  document.getElementById('adShowCountdown').value = ad.showCountdown ? 'true' : 'false';
   setAdLinkForm(ad.link);
 
   setAdFormMessage(
@@ -3610,6 +3614,29 @@ async function deleteAd(id) {
     }
 
     resetAdForm();
+    loadAds();
+  } catch (err) {
+    adminAlert('حدث خطأ في الاتصال');
+  }
+}
+
+async function toggleAdCountdown(id) {
+  const ad = adsCache.find((item) => String(item._id) === String(id));
+  if (!ad) return;
+
+  try {
+    const response = await adminFetch(`/admin/ads/${encodeURIComponent(id)}/countdown`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showCountdown: !ad.showCountdown }),
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      adminAlert(data.message || 'تعذر تغيير العدّاد');
+      return;
+    }
+
     loadAds();
   } catch (err) {
     adminAlert('حدث خطأ في الاتصال');
@@ -3701,6 +3728,10 @@ async function saveAd(event) {
     endsAtValue ? new Date(endsAtValue).toISOString() : '',
   );
   payload.append('link', link);
+  payload.append(
+    'showCountdown',
+    document.getElementById('adShowCountdown').value === 'true' ? 'true' : 'false',
+  );
   imageFiles.forEach((file) => payload.append('images', file));
 
   try {

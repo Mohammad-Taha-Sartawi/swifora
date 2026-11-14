@@ -254,6 +254,12 @@
               <small>عند تعديل الإعلان واختيار صور جديدة سيتم استبدال الصور الحالية. يُسمح بـJPEG أو PNG أو WebP أو GIF بحد أقصى 5 ميجابايت لكل صورة.</small></div>
             <div class="form-group"><label>يبدأ في (اختياري)</label><input type="datetime-local" id="adStartsAt"></div>
             <div class="form-group"><label>ينتهي في <span class="required-mark">*</span></label><input type="datetime-local" id="adEndsAt" required></div>
+            <div class="form-group"><label>العدّاد التنازلي على الإعلان</label>
+              <select id="adShowCountdown">
+                <option value="false">مخفي</option>
+                <option value="true">ظاهر — «ينتهي بعد» حتى تاريخ النهاية</option>
+              </select>
+            </div>
             <div class="form-group"><label>عند الضغط على الإعلان</label>
               <select id="adLinkType">
                 <option value="">لا شيء</option>
