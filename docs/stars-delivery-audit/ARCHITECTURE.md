@@ -229,7 +229,7 @@ No remote-config or runtime feature-flag system exists.
 | `ALLOW_MOCK_LOCATION` | Optional | [users.js:162](../../swifora_backend/src/routes/users.js#L162) |
 | `PROVIDER_DOCUMENTS_DIR` | Optional in dev, enforced in prod | [providerDocumentStorage.js:96-116](../../swifora_backend/src/services/providerDocumentStorage.js#L96-L116) |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` / `FIREBASE_SERVICE_ACCOUNT_PATH` | Optional | [pushNotifications.js:8-26](../../swifora_backend/src/services/pushNotifications.js#L8-L26) |
-| `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, `ADMIN_PASSWORD` | Only for `npm run admin:bootstrap` | [adminBootstrap.js:9-11](../../swifora_backend/src/scripts/adminBootstrap.js#L9-L11) |
+| `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, `ADMIN_PASSWORD` | Only for `npm run admin:bootstrap` / `npm run admin:create` (`ADMIN_PASSWORD_FILE` may replace `ADMIN_PASSWORD`) | [adminCreate.js](../../swifora_backend/src/scripts/adminCreate.js), [adminCreation.js](../../swifora_backend/src/services/adminCreation.js) |
 | `STARS_BACKUP_ROOT`, `STARS_BACKUP_QUIESCED`, `STARS_RESTORE_FROM`, `STARS_RESTORE_CONFIRM` | Only for ops scripts | [backupRestore.js](../../swifora_backend/src/scripts/backupRestore.js), [README.md](../../README.md) |
 
 **Env file drift** (key names only):

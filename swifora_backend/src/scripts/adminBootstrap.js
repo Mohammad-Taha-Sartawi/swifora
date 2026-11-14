@@ -1,32 +1,26 @@
+// First dashboard administrator (only when there is none yet).
+// usage: ADMIN_EMAIL=... ADMIN_FULL_NAME=... ADMIN_PASSWORD=... npm run admin:bootstrap
+//    or ADMIN_PASSWORD_FILE=/root/new-admin-password.txt instead of ADMIN_PASSWORD
 require('dotenv').config();
-const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
-const User = require('../models/User');
+const Admin = require('../models/Admin');
 const { requiredValue } = require('../config');
-const { isValidAdminPassword, MIN_ADMIN_PASSWORD_LENGTH } = require('../security/passwordPolicy');
+const { migrateAdminsFromUsers } = require('../services/adminMigration');
+const { createAdmin, resolveAdminPassword } = require('../services/adminCreation');
 
 async function bootstrapAdmin() {
-  const email = requiredValue('ADMIN_EMAIL').toLowerCase();
+  const email = requiredValue('ADMIN_EMAIL');
   const fullName = requiredValue('ADMIN_FULL_NAME');
-  const password = requiredValue('ADMIN_PASSWORD');
-
-  if (!isValidAdminPassword(password)) {
-    throw new Error(`ADMIN_PASSWORD must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters and must not be the legacy password`);
-  }
 
   await mongoose.connect(requiredValue('MONGODB_URI'));
-  const existingAdmin = await User.exists({ role: 'admin' });
-  if (existingAdmin) {
-    throw new Error('An administrator already exists; refusing to overwrite it');
-  }
-  const existingUser = await User.exists({ email });
-  if (existingUser) {
-    throw new Error('The administrator email is already in use');
+  // Admins left in "users" by older versions count as existing admins.
+  await migrateAdminsFromUsers();
+  if (await Admin.exists({})) {
+    throw new Error('An administrator already exists; use npm run admin:create to add another');
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-  await User.create({ fullName, email, password: passwordHash, role: 'admin', status: 'active' });
-  console.log(`Administrator created for ${email}`);
+  const admin = await createAdmin({ email, fullName, password: () => resolveAdminPassword() });
+  console.log(`Administrator created for ${admin.email}`);
 }
 
 bootstrapAdmin()

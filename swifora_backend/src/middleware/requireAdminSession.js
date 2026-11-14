@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const Admin = require('../models/Admin');
 const mongoose = require('mongoose');
 const {
   ADMIN_SESSION_COOKIE,
@@ -14,7 +14,7 @@ function isAdminSession(req) {
 }
 
 async function loadAdminById(id) {
-  return User.findOne({
+  return Admin.findOne({
     _id: id,
     role: 'admin',
     status: 'active',

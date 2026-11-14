@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
-const User = require('../models/User');
+const Admin = require('../models/Admin');
 const requireAdminSession = require('../middleware/requireAdminSession');
 const { ADMIN_SESSION_COOKIE } = require('../middleware/adminSession');
 const { adminCsrfProtection } = require('../security/adminCsrf');
@@ -90,7 +90,7 @@ router.post('/login', adminCsrfProtection, adminLoginLimiter, adminLoginAccountL
     const identifier = String(req.body.identifier || '').trim().toLowerCase();
     const password = typeof req.body.password === 'string' ? req.body.password : '';
     const admin = identifier
-      ? await User.findOne({ email: identifier, role: 'admin', deleted: { $ne: true }, status: 'active' }).select('+password +adminTotpSecret +adminTotpRecoveryCodeHashes')
+      ? await Admin.findOne({ email: identifier, role: 'admin', deleted: { $ne: true }, status: 'active' }).select('+password +adminTotpSecret +adminTotpRecoveryCodeHashes')
       : null;
 
     const passwordMatches = await adminPasswordMatches(
@@ -156,7 +156,7 @@ router.post('/reset-password', requireAdminSession, adminCsrfProtection, async (
     // Stored without surrounding spaces, the same as the dashboard form sends.
     const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword.trim() : '';
     const confirmPassword = typeof req.body?.confirmPassword === 'string' ? req.body.confirmPassword.trim() : '';
-    const admin = await User.findOne({
+    const admin = await Admin.findOne({
       _id: req.session.admin.id,
       role: 'admin',
       deleted: { $ne: true },
@@ -194,7 +194,7 @@ router.post('/reset-password', requireAdminSession, adminCsrfProtection, async (
 
 router.get('/2fa/status', requireAdminSession, adminCsrfProtection, async (req, res) => {
   try {
-    const admin = await User.findOne({
+    const admin = await Admin.findOne({
       _id: req.session.admin.id,
       role: 'admin',
       status: 'active',
@@ -225,7 +225,7 @@ router.get('/2fa/status', requireAdminSession, adminCsrfProtection, async (req, 
 
 router.post('/2fa/setup', requireAdminSession, adminCsrfProtection, async (req, res) => {
   try {
-    const admin = await User.findOne({
+    const admin = await Admin.findOne({
       _id: req.session.admin.id,
       role: 'admin',
       status: 'active',
@@ -271,7 +271,7 @@ router.post('/2fa/enable', requireAdminSession, adminCsrfProtection, async (req,
     const code = typeof req.body?.code === 'string'
       ? req.body.code.trim()
       : '';
-    const admin = await User.findOne({
+    const admin = await Admin.findOne({
       _id: req.session.admin.id,
       role: 'admin',
       status: 'active',
@@ -335,7 +335,7 @@ router.post('/2fa/disable', requireAdminSession, adminCsrfProtection, async (req
     const code = typeof req.body?.code === 'string'
       ? req.body.code.trim()
       : '';
-    const admin = await User.findOne({
+    const admin = await Admin.findOne({
       _id: req.session.admin.id,
       role: 'admin',
       status: 'active',

@@ -198,6 +198,8 @@ const CustomerRating = require('./models/CustomerRating');
 const CommissionSetting = require('./models/CommissionSetting');
 const PushToken = require('./models/PushToken');
 const AdminAuditLog = require('./models/AdminAuditLog');
+const Admin = require('./models/Admin');
+const { migrateAdminsFromUsers } = require('./services/adminMigration');
 const Ad = require('./models/Ad');
 const User = require('./models/User');
 
@@ -227,6 +229,7 @@ async function ensureMongoIndexes() {
     CommissionSetting.createIndexes(),
     PushToken.createIndexes(),
     AdminAuditLog.createIndexes(),
+    Admin.createIndexes(),
     Ad.createIndexes(),
   ]);
   console.log('Indexes ready');
@@ -288,6 +291,14 @@ async function connectMongo() {
     console.error('MongoDB index initialization failed:', String(err?.message || err).split('\n')[0]);
   }
 
+  // Administrators live in their own "admins" collection; move any left in
+  // "users" (older installs) once, keeping ids, passwords and 2FA.
+  try {
+    await migrateAdminsFromUsers({ log: (line) => console.log(line) });
+  } catch (err) {
+    console.error('Admin account migration failed:', String(err?.message || err).split('\n')[0]);
+  }
+
   try {
     const { seeded, count } = await seedLocationCatalog();
     console.log(`Location catalog ${seeded ? 'seeded' : 'up to date'} (${count} governorates)`);
@@ -341,7 +352,7 @@ io.use(async (socket, next) => {
 
     if (identity.role === 'admin') {
       const admin =
-        await User.findById(
+        await Admin.findById(
           identity.id,
           'role status deleted sessionVersion',
         );
