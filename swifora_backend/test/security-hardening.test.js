@@ -59,11 +59,17 @@ test('ad image upload rejects active HTML while accepting real image bytes', asy
     null,
   );
 
-  const png = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47,
-    0x0d, 0x0a, 0x1a, 0x0a,
-    0x00, 0x00, 0x00, 0x0d,
-  ]);
+  // PNG signature + IHDR of a 1200 x 540 banner.
+  const pngOfSize = (width, height) => {
+    const header = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 0);
+    header.writeUInt32BE(13, 8);
+    header.write('IHDR', 12, 'ascii');
+    header.writeUInt32BE(width, 16);
+    header.writeUInt32BE(height, 20);
+    return header;
+  };
+  const png = pngOfSize(1200, 540);
 
   assert.equal(
     detectSafeImageType(png).mimeType,
@@ -98,6 +104,14 @@ test('ad image upload rejects active HTML while accepting real image bytes', asy
   } finally {
     await removeAdImageFiles([pngFile]);
   }
+
+  // A square (or any non-banner) image is refused.
+  const squareFile = temporaryUploadFile(pngOfSize(800, 800));
+  await assert.rejects(
+    finalizeAdImageFiles([squareFile]),
+    /عرضها بين ضعفي ارتفاعها/,
+  );
+  assert.equal(fs.existsSync(squareFile.path), false);
 });
 
 test('only ad administration accepts image uploads', () => {

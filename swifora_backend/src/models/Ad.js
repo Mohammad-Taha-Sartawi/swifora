@@ -35,6 +35,13 @@ const adSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // '' | 'app:<screen>' | 'https://...' (see services/adPayload.js).
+    link: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500,
+    },
     sortOrder: {
       type: Number,
       default: 0,

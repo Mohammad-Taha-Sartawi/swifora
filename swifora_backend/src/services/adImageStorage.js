@@ -109,6 +109,69 @@ async function readFileHeader(filePath, length = 64) {
   }
 }
 
+// The banner fills the phone width at a fixed 160-180 point height, so an
+// image must be landscape with a width:height ratio between 2:1 and 2.7:1
+// (for example 1200 x 540 px). Other shapes would be cropped heavily.
+const MIN_AD_IMAGE_RATIO = 2.0;
+const MAX_AD_IMAGE_RATIO = 2.7;
+const AD_IMAGE_SHAPE_MESSAGE =
+  'صورة الإعلان يجب أن تكون أفقية بعرض شاشة الجوال كاملاً وارتفاع بين 160 و180 نقطة: '
+  + 'عرضها بين ضعفي ارتفاعها و2.7 ضعفه، مثل عرض 1200 بكسل وارتفاع 540 بكسل.';
+
+/** Pixel width/height of a PNG, GIF, JPEG or WebP image, or null. */
+function imageDimensions(buffer) {
+  if (buffer.length >= 24 && buffer.readUInt32BE(0) === 0x89504e47) {
+    return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+  }
+  if (buffer.length >= 10 && buffer.subarray(0, 3).toString('ascii') === 'GIF') {
+    return { width: buffer.readUInt16LE(6), height: buffer.readUInt16LE(8) };
+  }
+  if (buffer.length >= 30 && buffer.subarray(0, 4).toString('ascii') === 'RIFF') {
+    const chunk = buffer.subarray(12, 16).toString('ascii');
+    if (chunk === 'VP8X') {
+      return {
+        width: 1 + buffer.readUIntLE(24, 3),
+        height: 1 + buffer.readUIntLE(27, 3),
+      };
+    }
+    if (chunk === 'VP8 ') {
+      return {
+        width: buffer.readUInt16LE(26) & 0x3fff,
+        height: buffer.readUInt16LE(28) & 0x3fff,
+      };
+    }
+    if (chunk === 'VP8L') {
+      const bits = buffer.readUInt32LE(21);
+      return { width: 1 + (bits & 0x3fff), height: 1 + ((bits >> 14) & 0x3fff) };
+    }
+    return null;
+  }
+  if (buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
+    let offset = 2;
+    while (offset + 9 < buffer.length) {
+      if (buffer[offset] !== 0xff) return null;
+      const marker = buffer[offset + 1];
+      const length = buffer.readUInt16BE(offset + 2);
+      const isFrame = marker >= 0xc0 && marker <= 0xcf
+        && ![0xc4, 0xc8, 0xcc].includes(marker);
+      if (isFrame) {
+        return {
+          height: buffer.readUInt16BE(offset + 5),
+          width: buffer.readUInt16BE(offset + 7),
+        };
+      }
+      offset += 2 + length;
+    }
+  }
+  return null;
+}
+
+function hasBannerShape(dimensions) {
+  if (!dimensions || !dimensions.width || !dimensions.height) return false;
+  const ratio = dimensions.width / dimensions.height;
+  return ratio >= MIN_AD_IMAGE_RATIO && ratio <= MAX_AD_IMAGE_RATIO;
+}
+
 async function finalizeAdImageFiles(files) {
   const entries = Array.isArray(files) ? files : [];
 
@@ -128,6 +191,16 @@ async function finalizeAdImageFiles(files) {
         throw new AdImageValidationError(
           'Only JPEG, PNG, GIF, or WebP images are allowed.',
           'UNSUPPORTED_IMAGE',
+        );
+      }
+
+      const dimensions = imageDimensions(
+        await readFileHeader(file.path, 256 * 1024),
+      );
+      if (!hasBannerShape(dimensions)) {
+        throw new AdImageValidationError(
+          AD_IMAGE_SHAPE_MESSAGE,
+          'AD_IMAGE_SHAPE',
         );
       }
 
@@ -265,4 +338,8 @@ module.exports = {
   deleteAdImageByUrl,
   detectSafeImageType,
   isSafeUploadExtension,
+  imageDimensions,
+  hasBannerShape,
+  MIN_AD_IMAGE_RATIO,
+  MAX_AD_IMAGE_RATIO,
 };

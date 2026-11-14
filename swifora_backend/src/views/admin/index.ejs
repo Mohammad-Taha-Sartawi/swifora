@@ -232,6 +232,11 @@
     <!-- الإعلانات -->
     <div id="page-ads" class="page-section">
       <div class="top-header"><h1>الإعلانات <small>شريط إعلاني أعلى شاشة الزبون والسائق</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay15">جاري التحميل...</span></div></div>
+      <div class="ad-tabs" role="tablist" aria-label="الإعلانات">
+        <button type="button" class="ad-tab active" role="tab" id="adTabManage" aria-selected="true" aria-controls="adManagePanel" data-admin-action="showAdTab" data-admin-arg-count="1" data-admin-arg-1="manage"><i class="fas fa-rectangle-ad"></i> إدارة الإعلانات</button>
+        <button type="button" class="ad-tab" role="tab" id="adTabTracking" aria-selected="false" aria-controls="adTrackingPanel" data-admin-action="showAdTab" data-admin-arg-count="1" data-admin-arg-1="tracking"><i class="fas fa-chart-line"></i> تتبع الإعلانات</button>
+      </div>
+      <div id="adManagePanel" role="tabpanel" aria-labelledby="adTabManage">
       <div class="add-driver-form">
         <form id="adForm">
           <div class="form-grid">
@@ -244,9 +249,27 @@
               </select>
             </div>
             <div class="form-group full-width"><label>نص الإعلان</label><textarea id="adBody" maxlength="300" placeholder="نص قصير يظهر داخل الشريط الإعلاني"></textarea></div>
-            <div class="form-group full-width"><label>صور الإعلان (حتى 5 صور)</label><input type="file" id="adImages" accept="image/jpeg,image/png,image/webp,image/gif" multiple><small>يمكنك اختيار صورة أو أكثر. عند تعديل الإعلان واختيار صور جديدة سيتم استبدال الصور الحالية. يُسمح بـJPEG أو PNG أو WebP أو GIF بحد أقصى 5 ميجابايت لكل صورة.</small></div>
-            <div class="form-group"><label>يبدأ في</label><input type="datetime-local" id="adStartsAt"></div>
-            <div class="form-group"><label>ينتهي في</label><input type="datetime-local" id="adEndsAt"></div>
+            <div class="form-group full-width"><label>صور الإعلان (حتى 5 صور)</label><input type="file" id="adImages" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+              <div class="ad-size-guide"><i class="fas fa-mobile-screen"></i><div><strong>مقاس الصورة:</strong> يظهر الإعلان بعرض شاشة الجوال كاملاً وبارتفاع يتراوح بين 160 و180 نقطة. ارفع صورة أفقية يكون عرضها بين ضعفي ارتفاعها و2.7 ضعفه — <strong>المقاس المقترح: عرض 1200 بكسل وارتفاع 540 بكسل</strong> — وضع النص والشعار في منتصف الصورة لأن أطرافها قد تُقص قليلاً على بعض الأجهزة.</div></div>
+              <small>عند تعديل الإعلان واختيار صور جديدة سيتم استبدال الصور الحالية. يُسمح بـJPEG أو PNG أو WebP أو GIF بحد أقصى 5 ميجابايت لكل صورة.</small></div>
+            <div class="form-group"><label>يبدأ في (اختياري)</label><input type="datetime-local" id="adStartsAt"></div>
+            <div class="form-group"><label>ينتهي في <span class="required-mark">*</span></label><input type="datetime-local" id="adEndsAt" required></div>
+            <div class="form-group"><label>عند الضغط على الإعلان</label>
+              <select id="adLinkType">
+                <option value="">لا شيء</option>
+                <option value="app">فتح شاشة في التطبيق</option>
+                <option value="url">فتح رابط ويب</option>
+              </select>
+            </div>
+            <div class="form-group" id="adLinkScreenGroup" hidden><label>الشاشة</label>
+              <select id="adLinkScreen">
+                <option value="create_order">إنشاء طلب جديد (للزبائن)</option>
+                <option value="my_orders">طلباتي</option>
+                <option value="support">التواصل مع الدعم</option>
+                <option value="notifications">الإشعارات</option>
+              </select>
+            </div>
+            <div class="form-group" id="adLinkUrlGroup" hidden><label>الرابط</label><input type="url" id="adLinkUrl" maxlength="500" placeholder="https://example.com/offer" dir="ltr"></div>
             <div class="form-group"><label>الترتيب</label><input type="number" id="adSortOrder" min="0" max="9999" step="1" value="0"></div>
             <div class="form-group"><label>الحالة</label>
               <select id="adIsActive">
@@ -261,6 +284,23 @@
         </form>
       </div>
       <div id="adsList" class="commissions-table-container"><p>جاري تحميل الإعلانات...</p></div>
+      </div>
+      <div id="adTrackingPanel" role="tabpanel" aria-labelledby="adTabTracking" hidden>
+        <div class="ad-tracking-toolbar">
+          <label for="adStatsDays">الفترة</label>
+          <select id="adStatsDays">
+            <option value="1">اليوم</option>
+            <option value="7" selected>آخر 7 أيام</option>
+            <option value="30">آخر 30 يوماً</option>
+            <option value="90">آخر 90 يوماً</option>
+          </select>
+          <button type="button" class="action-btn info" data-admin-action="loadAdStats" data-admin-arg-count="0"><i class="fas fa-rotate"></i> تحديث</button>
+        </div>
+        <div id="adStatsTotals" class="ad-stats-cards"></div>
+        <div id="adStatsList" class="commissions-table-container"><p>جاري تحميل التتبع...</p></div>
+        <div id="adStatsDaily" class="commissions-table-container" hidden></div>
+        <p class="ad-tracking-note">المشاهدة تُحسب عند ظهور الإعلان على شاشة المستخدم، والضغطة عند فتحه. «المستخدمون» هم الأشخاص المختلفون في كل يوم، ونسبة الضغط هي نسبة من ضغطوا من بين من شاهدوا. تُرسل الأرقام من تطبيق الجوال، وتُحسب الأيام بتوقيت فلسطين.</p>
+      </div>
     </div>
 
     <!-- المناطق -->

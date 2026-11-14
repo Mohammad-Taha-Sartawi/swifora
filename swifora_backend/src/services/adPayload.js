@@ -4,6 +4,36 @@ const AD_AUDIENCES = Object.freeze([
   'providers',
 ]);
 
+// What a tap on the ad opens: nothing (''), a screen of the app
+// ('app:<screen>') or a web page (an https:// address).
+const AD_APP_SCREENS = Object.freeze([
+  'create_order',
+  'my_orders',
+  'support',
+  'notifications',
+]);
+const MAX_AD_LINK_LENGTH = 500;
+
+/** The stored link, '' for none, or undefined when it is not allowed. */
+function normalizeAdLink(value) {
+  const link = trimmed(value);
+  if (!link) return '';
+  if (link.length > MAX_AD_LINK_LENGTH) return undefined;
+
+  if (link.startsWith('app:')) {
+    return AD_APP_SCREENS.includes(link.slice(4)) ? link : undefined;
+  }
+
+  try {
+    const url = new URL(link);
+    if (url.protocol !== 'https:' || !url.hostname) return undefined;
+    if (url.username || url.password) return undefined;
+    return url.toString();
+  } catch (_) {
+    return undefined;
+  }
+}
+
 function trimmed(value) {
   return typeof value === 'string'
     ? value.trim()
@@ -86,6 +116,22 @@ function normalizeAdPayload(body = {}, { imageCount = 0 } = {}) {
     };
   }
 
+  // Every ad must end: the mobile apps stop showing it at that moment.
+  if (!endsAt) {
+    return {
+      ok: false,
+      message: 'تاريخ نهاية الإعلان مطلوب.',
+    };
+  }
+
+  const link = normalizeAdLink(body.link);
+  if (link === undefined) {
+    return {
+      ok: false,
+      message: 'رابط الإعلان غير صالح. اختر شاشة من التطبيق أو أدخل رابطاً يبدأ بـ https://',
+    };
+  }
+
   if (startsAt && endsAt && endsAt <= startsAt) {
     return {
       ok: false,
@@ -103,6 +149,7 @@ function normalizeAdPayload(body = {}, { imageCount = 0 } = {}) {
       startsAt,
       endsAt,
       sortOrder,
+      link,
     },
   };
 }
@@ -115,11 +162,14 @@ function publicAd(ad) {
     images: Array.isArray(ad.images) ? ad.images : [],
     startsAt: ad.startsAt || null,
     endsAt: ad.endsAt || null,
+    link: ad.link || '',
   };
 }
 
 module.exports = {
+  AD_APP_SCREENS,
   AD_AUDIENCES,
+  normalizeAdLink,
   normalizeAdPayload,
   publicAd,
 };

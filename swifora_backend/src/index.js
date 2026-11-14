@@ -199,6 +199,8 @@ const CommissionSetting = require('./models/CommissionSetting');
 const PushToken = require('./models/PushToken');
 const AdminAuditLog = require('./models/AdminAuditLog');
 const Admin = require('./models/Admin');
+const AdStat = require('./models/AdStat');
+const AdEventUser = require('./models/AdEventUser');
 const { migrateAdminsFromUsers } = require('./services/adminMigration');
 const Ad = require('./models/Ad');
 const User = require('./models/User');
@@ -230,6 +232,8 @@ async function ensureMongoIndexes() {
     PushToken.createIndexes(),
     AdminAuditLog.createIndexes(),
     Admin.createIndexes(),
+    AdStat.createIndexes(),
+    AdEventUser.createIndexes(),
     Ad.createIndexes(),
   ]);
   console.log('Indexes ready');

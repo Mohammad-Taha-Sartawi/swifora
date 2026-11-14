@@ -38,6 +38,7 @@ test('ad payload allows optional title and requires some content', () => {
     title: '',
     body: '',
     audience: 'all',
+    endsAt: '2026-11-20T10:00:00.000Z',
   }, { imageCount: 1 });
 
   assert.equal(imageOnly.ok, true);
@@ -76,6 +77,44 @@ test('ad payload allows optional title and requires some content', () => {
       sortOrder: -1,
     }, { imageCount: 1 }).ok,
     false,
+  );
+});
+
+test('every ad needs an expiry date', () => {
+  const withoutEnd = normalizeAdPayload({ title: 'Ad' }, { imageCount: 1 });
+  assert.equal(withoutEnd.ok, false);
+  assert.match(withoutEnd.message, /تاريخ نهاية الإعلان مطلوب/);
+});
+
+test('a tap opens nothing, an app screen or an https page', () => {
+  const ends = '2026-11-20T10:00:00.000Z';
+  const linkOf = (link) => normalizeAdPayload(
+    { title: 'Ad', endsAt: ends, link },
+    { imageCount: 1 },
+  );
+
+  assert.equal(linkOf('').value.link, '');
+  assert.equal(linkOf(undefined).value.link, '');
+  assert.equal(linkOf('app:create_order').value.link, 'app:create_order');
+  assert.equal(linkOf('app:support').value.link, 'app:support');
+  assert.equal(
+    linkOf('https://swifora.com/offer').value.link,
+    'https://swifora.com/offer',
+  );
+
+  for (const bad of [
+    'app:admin',
+    'http://swifora.com',
+    'javascript:alert(1)',
+    'https://user:pass@swifora.com',
+    `https://swifora.com/${'a'.repeat(600)}`,
+  ]) {
+    assert.equal(linkOf(bad).ok, false, bad);
+  }
+
+  assert.equal(
+    publicAd({ _id: 'x', link: 'app:my_orders', images: [] }).link,
+    'app:my_orders',
   );
 });
 

@@ -127,10 +127,11 @@ test('delegated browser actions replace legacy inline handlers', () => {
 
   // The pending-payout dashboard card, driver details and commissions table
   // expose pay and reset actions; customers have an edit form, and the
-  // today/month commission cards open their driver report.
+  // today/month commission cards open their driver report. The ads page
+  // has two tabs, a tracking refresh and a per-ad daily report.
   assert.equal(
     clickActions.length,
-    74,
+    78,
   );
 
   assert.equal(
@@ -185,12 +186,12 @@ test('delegated admin actions require the admin session capability', () => {
 
   assert.equal(
     generatedActions.length,
-    46,
+    47,
   );
 
   assert.equal(
     generatedCapabilities.length,
-    46,
+    47,
   );
 
   const generatedActionLines = browserSource

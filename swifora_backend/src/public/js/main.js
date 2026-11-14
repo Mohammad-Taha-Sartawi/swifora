@@ -411,6 +411,9 @@ const adminActionHandlers = Object.freeze({
   deleteUser,
   deleteAd,
   editAd,
+  showAdTab,
+  loadAdStats,
+  showAdDaily,
   freezeDriver,
   freezeUser,
   handleResetPassword,
@@ -3408,7 +3411,98 @@ function resetAdForm() {
   document.getElementById('adSortOrder').value = '0';
   document.getElementById('adAudience').value = 'all';
   document.getElementById('adIsActive').value = 'true';
+  setAdLinkForm('');
   setAdFormMessage('');
+}
+
+// ---- What a tap on the ad opens: '' | 'app:<screen>' | 'https://...' ----
+const AD_SCREEN_LABELS = {
+  create_order: 'إنشاء طلب جديد',
+  my_orders: 'طلباتي',
+  support: 'التواصل مع الدعم',
+  notifications: 'الإشعارات',
+};
+
+function syncAdLinkFields() {
+  const type = document.getElementById('adLinkType')?.value || '';
+  const screenGroup = document.getElementById('adLinkScreenGroup');
+  const urlGroup = document.getElementById('adLinkUrlGroup');
+  if (screenGroup) screenGroup.hidden = type !== 'app';
+  if (urlGroup) urlGroup.hidden = type !== 'url';
+}
+
+function setAdLinkForm(link) {
+  const value = String(link || '');
+  const typeInput = document.getElementById('adLinkType');
+  if (!typeInput) return;
+  if (value.startsWith('app:')) {
+    typeInput.value = 'app';
+    document.getElementById('adLinkScreen').value = value.slice(4);
+    document.getElementById('adLinkUrl').value = '';
+  } else if (value) {
+    typeInput.value = 'url';
+    document.getElementById('adLinkUrl').value = value;
+  } else {
+    typeInput.value = '';
+    document.getElementById('adLinkUrl').value = '';
+  }
+  syncAdLinkFields();
+}
+
+/** The link to save, or null (with a message shown) when it is invalid. */
+function adLinkFromForm() {
+  const type = document.getElementById('adLinkType').value;
+  if (type === 'app') {
+    return `app:${document.getElementById('adLinkScreen').value}`;
+  }
+  if (type === 'url') {
+    const raw = document.getElementById('adLinkUrl').value.trim();
+    try {
+      const url = new URL(raw);
+      if (url.protocol === 'https:' && url.hostname && !url.username && !url.password) {
+        return url.toString();
+      }
+    } catch (err) {
+      // reported below
+    }
+    setAdFormMessage('أدخل رابطاً صحيحاً يبدأ بـ https://', 'error');
+    return null;
+  }
+  return '';
+}
+
+function adLinkLabel(link) {
+  const value = String(link || '');
+  if (!value) return 'لا شيء';
+  if (value.startsWith('app:')) {
+    return `شاشة: ${AD_SCREEN_LABELS[value.slice(4)] || value.slice(4)}`;
+  }
+  return value;
+}
+
+// The banner fills the phone width at 160-180 points high: images must be
+// landscape with a width:height ratio between 2:1 and 2.7:1.
+const AD_IMAGE_MIN_RATIO = 2.0;
+const AD_IMAGE_MAX_RATIO = 2.7;
+
+async function adImageShapeProblem(files) {
+  for (const file of files) {
+    let width = 0;
+    let height = 0;
+    try {
+      const bitmap = await createImageBitmap(file);
+      width = bitmap.width;
+      height = bitmap.height;
+      bitmap.close();
+    } catch (err) {
+      return `تعذر قراءة الصورة «${file.name}».`;
+    }
+    const ratio = width / height;
+    if (!(ratio >= AD_IMAGE_MIN_RATIO && ratio <= AD_IMAGE_MAX_RATIO)) {
+      return `الصورة «${file.name}» عرضها ${width} بكسل وارتفاعها ${height} بكسل. يجب أن تكون أفقية بعرض شاشة الجوال كاملاً وارتفاع بين 160 و180 نقطة: عرضها بين ضعفي ارتفاعها و2.7 ضعفه، مثل عرض 1200 بكسل وارتفاع 540 بكسل.`;
+    }
+  }
+  return '';
 }
 
 async function loadAds() {
@@ -3442,7 +3536,7 @@ async function loadAds() {
         <td>${firstImage ? `<img class="ad-thumb" src="${escapeHtml(firstImage)}" alt="">` : ''}<strong>${escapeHtml(ad.title || 'بدون عنوان')}</strong><br><small>${escapeHtml(ad.body || '')}</small></td>
         <td>${escapeHtml(adAudienceLabel(ad.audience))}</td>
         <td>${adStatusBadge(ad.isActive)}</td>
-        <td>${escapeHtml(formatAdDate(ad.startsAt))}<br><small>${escapeHtml(formatAdDate(ad.endsAt))}</small></td>
+        <td>${escapeHtml(formatAdDate(ad.startsAt))}<br><small>${escapeHtml(formatAdDate(ad.endsAt))}</small>${ad.endsAt ? '' : '<br><span class="ad-ends-warning">بدون تاريخ نهاية — عدّله وأضف تاريخاً</span>'}<br><small>عند الضغط: ${escapeHtml(adLinkLabel(ad.link))}</small></td>
         <td>${escapeHtml(String(ad.sortOrder))}</td>
         <td>
           <div class="table-actions">
@@ -3489,6 +3583,7 @@ function editAd(id) {
   document.getElementById('adEndsAt').value = toDateTimeLocal(ad.endsAt);
   document.getElementById('adSortOrder').value = String(ad.sortOrder || 0);
   document.getElementById('adIsActive').value = ad.isActive ? 'true' : 'false';
+  setAdLinkForm(ad.link);
 
   setAdFormMessage(
     `أنت تعدّل إعلاناً موجوداً${Array.isArray(ad.images) && ad.images.length > 0 ? ` (${ad.images.length} صورة حالية)` : ''}. اضغط حفظ الإعلان لتحديثه.`,
@@ -3569,8 +3664,22 @@ async function saveAd(event) {
     return;
   }
 
+  if (!endsAtValue) {
+    setAdFormMessage('حدد تاريخ نهاية الإعلان؛ يتوقف ظهوره في التطبيق عنده.', 'error');
+    return;
+  }
+
   if (startsAtValue && endsAtValue && new Date(endsAtValue) <= new Date(startsAtValue)) {
     setAdFormMessage('تاريخ النهاية يجب أن يكون بعد تاريخ البداية.', 'error');
+    return;
+  }
+
+  const link = adLinkFromForm();
+  if (link === null) return;
+
+  const shapeProblem = await adImageShapeProblem(imageFiles);
+  if (shapeProblem) {
+    setAdFormMessage(shapeProblem, 'error');
     return;
   }
 
@@ -3588,6 +3697,7 @@ async function saveAd(event) {
     'endsAt',
     endsAtValue ? new Date(endsAtValue).toISOString() : '',
   );
+  payload.append('link', link);
   imageFiles.forEach((file) => payload.append('images', file));
 
   try {
@@ -3619,6 +3729,132 @@ async function saveAd(event) {
 const adForm = document.getElementById('adForm');
 if (adForm) {
   adForm.addEventListener('submit', saveAd);
+}
+
+const adLinkTypeInput = document.getElementById('adLinkType');
+if (adLinkTypeInput) {
+  adLinkTypeInput.addEventListener('change', syncAdLinkFields);
+}
+
+const adStatsDaysInput = document.getElementById('adStatsDays');
+if (adStatsDaysInput) {
+  adStatsDaysInput.addEventListener('change', () => loadAdStats());
+}
+
+// ---- Ads tracking tab ----
+function showAdTab(tab) {
+  const tracking = tab === 'tracking';
+  const manageTab = document.getElementById('adTabManage');
+  const trackingTab = document.getElementById('adTabTracking');
+  document.getElementById('adManagePanel').hidden = tracking;
+  document.getElementById('adTrackingPanel').hidden = !tracking;
+  manageTab.classList.toggle('active', !tracking);
+  trackingTab.classList.toggle('active', tracking);
+  manageTab.setAttribute('aria-selected', String(!tracking));
+  trackingTab.setAttribute('aria-selected', String(tracking));
+  if (tracking) loadAdStats();
+}
+
+function formatAdCount(value) {
+  return Number(value || 0).toLocaleString('ar-EG');
+}
+
+function adStatCard(label, value, hint = '') {
+  return `<div class="ad-stat-card"><span class="label">${escapeHtml(label)}</span><span class="value ad-stats-num">${escapeHtml(value)}</span>${hint ? `<span class="hint">${escapeHtml(hint)}</span>` : ''}</div>`;
+}
+
+function adStatsDays() {
+  return document.getElementById('adStatsDays')?.value || '7';
+}
+
+async function loadAdStats() {
+  const totalsBox = document.getElementById('adStatsTotals');
+  const list = document.getElementById('adStatsList');
+  const daily = document.getElementById('adStatsDaily');
+  if (!totalsBox || !list) return;
+  if (daily) daily.hidden = true;
+
+  try {
+    const response = await adminFetch(`/admin/ads/stats?days=${encodeURIComponent(adStatsDays())}`);
+    const data = await response.json();
+    if (!data.success) throw new Error('stats');
+
+    const totals = data.totals || {};
+    totalsBox.innerHTML = [
+      adStatCard('المشاهدات', formatAdCount(totals.impressions), `${formatAdCount(totals.viewers)} مستخدم`),
+      adStatCard('الضغطات', formatAdCount(totals.taps), `${formatAdCount(totals.tappers)} مستخدم`),
+      adStatCard('نسبة الضغط', `${Number(totals.ctr || 0).toLocaleString('ar-EG')}%`, 'من شاهدوا الإعلان ثم ضغطوا عليه'),
+      adStatCard('الفترة', document.getElementById('adStatsDays')?.selectedOptions?.[0]?.textContent || '', data.fromDay === data.toDay ? data.toDay : `من ${data.fromDay} إلى ${data.toDay}`),
+    ].join('');
+
+    const ads = Array.isArray(data.ads) ? data.ads : [];
+    if (ads.length === 0) {
+      list.innerHTML = '<p class="settings-message">لا توجد إعلانات بعد.</p>';
+      return;
+    }
+
+    const rows = ads.map((ad) => `
+      <tr>
+        <td>${ad.image ? `<img class="ad-thumb" src="${escapeHtml(ad.image)}" alt="">` : ''}<strong>${escapeHtml(ad.title || 'بدون عنوان')}</strong><br>${adStatusBadge(ad.isActive)} <small>ينتهي: ${escapeHtml(formatAdDate(ad.endsAt))}</small></td>
+        <td class="ad-stats-num">${escapeHtml(formatAdCount(ad.impressions))}<br><small>${escapeHtml(formatAdCount(ad.viewers))} مستخدم</small></td>
+        <td class="ad-stats-num">${escapeHtml(formatAdCount(ad.taps))}<br><small>${escapeHtml(formatAdCount(ad.tappers))} مستخدم</small></td>
+        <td class="ad-stats-num">${escapeHtml(Number(ad.ctr || 0).toLocaleString('ar-EG'))}%</td>
+        <td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="showAdDaily" data-admin-arg-count="2" data-admin-arg-1="${escapeHtml(String(ad._id))}" data-admin-arg-2="${escapeHtml(ad.title || 'بدون عنوان')}">التفاصيل اليومية</button></td>
+      </tr>
+    `).join('');
+
+    list.innerHTML = `
+      <h3><i class="fas fa-chart-line"></i> أداء كل إعلان</h3>
+      <table class="commissions-table">
+        <thead>
+          <tr>
+            <th>الإعلان</th>
+            <th>المشاهدات</th>
+            <th>الضغطات</th>
+            <th>نسبة الضغط</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  } catch (err) {
+    totalsBox.innerHTML = '';
+    list.innerHTML = '<p class="settings-message error">تعذر تحميل بيانات التتبع. حاول مرة أخرى.</p>';
+  }
+}
+
+async function showAdDaily(id, title) {
+  const box = document.getElementById('adStatsDaily');
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = '<p>جاري التحميل...</p>';
+
+  try {
+    const response = await adminFetch(`/admin/ads/stats/${encodeURIComponent(id)}?days=${encodeURIComponent(adStatsDays())}`);
+    const data = await response.json();
+    if (!data.success) throw new Error('daily');
+    const days = Array.isArray(data.days) ? data.days : [];
+    const rows = days.length === 0
+      ? '<tr><td colspan="4">لا توجد مشاهدات أو ضغطات في هذه الفترة.</td></tr>'
+      : days.map((day) => `
+        <tr>
+          <td>${escapeHtml(day.day)}</td>
+          <td class="ad-stats-num">${escapeHtml(formatAdCount(day.impressions))} <small>(${escapeHtml(formatAdCount(day.viewers))} مستخدم)</small></td>
+          <td class="ad-stats-num">${escapeHtml(formatAdCount(day.taps))} <small>(${escapeHtml(formatAdCount(day.tappers))} مستخدم)</small></td>
+          <td class="ad-stats-num">${escapeHtml(Number(day.ctr || 0).toLocaleString('ar-EG'))}%</td>
+        </tr>`).join('');
+    box.innerHTML = `
+      <h3><i class="fas fa-calendar-day"></i> التفاصيل اليومية: ${escapeHtml(title || '')}</h3>
+      <table class="commissions-table">
+        <thead><tr><th>اليوم</th><th>المشاهدات</th><th>الضغطات</th><th>نسبة الضغط</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    box.innerHTML = '<p class="settings-message error">تعذر تحميل التفاصيل اليومية.</p>';
+  }
 }
 
 const adCancelEdit = document.getElementById('adCancelEdit');

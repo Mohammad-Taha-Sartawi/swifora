@@ -5,6 +5,9 @@ const {
 const express = require('express');
 const mongoose = require('mongoose');
 const Ad = require('../models/Ad');
+const AdStat = require('../models/AdStat');
+const AdEventUser = require('../models/AdEventUser');
+const { adTrackingReport, adDailyReport } = require('../services/adTracking');
 const { normalizeAdPayload } = require('../services/adPayload');
 const {
   adImageUpload,
@@ -27,6 +30,7 @@ function serializeAd(ad) {
     startsAt: ad.startsAt || null,
     endsAt: ad.endsAt || null,
     sortOrder: ad.sortOrder || 0,
+    link: ad.link || '',
     createdAt: ad.createdAt || null,
     updatedAt: ad.updatedAt || null,
   };
@@ -62,6 +66,38 @@ function uploadMiddleware(req, res, next) {
 async function cleanupRequestFiles(req) {
   await removeAdImageFiles(req.files);
 }
+
+function reportDays(value) {
+  const days = Number(value);
+  return [1, 7, 30, 90].includes(days) ? days : 7;
+}
+
+// Tracking tab: views and taps reported by the mobile apps.
+router.get('/stats', async (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      ...(await adTrackingReport({ days: reportDays(req.query.days) })),
+    });
+  } catch (err) {
+    return sendInternalServerFailure(res);
+  }
+});
+
+router.get('/stats/:id', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'الإعلان غير موجود.' });
+    }
+    const days = await adDailyReport({
+      adId: req.params.id,
+      days: reportDays(req.query.days),
+    });
+    return res.json({ success: true, days });
+  } catch (err) {
+    return sendInternalServerFailure(res);
+  }
+});
 
 router.get('/', async (req, res) => {
   try {
@@ -247,9 +283,11 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    await Promise.all(
-      (deleted.images || []).map(deleteAdImageByUrl),
-    );
+    await Promise.all([
+      ...(deleted.images || []).map(deleteAdImageByUrl),
+      AdStat.deleteMany({ adId: deleted._id }),
+      AdEventUser.deleteMany({ adId: deleted._id }),
+    ]);
 
     return res.json({
       success: true,
