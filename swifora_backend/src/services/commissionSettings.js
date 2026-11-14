@@ -25,6 +25,28 @@ async function getCommissionConfig() {
   }
 }
 
+/** App display options for drivers (stored with the commission setting). */
+async function getDriverDisplaySettings() {
+  try {
+    const setting = await CommissionSetting.findOne({ key: 'platform' })
+      .select('showDriverCommissionCard')
+      .lean();
+    return { showCommissionCard: setting?.showDriverCommissionCard !== false };
+  } catch (_) {
+    // Fall back to showing the card: hiding money owed by mistake is worse.
+    return { showCommissionCard: true };
+  }
+}
+
+async function setDriverCommissionCardVisible(visible) {
+  const setting = await CommissionSetting.findOneAndUpdate(
+    { key: 'platform' },
+    { $set: { showDriverCommissionCard: visible === true, updatedAt: new Date() } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  ).lean();
+  return { showCommissionCard: setting.showDriverCommissionCard !== false };
+}
+
 function calculateCommission(price, config = DEFAULT_COMMISSION) {
   const normalized = normalizeCommissionConfig(config);
   const orderPrice = Number(price) || 0;
@@ -42,4 +64,6 @@ module.exports = {
   normalizeCommissionConfig,
   getCommissionConfig,
   calculateCommission,
+  getDriverDisplaySettings,
+  setDriverCommissionCardVisible,
 };

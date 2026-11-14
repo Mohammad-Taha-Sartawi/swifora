@@ -16,6 +16,12 @@ const commissionSettingSchema = new mongoose.Schema({
     default: 1,
     min: 0,
   },
+  // Show the "commission due" card (with "pay now") on the driver's home
+  // screen in the app. On by default.
+  showDriverCommissionCard: {
+    type: Boolean,
+    default: true,
+  },
   updatedAt: {
     type: Date,
     default: Date.now,

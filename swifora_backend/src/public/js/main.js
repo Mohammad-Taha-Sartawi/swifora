@@ -251,7 +251,10 @@ document.querySelectorAll('.sidebar ul li[data-page]').forEach(item => {
     if (page === 'drivers') loadDriversList();
     if (page === 'users') loadUsersList();
     if (page === 'commissions') loadCommissions();
-    if (page === 'settings') loadCommissionSettings();
+    if (page === 'settings') {
+      loadCommissionSettings();
+      loadDriverDisplaySettings();
+    }
     if (page === 'driver-reports') loadDriverReports();
       if (page === 'user-reports') loadUserReports();
       if (page === 'support-chat') initSupportChat();
@@ -1572,6 +1575,61 @@ async function saveCommissionSettings(event) {
 const commissionSettingsForm = document.getElementById('commissionSettingsForm');
 if (commissionSettingsForm) {
   commissionSettingsForm.addEventListener('submit', saveCommissionSettings);
+}
+
+// ---- Driver app: show/hide the "commission due" card ----
+async function loadDriverDisplaySettings() {
+  const select = document.getElementById('driverCommissionCardVisible');
+  const message = document.getElementById('driverDisplaySettingsMessage');
+  if (!select) return;
+  try {
+    const res = await adminFetch('/admin/api/driver-display-settings');
+    if (!res.ok) throw new Error('load');
+    const data = await res.json();
+    select.value = data.showCommissionCard === false ? 'false' : 'true';
+    if (message) {
+      message.textContent = '';
+      message.className = 'settings-message';
+    }
+  } catch (err) {
+    if (message) {
+      message.textContent = 'تعذر تحميل الإعداد.';
+      message.className = 'settings-message error';
+    }
+  }
+}
+
+async function saveDriverDisplaySettings(event) {
+  event.preventDefault();
+  const select = document.getElementById('driverCommissionCardVisible');
+  const message = document.getElementById('driverDisplaySettingsMessage');
+  if (!select || !message) return;
+  try {
+    const res = await adminFetch('/admin/api/driver-display-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showCommissionCard: select.value === 'true' }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      message.textContent = data.message || 'تعذر حفظ الإعداد.';
+      message.className = 'settings-message error';
+      return;
+    }
+    select.value = data.showCommissionCard ? 'true' : 'false';
+    message.textContent = data.showCommissionCard
+      ? 'سيظهر مربع العمولة للسائقين.'
+      : 'تم إخفاء مربع العمولة عن السائقين.';
+    message.className = 'settings-message success';
+  } catch (err) {
+    message.textContent = 'تعذر حفظ الإعداد.';
+    message.className = 'settings-message error';
+  }
+}
+
+const driverDisplaySettingsForm = document.getElementById('driverDisplaySettingsForm');
+if (driverDisplaySettingsForm) {
+  driverDisplaySettingsForm.addEventListener('submit', saveDriverDisplaySettings);
 }
 
 async function loadCommissions() {

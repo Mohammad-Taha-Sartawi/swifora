@@ -260,7 +260,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
   const adminFiles = new Map([
     [
       'src/routes/adminApi.js',
-      { error: 5, failure: 0 },
+      // +2: driver display settings (commission card) get/put.
+      { error: 7, failure: 0 },
     ],
     [
       'src/routes/adminAreas.js',
@@ -337,11 +338,11 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     failureTotal += failureCalls.length;
   }
 
-  assert.equal(errorTotal, 22);
+  assert.equal(errorTotal, 24);
   assert.equal(failureTotal, 25);
   assert.equal(
     errorTotal + failureTotal,
-    47,
+    49,
   );
 });
 

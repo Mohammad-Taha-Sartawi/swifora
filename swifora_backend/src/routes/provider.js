@@ -18,6 +18,7 @@ const {
   canProviderSeeOrder,
 } = require('../services/orderVisibility');
 
+const { getDriverDisplaySettings } = require('../services/commissionSettings');
 const router = express.Router();
 router.use(auth, requireRole('provider'));
 
@@ -231,6 +232,8 @@ router.get('/stats', async (req, res) => {
       blockedUntil: blocked ? user.blockedUntil : null,
       offerCooldownUntil,
       isAvailable: user.isAvailable !== false,
+      // Dashboard setting: show the "commission due" card in the app.
+      showCommissionCard: (await getDriverDisplaySettings()).showCommissionCard,
     });
   } catch (err) {
     console.error('Stats error:', err.message);

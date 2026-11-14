@@ -89,6 +89,11 @@ function planLiveEffects(change) {
     }
   }
 
+  if (collection === 'commissionsettings') {
+    // E.g. the "commission due" card was shown/hidden for drivers.
+    appEvents.push({ room: 'role:provider', event: 'earnings_changed' });
+  }
+
   if (collection === 'commissionpayments') {
     const driverId = change.fullDocument?.driverId?.toString?.();
     if (driverId) {

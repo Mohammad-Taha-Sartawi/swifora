@@ -8,6 +8,8 @@ const CommissionSetting = require('../models/CommissionSetting');
 const {
   normalizeCommissionConfig,
   getCommissionConfig,
+  getDriverDisplaySettings,
+  setDriverCommissionCardVisible,
 } = require('../services/commissionSettings');
 const {
   orderStatBoundaries,
@@ -221,6 +223,31 @@ router.get('/top-driver', async (req, res) => {
     }
   } catch (err) {
     sendInternalServerError(res);
+  }
+});
+
+// Driver app: show or hide the "commission due" card.
+router.get('/driver-display-settings', async (req, res) => {
+  try {
+    res.json(await getDriverDisplaySettings());
+  } catch (err) {
+    sendInternalServerError(res);
+  }
+});
+
+router.put('/driver-display-settings', async (req, res) => {
+  try {
+    const visible = req.body?.showCommissionCard;
+    if (typeof visible !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'اختر إظهار مربع العمولة أو إخفاءه.',
+      });
+    }
+    const settings = await setDriverCommissionCardVisible(visible);
+    return res.json({ success: true, ...settings });
+  } catch (err) {
+    return sendInternalServerError(res);
   }
 });
 
