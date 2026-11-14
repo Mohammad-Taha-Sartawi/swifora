@@ -30,10 +30,10 @@ class AppActionTile extends StatelessWidget {
     final scheme = theme.colorScheme;
     final toneStyle = appToneStyle(context, tone);
     final isEnabled = onTap != null;
-    final textDirection = Directionality.of(context);
-    final chevron = textDirection == TextDirection.rtl
-        ? Icons.chevron_left
-        : Icons.chevron_right;
+    // "Forward" chevron: Material mirrors it in RTL, so it points left in
+    // Arabic and right in English. Picking chevron_left for RTL as well
+    // reversed it twice and made it point right in Arabic.
+    const chevron = Icons.chevron_right;
 
     // The accessible label must announce the trailing order count. Provider
     // tiles render counts through [trailingLabel]; without this, the visible

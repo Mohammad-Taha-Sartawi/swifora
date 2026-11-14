@@ -17,6 +17,7 @@ import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 import '../bloc/app/app_bloc.dart';
+import '../services/list_screen_navigation.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   final String token;
@@ -34,7 +35,8 @@ class MyOrdersScreen extends StatefulWidget {
   State<MyOrdersScreen> createState() => _MyOrdersScreenState();
 }
 
-class _MyOrdersScreenState extends State<MyOrdersScreen> {
+class _MyOrdersScreenState extends State<MyOrdersScreen>
+    with ListScreenNavigation {
   final OrderService _orderService = OrderService();
   final OfferService _offerService = OfferService();
   List<Map<String, dynamic>>? _orders;
@@ -347,7 +349,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   }
 
   @override
+  String get listScreenTag =>
+      'orders:${widget.statuses == null ? 'all' : (widget.statuses!.toList()..sort()).join(',')}';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(_loading || _loadFailed ? null : (_orders?.length ?? 0));
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final scheme = Theme.of(context).colorScheme;
     return Directionality(

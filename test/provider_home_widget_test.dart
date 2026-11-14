@@ -218,7 +218,7 @@ void main() {
         expect(
           find.descendant(
             of: disabledArea,
-            matching: find.text('New Orders Awaiting Your Offer'),
+            matching: find.text('New requests'),
           ),
           findsOneWidget,
         );
@@ -482,9 +482,9 @@ void main() {
 
   group('UX01-005 theme/locale matrix', () {
     for (final (themeMode, locale, expectedTitle) in [
-      (ThemeMode.dark, const Locale('en'), 'New Orders Awaiting Your Offer'),
-      (ThemeMode.light, const Locale('ar'), 'طلبات جديدة تنتظر تقديم عرض سعر'),
-      (ThemeMode.dark, const Locale('ar'), 'طلبات جديدة تنتظر تقديم عرض سعر'),
+      (ThemeMode.dark, const Locale('en'), 'New requests'),
+      (ThemeMode.light, const Locale('ar'), 'طلبات جديدة'),
+      (ThemeMode.dark, const Locale('ar'), 'طلبات جديدة'),
     ]) {
       testWidgets(
         'renders the dashboard in ${themeMode.name}/${locale.languageCode}',

@@ -14,6 +14,7 @@ import '../services/validators.dart';
 import '../services/theme_service.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/brand/swifora_brand.dart';
 import 'home_screen.dart';
 import 'provider_home_screen.dart';
 import 'forgot_password_screen.dart';
@@ -38,8 +39,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final GuestSupportService _guestSupport = GuestSupportService();
   bool _isLogin = true;
+  bool _obscurePassword = true;
   String _selectedRole = 'customer';
   List<GovernorateOption> _governorates = [];
+  // The governorate list comes from the server. While it loads, or when it
+  // could not be loaded, the dropdowns have no items (and Flutter disables
+  // them), so the form says why and offers a retry instead of looking frozen.
+  bool _areasLoading = false;
+  bool _areasFailed = false;
   final _cityFieldKey = GlobalKey<FormFieldState<String>>();
 
   String? _selectedGovernorate;
@@ -68,13 +75,77 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadAreas() async {
+    if (_areasLoading) return;
+    setState(() {
+      _areasLoading = true;
+      _areasFailed = false;
+    });
     try {
       final governorates = await LocationCatalog.load();
       if (!mounted) return;
       setState(() {
         _governorates = governorates;
+        _areasLoading = false;
       });
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _areasLoading = false;
+        _areasFailed = true;
+      });
+    }
+  }
+
+  /// Shown under the governorate field until the list has loaded.
+  Widget _areasStatus(BuildContext context) {
+    final theme = Theme.of(context);
+    if (_areasLoading) {
+      return Padding(
+        key: const Key('governorateLoading'),
+        padding: const EdgeInsets.only(top: AppSpacing.sm),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              AppLocalization.get(context, 'governoratesLoading'),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      key: const Key('governorateLoadFailed'),
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 18,
+            color: theme.colorScheme.error,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              AppLocalization.get(context, 'governoratesLoadFailed'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+          TextButton(
+            key: const Key('governorateRetry'),
+            onPressed: _loadAreas,
+            child: Text(AppLocalization.get(context, 'retry')),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -93,48 +164,141 @@ class _LoginScreenState extends State<LoginScreen> {
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final isMobile = Responsive.isMobile(context);
 
+    final dark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: Responsive.pageInsets(context),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: Responsive.maxAuthWidth,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildLanguageBar(context, isAr),
-                  SizedBox(height: isMobile ? AppSpacing.xl : AppSpacing.lg),
-                  _buildBrandHeader(context),
-                  const SizedBox(height: AppSpacing.xl),
-                  _buildRoleSelection(context),
-                  const SizedBox(height: AppSpacing.xl),
-                  _buildFormCard(context),
-                  const SizedBox(height: AppSpacing.xxl),
-                ],
+      backgroundColor: scheme.surface,
+      body: Stack(
+        children: [
+          // Decorative, painted once: a quiet skyline and delivery route
+          // behind the brand (approved Dark/Day login backdrop).
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 300,
+            child: ExcludeSemantics(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0.9, -0.9),
+                    radius: 1.2,
+                    colors: [
+                      (dark ? scheme.primary : scheme.secondary).withValues(
+                        alpha: dark ? 0.16 : 0.10,
+                      ),
+                      scheme.surface.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+                child: CustomPaint(
+                  painter: SwiforaSkylinePainter(
+                    buildingColor: dark
+                        ? scheme.surfaceContainerHigh.withValues(alpha: 0.7)
+                        : scheme.secondaryContainer.withValues(alpha: 0.55),
+                    windowColor: (dark ? scheme.secondary : scheme.surface)
+                        .withValues(alpha: dark ? 0.55 : 0.9),
+                    routeColor: (dark ? scheme.primary : scheme.secondary)
+                        .withValues(alpha: 0.7),
+                    pinColor: dark ? scheme.secondary : AppColors.accent,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: Responsive.pageInsets(context),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: Responsive.maxAuthWidth,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildLanguageBar(context, isAr),
+                      SizedBox(
+                        height: isMobile ? AppSpacing.sm : AppSpacing.lg,
+                      ),
+                      _buildBrandHeader(context),
+                      const SizedBox(height: AppSpacing.xl),
+                      _buildRoleSelection(context),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildFormCard(context),
+                      const SizedBox(height: AppSpacing.xxl),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildLanguageBar(BuildContext context, bool isAr) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    final activeFill = dark ? scheme.primary : scheme.secondaryContainer;
+    final activeText = dark ? scheme.onPrimary : scheme.onSecondaryContainer;
+
+    Widget option(String label, bool active, String semantic) {
+      return Semantics(
+        button: true,
+        selected: active,
+        label: semantic,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: active
+              ? null
+              : () => context.read<AppBloc>().add(ToggleLocale()),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            constraints: const BoxConstraints(minWidth: 56, minHeight: 44),
+            alignment: Alignment.center,
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: active ? activeFill : null,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: active ? activeText : scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Tooltip(
           message: AppLocalization.get(context, 'language'),
-          child: TextButton.icon(
-            onPressed: () => context.read<AppBloc>().add(ToggleLocale()),
-            icon: const Icon(Icons.translate, size: AppSizes.iconSm),
-            label: Text(
-              isAr ? 'EN' : 'ع',
-              style: Theme.of(context).textTheme.labelLarge,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              textDirection: TextDirection.ltr,
+              children: [
+                option('AR', isAr, 'العربية'),
+                option('EN', !isAr, 'English'),
+              ],
             ),
           ),
         ),
@@ -146,35 +310,17 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
+    final dark = theme.brightness == Brightness.dark;
+
     return Column(
       children: [
-        Container(
-          width: 88,
-          height: 88,
-          decoration: BoxDecoration(
-            color: scheme.primaryContainer,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: scheme.secondary.withValues(alpha: 0.42),
-              width: 1.5,
-            ),
-          ),
-          child: Icon(
-            Icons.local_shipping_outlined,
-            size: 44,
-            color: scheme.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          AppLocalization.get(context, 'app_name'),
-          style: theme.textTheme.headlineLarge,
-          textAlign: TextAlign.center,
-        ),
+        SwiforaMark(size: dark ? 88 : 72, tile: !dark),
+        const SizedBox(height: AppSpacing.md),
+        const SwiforaWordmark(),
         const SizedBox(height: AppSpacing.sm),
         Text(
           _isLogin
-              ? AppLocalization.get(context, 'welcome_back')
+              ? AppLocalization.get(context, 'app_tagline')
               : AppLocalization.get(context, 'create_account_hint'),
           style: theme.textTheme.bodyLarge?.copyWith(
             color: scheme.onSurfaceVariant,
@@ -186,28 +332,37 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildRoleSelection(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _RoleCard(
-            icon: Icons.person_outline,
-            title: AppLocalization.get(context, 'customer'),
-            subtitle: AppLocalization.get(context, 'customer_subtitle'),
-            isSelected: _selectedRole == 'customer',
-            onTap: () => _selectRole('customer'),
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _RoleCard(
+              icon: Icons.person_outline,
+              title: AppLocalization.get(context, 'customer'),
+              subtitle: AppLocalization.get(context, 'customer_subtitle'),
+              isSelected: _selectedRole == 'customer',
+              onTap: () => _selectRole('customer'),
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _RoleCard(
-            icon: Icons.delivery_dining_outlined,
-            title: AppLocalization.get(context, 'provider'),
-            subtitle: AppLocalization.get(context, 'provider_subtitle'),
-            isSelected: _selectedRole == 'provider',
-            onTap: () => _selectRole('provider'),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: _RoleCard(
+              icon: Icons.delivery_dining_outlined,
+              title: AppLocalization.get(context, 'provider'),
+              subtitle: AppLocalization.get(context, 'provider_subtitle'),
+              isSelected: _selectedRole == 'provider',
+              onTap: () => _selectRole('provider'),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -281,6 +436,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? AppLocalization.get(context, 'required')
                       : null,
                 ),
+                if (_governorates.isEmpty && (_areasLoading || _areasFailed))
+                  _areasStatus(context),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   key: _cityFieldKey,
@@ -371,18 +528,38 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
+                key: const Key('passwordField'),
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 textInputAction: _isLogin
                     ? TextInputAction.done
                     : TextInputAction.next,
+                // "Done" on the keyboard signs in, like the main button.
+                onFieldSubmitted: _isLogin ? (_) => _submit() : null,
                 autofillHints: [
                   _isLogin ? AutofillHints.password : AutofillHints.newPassword,
                 ],
-                decoration: _inputDecoration(
-                  AppLocalization.get(context, 'password'),
-                  Icons.lock_outline,
-                ),
+                decoration:
+                    _inputDecoration(
+                      AppLocalization.get(context, 'password'),
+                      Icons.lock_outline,
+                    ).copyWith(
+                      suffixIcon: IconButton(
+                        key: const Key('passwordVisibilityToggle'),
+                        tooltip: AppLocalization.get(
+                          context,
+                          _obscurePassword ? 'show_password' : 'hide_password',
+                        ),
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                      ),
+                    ),
                 validator: (v) {
                   if (v == null || v.isEmpty) {
                     return AppLocalization.get(context, 'required');
@@ -404,6 +581,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: AlignmentDirectional.centerEnd,
                   child: TextButton(
                     key: const Key('forgotPasswordButton'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.secondary,
+                    ),
                     onPressed: _openPasswordRecovery,
                     child: Text(
                       AppLocalization.get(context, 'forgot_password'),
@@ -488,13 +668,28 @@ class _LoginScreenState extends State<LoginScreen> {
                         // so onPrimary would disappear; onSurface keeps the
                         // indicator legible in both themes (UX01-001).
                         ? const AppButtonLoadingIndicator()
-                        : Text(
-                            _isLogin
-                                ? AppLocalization.get(context, 'sign_in')
-                                : AppLocalization.get(
-                                    context,
-                                    'create_account',
-                                  ),
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _isLogin
+                                      ? AppLocalization.get(context, 'sign_in')
+                                      : AppLocalization.get(
+                                          context,
+                                          'create_account',
+                                        ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              // Forward arrow, mirrored by Flutter in RTL: left in Arabic,
+                              // right in English (same as the row chevrons).
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: AppSizes.iconMd,
+                              ),
+                            ],
                           ),
                   );
                 },
@@ -526,17 +721,35 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              TextButton.icon(
-                onPressed: _openSupport,
-                icon: Icon(
-                  Icons.headset_mic_outlined,
-                  size: AppSizes.iconSm,
-                  color: theme.colorScheme.secondary,
-                ),
-                label: Text(
-                  AppLocalization.get(context, 'contact_support'),
-                  style: TextStyle(color: theme.colorScheme.secondary),
-                ),
+              Center(
+                child: theme.brightness == Brightness.dark
+                    ? OutlinedButton.icon(
+                        onPressed: _openSupport,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.colorScheme.secondary,
+                          side: BorderSide(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
+                          shape: const StadiumBorder(),
+                        ),
+                        icon: const Icon(
+                          Icons.headset_mic_outlined,
+                          size: AppSizes.iconSm,
+                        ),
+                        label: Text(
+                          AppLocalization.get(context, 'contact_support'),
+                        ),
+                      )
+                    : TextButton.icon(
+                        onPressed: _openSupport,
+                        icon: const Icon(
+                          Icons.headset_mic_outlined,
+                          size: AppSizes.iconSm,
+                        ),
+                        label: Text(
+                          AppLocalization.get(context, 'contact_support'),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -967,16 +1180,15 @@ class _RoleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    // Dark: teal selection; Day: soft gold selection (approved references).
     final background = isSelected
-        ? scheme.secondaryContainer
-        : scheme.surfaceContainerLow;
+        ? (dark ? scheme.primaryContainer : scheme.secondaryContainer)
+        : Colors.transparent;
     final foreground = isSelected
-        ? scheme.onSecondaryContainer
+        ? (dark ? scheme.onPrimaryContainer : scheme.onSecondaryContainer)
         : scheme.onSurface;
-    final subtitleColor = isSelected
-        ? scheme.onSecondaryContainer.withValues(alpha: 0.82)
-        : scheme.onSurfaceVariant;
-    final borderColor = isSelected ? scheme.secondary : scheme.outlineVariant;
+    final accent = dark ? scheme.primary : scheme.secondary;
 
     return Semantics(
       selected: isSelected,
@@ -988,13 +1200,16 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadiusDirectional.circular(AppRadius.lg),
-          border: Border.all(color: borderColor, width: isSelected ? 2 : 1),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(
+            color: isSelected ? accent : Colors.transparent,
+            width: 1.5,
+          ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: scheme.shadow.withValues(alpha: 0.12),
-                    blurRadius: 12,
+                    color: accent.withValues(alpha: dark ? 0.25 : 0.18),
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ]
@@ -1002,53 +1217,40 @@ class _RoleCard extends StatelessWidget {
         ),
         child: Material(
           type: MaterialType.transparency,
-          child: Stack(
-            children: [
-              // Non-color selection cue (UX01-004): the check icon remains
-              // meaningful when color contrast or elevation is not perceivable.
-              if (isSelected)
-                PositionedDirectional(
-                  top: AppSpacing.sm,
-                  end: AppSpacing.sm,
-                  child: Icon(
-                    Icons.check_circle,
-                    size: 20,
-                    color: scheme.secondary,
-                  ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 64),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
                 ),
-              InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: AppSpacing.lg,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(icon, size: 36, color: foreground),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 26, color: foreground),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: Text(
                         title,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: foreground,
+                          fontWeight: FontWeight.w800,
                         ),
-                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: subtitleColor,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                    ),
+                    // Non-color selection cue (UX01-004).
+                    if (isSelected) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      Icon(Icons.check_circle, size: 20, color: accent),
                     ],
-                  ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

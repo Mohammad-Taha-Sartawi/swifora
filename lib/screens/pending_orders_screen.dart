@@ -15,6 +15,7 @@ import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/ui/governorate_scope_warning.dart';
 import 'submit_offer_screen.dart';
+import '../services/list_screen_navigation.dart';
 
 class PendingOrdersScreen extends StatefulWidget {
   final List<Map<String, dynamic>> orders;
@@ -33,7 +34,8 @@ class PendingOrdersScreen extends StatefulWidget {
   State<PendingOrdersScreen> createState() => _PendingOrdersScreenState();
 }
 
-class _PendingOrdersScreenState extends State<PendingOrdersScreen> {
+class _PendingOrdersScreenState extends State<PendingOrdersScreen>
+    with ListScreenNavigation {
   final ProviderService _providerService = ProviderService();
 
   late final List<Map<String, dynamic>> _orders = List.of(widget.orders);
@@ -425,7 +427,11 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen> {
   }
 
   @override
+  String get listScreenTag => 'driver:new_orders';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(_orders.length);
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final scheme = Theme.of(context).colorScheme;
     return Directionality(

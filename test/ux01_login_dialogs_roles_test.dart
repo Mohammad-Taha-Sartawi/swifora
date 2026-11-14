@@ -105,9 +105,12 @@ void main() {
       },
   ];
 
+  late _LocationsAdapter locationsAdapter;
+
   setUpAll(() {
     ApiConfig.initForTesting('http://127.0.0.1:1');
-    MobileApiClient.testAdapter = _LocationsAdapter(governoratesPayload);
+    locationsAdapter = _LocationsAdapter(governoratesPayload);
+    MobileApiClient.testAdapter = locationsAdapter;
   });
 
   tearDownAll(() {
@@ -116,6 +119,7 @@ void main() {
 
   setUp(() {
     LocationCatalog.clearCache();
+    locationsAdapter.failuresLeft = 0;
   });
 
   Future<void> waitForGovernorateOptions(WidgetTester tester) async {
@@ -392,6 +396,43 @@ void main() {
       );
     }
 
+    testWidgets(
+      'an unreachable server shows an error with retry, not frozen fields',
+      (tester) async {
+        locationsAdapter.failuresLeft = 2; // startup load + sign-up retry
+        await tester.pumpWidget(loginHarness(locale: const Locale('en')));
+        await tester.pump(const Duration(milliseconds: 100));
+
+        final signupToggle = find.textContaining('Sign Up', findRichText: true);
+        await tester.ensureVisible(signupToggle);
+        await tester.pumpAndSettle(const Duration(milliseconds: 80));
+        await tester.tap(signupToggle);
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(find.byKey(const Key('governorateLoadFailed')), findsOneWidget);
+        expect(
+          find.text(
+            'Could not load the governorates. Check the connection '
+            'to the server and try again.',
+          ),
+          findsOneWidget,
+        );
+
+        final retry = find.byKey(const Key('governorateRetry'));
+        await tester.ensureVisible(retry);
+        await tester.tap(retry);
+        await waitForGovernorateOptions(tester);
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(find.byKey(const Key('governorateLoadFailed')), findsNothing);
+        expect(find.byKey(const Key('governorateLoading')), findsNothing);
+        expect(governorateDropdown(tester).onChanged, isNotNull);
+      },
+    );
+
     testWidgets('cities are limited to the selected governorate', (
       tester,
     ) async {
@@ -519,12 +560,23 @@ class _LocationsAdapter implements HttpClientAdapter {
 
   final List<Map<String, dynamic>> governorates;
 
+  /// Catalog requests to fail (server unreachable) before answering.
+  int failuresLeft = 0;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (options.uri.path.endsWith('/locations/governorates') &&
+        failuresLeft > 0) {
+      failuresLeft -= 1;
+      throw DioException.connectionError(
+        requestOptions: options,
+        reason: 'server unreachable',
+      );
+    }
     final body = options.uri.path.endsWith('/locations/governorates')
         ? governorates
         : <String, dynamic>{};

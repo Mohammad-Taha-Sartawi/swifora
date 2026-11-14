@@ -15,6 +15,7 @@ import '../widgets/ui/app_notification_bell.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 import 'rejected_orders_screen.dart';
+import '../services/list_screen_navigation.dart';
 
 class OfferedOrdersScreen extends StatefulWidget {
   final List<Map<String, dynamic>> orders;
@@ -31,7 +32,8 @@ class OfferedOrdersScreen extends StatefulWidget {
   State<OfferedOrdersScreen> createState() => _OfferedOrdersScreenState();
 }
 
-class _OfferedOrdersScreenState extends State<OfferedOrdersScreen> {
+class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
+    with ListScreenNavigation {
   final ProviderService _providerService = ProviderService();
   late final List<Map<String, dynamic>> _orders = List.of(widget.orders);
   StreamSubscription? _offerNotSelectedSub;
@@ -142,7 +144,11 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen> {
   }
 
   @override
+  String get listScreenTag => 'driver:offered';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(_orders.length);
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final scheme = Theme.of(context).colorScheme;
 
@@ -380,7 +386,10 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: appToneStyle(context, AppTone.warning).foreground,
+                        color: appToneStyle(
+                          context,
+                          AppTone.warning,
+                        ).foreground,
                       ),
                     ),
                   ],

@@ -8,10 +8,14 @@ import '../services/responsive.dart';
 import '../services/localization_service.dart';
 import '../services/api_config.dart';
 import '../services/theme_service.dart';
+import '../widgets/brand/swifora_brand.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
-import '../widgets/ui/app_tone.dart';
 
+/// M-CREATE-ORDER (owner-approved layout). Submission is unchanged: one
+/// step, the same fields and the same API call. The approved image also
+/// shows a review step and photo attachments; those need separate feature
+/// approval and are not part of this screen yet.
 class CreateOrderScreen extends StatefulWidget {
   final UserModel user;
   final String token;
@@ -24,8 +28,9 @@ class CreateOrderScreen extends StatefulWidget {
 
 class _CreateOrderScreenState extends State<CreateOrderScreen> {
   String? _selectedType;
+  bool _typeMissing = false;
   final _descController = TextEditingController();
-  final _phoneController = TextEditingController();
+  late final _phoneController = TextEditingController(text: widget.user.phone);
   final _locationController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -37,190 +42,335 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     super.dispose();
   }
 
+  void _selectType(String type) {
+    setState(() {
+      _selectedType = type;
+      _typeMissing = false;
+    });
+  }
+
+  String get _descriptionLabel => switch (_selectedType) {
+    'product' => AppLocalization.get(context, 'product_label'),
+    'people' => AppLocalization.get(context, 'people_label'),
+    'goods' => AppLocalization.get(context, 'goods_label'),
+    _ => AppLocalization.get(context, 'order_description_label'),
+  };
+
+  void _showInfo() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.xl,
+              0,
+              AppSpacing.xl,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalization.get(sheetContext, 'new_order'),
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                for (final key in const [
+                  'order_reaches_drivers',
+                  'clearer_description_helper',
+                  'phone_hint',
+                ])
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      bottom: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: AppSizes.iconSm,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            AppLocalization.get(sheetContext, key),
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _fieldLabel(BuildContext context, String text) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        bottom: AppSpacing.sm,
+        top: AppSpacing.lg,
+      ),
+      child: Text.rich(
+        TextSpan(
+          text: text,
+          children: [
+            TextSpan(
+              text: ' *',
+              style: TextStyle(color: theme.colorScheme.secondary),
+            ),
+          ],
+        ),
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tone = appToneStyle(context, AppTone.accent);
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalization.get(context, 'new_order')),
-        centerTitle: true,
-      ),
+      // No AppBar: the top inset is handled here, the bottom inset (gesture
+      // bar) by the inner SafeArea.
       body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: Responsive.paddingHorizontal(context),
-                vertical: Responsive.paddingVertical(context),
-              ),
-              child: Column(
-                children: [
-                  _OptionCard(
-                    icon: Icons.shopping_bag_outlined,
-                    label: AppLocalization.get(context, 'product'),
-                    isSelected: _selectedType == 'product',
-                    onTap: () => setState(() => _selectedType = 'product'),
-                  ),
-                  const SizedBox(height: 12),
-                  _OptionCard(
-                    icon: Icons.people_outline,
-                    label: AppLocalization.get(context, 'people'),
-                    isSelected: _selectedType == 'people',
-                    onTap: () => setState(() => _selectedType = 'people'),
-                  ),
-                  const SizedBox(height: 12),
-                  _OptionCard(
-                    icon: Icons.inventory_2_outlined,
-                    label: AppLocalization.get(context, 'goods'),
-                    isSelected: _selectedType == 'goods',
-                    onTap: () => setState(() => _selectedType = 'goods'),
-                  ),
-                  if (_selectedType != null) ...[
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerLow,
-                        borderRadius: BorderRadiusDirectional.circular(
-                          AppRadius.lg,
-                        ),
-                        border: Border.all(color: scheme.outlineVariant),
+        bottom: false,
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.paddingHorizontal(context),
+                  vertical: Responsive.paddingVertical(context),
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          SwiforaRoundButton(
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).backButtonTooltip,
+                            onPressed: () => Navigator.maybePop(context),
+                            child: const Icon(Icons.arrow_back_rounded),
+                          ),
+                          Expanded(
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                AppLocalization.get(context, 'new_order'),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SwiforaRoundButton(
+                            tooltip: AppLocalization.get(
+                              context,
+                              'order_reaches_drivers',
+                            ),
+                            onPressed: _showInfo,
+                            child: Icon(
+                              Icons.info_outline_rounded,
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            TextFormField(
-                              controller: _descController,
-                              maxLines: 4,
-                              decoration: InputDecoration(
-                                alignLabelWithHint: true,
-                                hint: Text(
-                                  AppLocalization.get(context, 'desc_hint'),
-                                ),
-                                labelText: _selectedType == 'product'
-                                    ? AppLocalization.get(
-                                        context,
-                                        'product_label',
-                                      )
-                                    : _selectedType == 'people'
-                                    ? AppLocalization.get(
-                                        context,
-                                        'people_label',
-                                      )
-                                    : AppLocalization.get(
-                                        context,
-                                        'goods_label',
-                                      ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              validator: (v) => v!.isEmpty
-                                  ? AppLocalization.get(context, 'required')
-                                  : null,
+                      const SizedBox(height: AppSpacing.xl),
+                      Text(
+                        AppLocalization.get(context, 'what_to_deliver'),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _OptionCard(
+                              icon: Icons.inventory_2_outlined,
+                              label: AppLocalization.get(context, 'product'),
+                              isSelected: _selectedType == 'product',
+                              onTap: () => _selectType('product'),
                             ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _locationController,
-                              decoration: InputDecoration(
-                                labelText: AppLocalization.get(
-                                  context,
-                                  'delivery_location',
-                                ),
-                                hintText: AppLocalization.get(
-                                  context,
-                                  'location_hint',
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.location_on_outlined,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              maxLines: 2,
-                              validator: (v) => v!.isEmpty
-                                  ? AppLocalization.get(context, 'required')
-                                  : null,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _OptionCard(
+                              icon: Icons.people_outline,
+                              label: AppLocalization.get(context, 'people'),
+                              isSelected: _selectedType == 'people',
+                              onTap: () => _selectType('people'),
                             ),
-                            const SizedBox(height: 14),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _phoneController,
-                              decoration: InputDecoration(
-                                hint: Text(
-                                  AppLocalization.get(context, 'phone_hint'),
-                                ),
-
-                                labelText: AppLocalization.get(
-                                  context,
-                                  'phone_label',
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              keyboardType: TextInputType.phone,
-                              textDirection: TextDirection.ltr,
-                              validator: (v) => v!.isEmpty
-                                  ? AppLocalization.get(context, 'required')
-                                  : null,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _OptionCard(
+                              icon: Icons.local_shipping_outlined,
+                              label: AppLocalization.get(context, 'goods'),
+                              isSelected: _selectedType == 'goods',
+                              onTap: () => _selectType('goods'),
                             ),
-                            const SizedBox(height: 20),
-                            BlocConsumer<OrderBloc, OrderState>(
-                              listener: (context, state) {
-                                if (state is OrderSuccess) {
-                                  AppFeedback.success(
-                                    context,
-                                    AppLocalization.get(context, 'order_sent'),
-                                  );
-                                  Navigator.pop(context);
-                                }
-                                if (state is OrderError) {
-                                  AppFeedback.error(context, state.message);
-                                }
-                              },
-                              builder: (context, state) {
-                                final isLoading = state is OrderLoading;
-                                return ElevatedButton(
-                                  onPressed: isLoading ? null : _submit,
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    backgroundColor: tone.solid,
-                                    foregroundColor: tone.onSolid,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  child: isLoading
-                                      ? const AppButtonLoadingIndicator()
-                                      : Text(
+                          ),
+                        ],
+                      ),
+                      if (_typeMissing)
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                            top: AppSpacing.sm,
+                          ),
+                          child: Text(
+                            AppLocalization.get(context, 'what_to_deliver'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.error,
+                            ),
+                          ),
+                        ),
+                      _fieldLabel(context, _descriptionLabel),
+                      TextFormField(
+                        controller: _descController,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          alignLabelWithHint: true,
+                          hintText: AppLocalization.get(
+                            context,
+                            'order_description_hint',
+                          ),
+                          hintMaxLines: 3,
+                          prefixIcon: const Padding(
+                            padding: EdgeInsetsDirectional.only(bottom: 48),
+                            child: Icon(Icons.assignment_outlined),
+                          ),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? AppLocalization.get(context, 'required')
+                            : null,
+                      ),
+                      _fieldLabel(
+                        context,
+                        AppLocalization.get(context, 'delivery_location_label'),
+                      ),
+                      TextFormField(
+                        controller: _locationController,
+                        decoration: InputDecoration(
+                          hintText: AppLocalization.get(
+                            context,
+                            'delivery_location_hint',
+                          ),
+                          prefixIcon: const Icon(Icons.location_on_outlined),
+                        ),
+                        maxLines: 2,
+                        minLines: 1,
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? AppLocalization.get(context, 'required')
+                            : null,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        AppLocalization.get(
+                          context,
+                          'clearer_description_helper',
+                        ),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      _fieldLabel(
+                        context,
+                        AppLocalization.get(context, 'contact_phone_label'),
+                      ),
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: InputDecoration(
+                          hintText: '05x xxx xxxx',
+                          helperText: AppLocalization.get(
+                            context,
+                            'phone_hint',
+                          ),
+                          helperMaxLines: 2,
+                          prefixIcon: const Icon(Icons.phone_outlined),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        textDirection: TextDirection.ltr,
+                        autofillHints: const [AutofillHints.telephoneNumber],
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? AppLocalization.get(context, 'required')
+                            : null,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      BlocConsumer<OrderBloc, OrderState>(
+                        listener: (context, state) {
+                          if (state is OrderSuccess) {
+                            AppFeedback.success(
+                              context,
+                              AppLocalization.get(context, 'order_sent'),
+                            );
+                            Navigator.pop(context);
+                          }
+                          if (state is OrderError) {
+                            AppFeedback.error(context, state.message);
+                          }
+                        },
+                        builder: (context, state) {
+                          final isLoading = state is OrderLoading;
+                          return ElevatedButton(
+                            key: const Key('submitOrderButton'),
+                            onPressed: isLoading ? null : _submit,
+                            child: isLoading
+                                ? const AppButtonLoadingIndicator()
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
                                           AppLocalization.get(
                                             context,
                                             'submit_order',
                                           ),
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      const Icon(
+                                        Icons.send_rounded,
+                                        size: AppSizes.iconMd,
+                                      ),
+                                    ],
+                                  ),
+                          );
+                        },
                       ),
-                    ),
-                  ],
-                ],
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        AppLocalization.get(context, 'order_reaches_drivers'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -230,7 +380,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final typeChosen = _selectedType != null;
+    final formValid = _formKey.currentState!.validate();
+    if (!typeChosen) {
+      setState(() => _typeMissing = true);
+    }
+    if (!typeChosen || !formValid) return;
 
     context.read<OrderBloc>().add(
       CreateOrderEvent(
@@ -245,6 +400,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   }
 }
 
+/// One order type: icon, text and a check when selected (not colour only).
 class _OptionCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -260,10 +416,9 @@ class _OptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final foreground = isSelected
-        ? scheme.onSecondaryContainer
-        : scheme.onSurface;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground = isSelected ? scheme.primary : scheme.onSurface;
 
     return Semantics(
       button: true,
@@ -272,46 +427,68 @@ class _OptionCard extends StatelessWidget {
       excludeSemantics: true,
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: double.infinity,
+        duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
           color: isSelected
-              ? scheme.secondaryContainer
+              ? scheme.primaryContainer.withValues(alpha: 0.7)
               : scheme.surfaceContainerLow,
-          borderRadius: BorderRadiusDirectional.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           border: Border.all(
-            color: isSelected ? scheme.secondary : scheme.outlineVariant,
+            color: isSelected ? scheme.primary : scheme.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.18),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.symmetric(
-                vertical: 18,
-                horizontal: 20,
-              ),
-              child: Row(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 112),
+              child: Stack(
                 children: [
-                  Icon(icon, color: foreground, size: AppSizes.iconLg),
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(color: foreground),
+                  if (isSelected)
+                    PositionedDirectional(
+                      top: AppSpacing.sm,
+                      end: AppSpacing.sm,
+                      child: Icon(
+                        Icons.check_circle,
+                        size: AppSizes.iconSm,
+                        color: scheme.primary,
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      vertical: AppSpacing.lg,
+                      horizontal: AppSpacing.sm,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, color: foreground, size: 30),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: foreground,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (isSelected)
-                    Icon(
-                      Icons.check_circle,
-                      size: AppSizes.iconMd,
-                      color: scheme.secondary,
-                    ),
                 ],
               ),
             ),

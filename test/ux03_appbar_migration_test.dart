@@ -6,7 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'ux03_screen_harness.dart';
 
 const _migratedScreens = [
-  Ux03Screen.createOrder,
+  // createOrder uses the owner-approved header (round back/info buttons)
+  // instead of an AppBar; see M-CREATE-ORDER in the swifora-ui-ux skill.
   Ux03Screen.myOrders,
   Ux03Screen.notifications,
   Ux03Screen.orderDetail,

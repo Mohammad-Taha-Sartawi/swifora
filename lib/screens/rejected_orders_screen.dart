@@ -11,6 +11,7 @@ import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/ui/star_rating_dialog.dart';
+import '../services/list_screen_navigation.dart';
 
 class RejectedOrdersScreen extends StatefulWidget {
   final String token;
@@ -20,7 +21,8 @@ class RejectedOrdersScreen extends StatefulWidget {
   State<RejectedOrdersScreen> createState() => _RejectedOrdersScreenState();
 }
 
-class _RejectedOrdersScreenState extends State<RejectedOrdersScreen> {
+class _RejectedOrdersScreenState extends State<RejectedOrdersScreen>
+    with ListScreenNavigation {
   final ProviderService _providerService = ProviderService();
 
   List<Map<String, dynamic>> _orders = [];
@@ -56,7 +58,10 @@ class _RejectedOrdersScreenState extends State<RejectedOrdersScreen> {
     try {
       await _providerService.rateCustomer(widget.token, orderId, rating);
       if (!mounted) return;
-      AppFeedback.success(context, AppLocalization.get(context, 'rating_thanks'));
+      AppFeedback.success(
+        context,
+        AppLocalization.get(context, 'rating_thanks'),
+      );
       await _load(showLoading: false);
     } catch (error) {
       if (!mounted) return;
@@ -99,7 +104,11 @@ class _RejectedOrdersScreenState extends State<RejectedOrdersScreen> {
   }
 
   @override
+  String get listScreenTag => 'driver:rejected';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(_loading || _error != null ? null : _orders.length);
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final typeLabels = {
       'product': AppLocalization.get(context, 'product'),

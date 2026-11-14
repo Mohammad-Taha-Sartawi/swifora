@@ -11,6 +11,7 @@ import '../services/theme_service.dart';
 import '../bloc/app/app_bloc.dart';
 import '../widgets/ui/app_status_badge.dart';
 import '../widgets/ui/app_tone.dart';
+import '../services/list_screen_navigation.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final String token;
@@ -19,7 +20,8 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with ListScreenNavigation {
   Timer? _refreshTimer;
 
   @override
@@ -44,7 +46,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   @override
+  String get listScreenTag => 'notifications';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(null);
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final scheme = Theme.of(context).colorScheme;
     final pinnedTone = appToneStyle(context, AppTone.warning);
@@ -70,6 +76,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               constraints: const BoxConstraints(maxWidth: 600),
               child: BlocBuilder<NotificationBloc, NotificationState>(
                 builder: (context, state) {
+                  trackListItems(
+                    state is NotificationsLoaded
+                        ? state.notifications.length
+                        : null,
+                  );
                   if (state is NotificationLoading)
                     return const Center(child: CircularProgressIndicator());
                   if (state is NotificationsLoaded) {

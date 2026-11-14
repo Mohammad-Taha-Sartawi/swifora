@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/app/app_bloc.dart';
-import '../bloc/app/app_event.dart';
-import '../bloc/app/app_state.dart';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_event.dart';
 import '../bloc/order/order_bloc.dart';
@@ -26,19 +24,19 @@ import '../widgets/ui/app_action_tile.dart';
 import '../widgets/ui/ad_banner_carousel.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
-import '../widgets/ui/app_section_header.dart';
 import '../widgets/ui/app_tone.dart';
+import '../widgets/brand/swifora_brand.dart';
+import '../widgets/brand/swifora_home_chrome.dart';
 import 'create_order_screen.dart';
 import 'my_orders_screen.dart';
-import 'notifications_screen.dart';
 import 'order_offers_screen.dart';
 import 'login_screen.dart';
 import 'report_screen.dart';
 import 'profile_screen.dart';
-import 'settings_screen.dart';
 import 'support_chat_screen.dart';
 import '../services/socket_service.dart';
 import '../services/mobile_session_failure.dart';
+import '../services/list_screen_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -59,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _notifTimer;
   int _pendingOrdersCount = 0;
   int _inProgressOrdersCount = 0;
+  int _onTheWayCount = 0;
   int? _availableDriversCount;
   int _supportUnreadCount = 0;
   int _adRefreshTick = 0;
@@ -76,8 +75,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _supportReplySub;
   bool _sessionExitStarted = false;
   late UserModel _user = widget.user;
-  String? _openingOffersOrderId;
-  bool _openingDeliveryConfirmation = false;
+  final Set<String> _openingOffersOrderIds = {};
+  bool _openingInProgressOrders = false;
 
   @override
   void initState() {
@@ -169,6 +168,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ) {
       if (!mounted) return;
       _loadOrderCounts();
+      // The driver pressed "start delivery": show the in-progress orders.
+      if (data['status']?.toString() == 'fulfilling') {
+        unawaited(_openInProgressForLiveEvent());
+      }
     });
 
     _offerAcceptedSub = SocketService.instance.onOfferAccepted.listen((data) {
@@ -194,19 +197,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _openOffersForIncomingOffer(String orderId) async {
-    if (!mounted || orderId.isEmpty || _openingOffersOrderId != null) {
-      return;
+  /// Live events open a screen only while the customer is on the home
+  /// screen or looking at a list screen, never over a form (create order,
+  /// profile, chat) or a dialog, and never when that screen is already the
+  /// one on top ([alreadyShowing]).
+  bool _canOpenForLiveEvent(Set<String> alreadyShowing) {
+    if (!mounted) return false;
+    final visibleList = VisibleListScreen.tag;
+    if (visibleList != null && alreadyShowing.contains(visibleList)) {
+      return false;
     }
-
-    // Only auto-open while the customer is actually on the home screen; the
-    // offers screen itself live-refreshes when it is already open.
     final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) {
+    final onHome = route == null || route.isCurrent;
+    return onHome || visibleList != null;
+  }
+
+  Future<void> _openOffersForIncomingOffer(String orderId) async {
+    if (!mounted ||
+        orderId.isEmpty ||
+        _openingOffersOrderIds.contains(orderId)) {
       return;
     }
 
-    _openingOffersOrderId = orderId;
+    // The offers screen of this order live-refreshes when it is already open.
+    if (!_canOpenForLiveEvent({'offers:$orderId'})) return;
+
+    _openingOffersOrderIds.add(orderId);
     try {
       await Navigator.push(
         context,
@@ -218,33 +234,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       );
     } finally {
-      _openingOffersOrderId = null;
+      _openingOffersOrderIds.remove(orderId);
       if (mounted) {
         _loadOrderCounts();
       }
     }
   }
 
-  Future<void> _openDeliveryConfirmation() async {
-    if (!mounted || _openingDeliveryConfirmation) return;
+  /// Delivery started, or the driver asks the customer to confirm delivery:
+  /// open the in-progress orders (where the confirmation button is).
+  Future<void> _openDeliveryConfirmation() => _openInProgressForLiveEvent();
 
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return;
+  Future<void> _openInProgressForLiveEvent() async {
+    if (!mounted || _openingInProgressOrders) return;
+    if (!_canOpenForLiveEvent(const {
+      'orders:accepted,fulfilling',
+      'orders:fulfilling',
+    })) {
+      return;
+    }
 
-    _openingDeliveryConfirmation = true;
+    _openingInProgressOrders = true;
     try {
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => MyOrdersScreen(
             token: widget.token,
-            statuses: const {'fulfilling'},
+            statuses: const {'accepted', 'fulfilling'},
             titleKey: 'in_progress_orders_btn',
           ),
         ),
       );
     } finally {
-      _openingDeliveryConfirmation = false;
+      _openingInProgressOrders = false;
       if (mounted) {
         _loadOrderCounts();
       }
@@ -261,6 +284,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       var pending = 0;
       var inProgress = 0;
+      var onTheWay = 0;
 
       for (final order in orders) {
         final status = order['status']?.toString();
@@ -269,12 +293,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           pending += 1;
         } else if (status == 'accepted' || status == 'fulfilling') {
           inProgress += 1;
+          if (status == 'fulfilling') onTheWay += 1;
         }
       }
 
       setState(() {
         _pendingOrdersCount = pending;
         _inProgressOrdersCount = inProgress;
+        _onTheWayCount = onTheWay;
       });
     } catch (_) {}
   }
@@ -436,7 +462,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Directionality(
       textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
-        appBar: _buildAppBar(context),
+        bottomNavigationBar: SwiforaBottomNav(
+          items: [
+            const SwiforaNavItem(
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home_rounded,
+              labelKey: 'nav_home',
+            ),
+            SwiforaNavItem(
+              icon: Icons.inventory_2_outlined,
+              selectedIcon: Icons.inventory_2,
+              labelKey: 'nav_orders',
+              onTap: _openOrdersReport,
+            ),
+            SwiforaNavItem(
+              icon: Icons.notifications_none_rounded,
+              selectedIcon: Icons.notifications,
+              labelKey: 'nav_notifications',
+              onTap: () => openSwiforaNotifications(context, widget.token),
+            ),
+            SwiforaNavItem(
+              icon: Icons.person_outline,
+              selectedIcon: Icons.person,
+              labelKey: 'nav_account',
+              onTap: _openAccountMenu,
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -463,76 +515,110 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      AdBannerCarousel(
-                        token: widget.token,
-                        refreshTick: _adRefreshTick,
+                      SwiforaHeader(
+                        actions: [
+                          SwiforaNotificationButton(token: widget.token),
+                          SwiforaAccountButton(
+                            fullName: _user.fullName,
+                            onPressed: _openAccountMenu,
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text.rich(
+                        TextSpan(
+                          text: AppLocalization.get(context, 'home_greeting'),
+                          children: const [TextSpan(text: ' 👋')],
+                        ),
+                        style: theme.textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
-                        AppLocalization.get(context, 'welcome_back'),
-                        style: theme.textTheme.headlineSmall,
+                        AppLocalization.get(context, 'home_subtitle'),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        AppLocalization.get(context, 'customer_subtitle'),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      if (_pendingOrdersCount > 0) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        _buildPendingBanner(context),
-                      ],
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.xl),
                       _buildPrimaryOrderCard(context),
                       if (_availableDriversCount != null) ...[
                         const SizedBox(height: AppSpacing.md),
                         _buildAvailableDriversBanner(context),
                       ],
+                      // Advertisements stay below the main action, never
+                      // in place of it.
+                      AdBannerCarousel(
+                        token: widget.token,
+                        refreshTick: _adRefreshTick,
+                      ),
                       const SizedBox(height: AppSpacing.lg),
-                      AppSectionHeader(
+                      SwiforaSectionTitle(
                         title: AppLocalization.get(
                           context,
                           'my_orders_section',
                         ),
+                        actionLabel: AppLocalization.get(
+                          context,
+                          'view_all_orders',
+                        ),
+                        onAction: _openOrdersReport,
                       ),
-                      AppActionWrap(
-                        children: [
-                          AppActionTile(
-                            icon: Icons.local_offer_outlined,
-                            title: AppLocalization.get(context, 'offers_title'),
-                            tone: AppTone.warning,
-                            badgeCount: _pendingOrdersCount,
-                            onTap: _openMyOrders,
-                          ),
-                          AppActionTile(
-                            icon: Icons.delivery_dining_outlined,
-                            title: AppLocalization.get(
-                              context,
-                              'in_progress_orders_btn',
-                            ),
-                            tone: AppTone.success,
-                            badgeCount: _inProgressOrdersCount,
-                            onTap: _openInProgressOrders,
-                          ),
-                          AppActionTile(
-                            icon: Icons.assessment_outlined,
-                            title: AppLocalization.get(context, 'report_30'),
-                            tone: AppTone.neutral,
-                            onTap: () {
-                              Navigator.push(
+                      SwiforaActionRow(
+                        tapKey: const Key('offersRow'),
+                        icon: Icons.sell_outlined,
+                        tone: AppTone.warning,
+                        title: AppLocalization.get(context, 'offers_title'),
+                        subtitle: _pendingOrdersCount > 0
+                            ? AppLocalization.get(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => MyOrdersScreen(
-                                    token: widget.token,
-                                    titleKey: 'orders_report',
-                                    readOnlyReport: true,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                                'pending_items_alert',
+                              ).replaceAll('%d', '$_pendingOrdersCount')
+                            : AppLocalization.get(
+                                context,
+                                'offers_none_waiting',
+                              ),
+                        count: _pendingOrdersCount,
+                        emphasized: _pendingOrdersCount > 0,
+                        onTap: _openMyOrders,
                       ),
+                      const SizedBox(height: AppSpacing.md),
+                      SwiforaActionRow(
+                        tapKey: const Key('inProgressRow'),
+                        icon: Icons.local_shipping_outlined,
+                        tone: AppTone.success,
+                        title: AppLocalization.get(
+                          context,
+                          'in_progress_orders_btn',
+                        ),
+                        subtitle: AppLocalization.get(
+                          context,
+                          'track_orders_live',
+                        ),
+                        count: _inProgressOrdersCount,
+                        onTap: _openInProgressOrders,
+                      ),
+                      if (_onTheWayCount > 0) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        SwiforaActionRow(
+                          tapKey: const Key('onTheWayRow'),
+                          icon: Icons.map_outlined,
+                          tone: AppTone.success,
+                          title: AppLocalization.get(
+                            context,
+                            'order_on_the_way',
+                          ),
+                          subtitle: AppLocalization.get(
+                            context,
+                            'view_details',
+                          ),
+                          emphasized: true,
+                          onTap: _openOnTheWay,
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.lg),
-                      AppSectionHeader(
+                      SwiforaSectionTitle(
                         title: AppLocalization.get(
                           context,
                           'help_and_report_section',
@@ -608,365 +694,245 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ).then((_) => _loadOrderCounts());
   }
 
+  void _openOrdersReport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MyOrdersScreen(
+          token: widget.token,
+          titleKey: 'orders_report',
+          readOnlyReport: true,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openOnTheWay() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MyOrdersScreen(
+          token: widget.token,
+          statuses: const {'fulfilling'},
+          titleKey: 'in_progress_orders_btn',
+        ),
+      ),
+    );
+    if (mounted) _loadOrderCounts();
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(
+          user: _user,
+          token: widget.token,
+          onUserUpdated: (updated) {
+            setState(() {
+              _user = updated;
+            });
+            _loadAvailableDriversCount();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openAccountMenu() {
+    showSwiforaAccountSheet(
+      context,
+      fullName: _user.fullName,
+      onProfile: _openProfile,
+      onLogout: _logout,
+    );
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showLogoutConfirmation(context);
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    // Remove this device's push token while the session is still
+    // valid; revoking first made the removal fail with 401.
+    await PushNotificationService.instance.stop().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {},
+    );
+    if (!mounted) return;
+    unawaited(AuthService().revokeSession(widget.token));
+    SocketService.instance.disconnect();
+    context.read<AuthBloc>().add(LogoutEvent());
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  /// The single main action: create a new order (approved hero card).
   Widget _buildPrimaryOrderCard(BuildContext context) {
     final theme = Theme.of(context);
-    final tone = appToneStyle(context, AppTone.primary);
-    final chevron = Directionality.of(context) == TextDirection.rtl
-        ? Icons.chevron_left
-        : Icons.chevron_right;
-
-    return Semantics(
-      button: true,
-      label: AppLocalization.get(context, 'new_order'),
-      onTap: _openCreateOrder,
-      excludeSemantics: true,
-      child: Material(
-        key: const Key('createOrderCta'),
-        color: tone.solid,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadiusDirectional.circular(AppRadius.lg),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: _openCreateOrder,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.lg,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: AppSizes.minTouchTarget,
-                  height: AppSizes.minTouchTarget,
-                  decoration: BoxDecoration(
-                    color: tone.onSolid.withValues(alpha: 0.14),
-                    borderRadius: BorderRadiusDirectional.circular(
-                      AppRadius.md,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.add_circle_outline,
-                    color: tone.onSolid,
-                    size: AppSizes.iconLg,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppLocalization.get(context, 'new_order'),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: tone.onSolid,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        AppLocalization.get(context, 'new_order_subtitle'),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: tone.onSolid.withValues(alpha: 0.88),
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Icon(chevron, color: tone.onSolid),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
 
-    return AppBar(
-      title: Tooltip(
-        message: AppLocalization.get(context, 'profile'),
-        child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProfileScreen(
-                  user: _user,
-                  token: widget.token,
-                  onUserUpdated: (updated) {
-                    setState(() {
-                      _user = updated;
-                    });
-                    _loadAvailableDriversCount();
-                  },
+    return SwiforaCard(
+      // The whole card opens the order form (a larger target than the button).
+      onTap: _openCreateOrder,
+      padding: EdgeInsets.zero,
+      borderColor: scheme.primary.withValues(alpha: 0.35),
+      gradient: LinearGradient(
+        begin: AlignmentDirectional.topStart,
+        end: AlignmentDirectional.bottomEnd,
+        colors: dark
+            ? [scheme.surfaceContainerHigh, scheme.surfaceContainerLow]
+            : [scheme.surfaceContainerLowest, scheme.primaryContainer],
+      ),
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            end: 0,
+            top: 0,
+            bottom: 0,
+            width: 170,
+            child: ExcludeSemantics(
+              child: CustomPaint(
+                painter: SwiforaRoutePainter(
+                  routeColor: scheme.primary,
+                  accentColor: dark ? scheme.secondary : AppColors.accent,
+                  ringColor: scheme.primary.withValues(alpha: 0.18),
                 ),
               ),
-            );
-          },
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          ),
+          PositionedDirectional(
+            end: 40,
+            top: 92,
+            child: ExcludeSemantics(
+              child: Icon(
+                Icons.inventory_2_outlined,
+                size: 52,
+                color: dark ? scheme.secondary : AppColors.accent,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: AppSizes.avatarSm / 2,
-                  backgroundColor: scheme.primaryContainer,
+                Text(
+                  AppLocalization.get(context, 'hero_tag'),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.secondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                FractionallySizedBox(
+                  widthFactor: 0.62,
+                  alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    widget.user.fullName.isNotEmpty
-                        ? widget.user.fullName[0].toUpperCase()
-                        : 'C',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: scheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
+                    AppLocalization.get(context, 'hero_title'),
+                    style: theme.textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Flexible(
+                const SizedBox(height: AppSpacing.sm),
+                FractionallySizedBox(
+                  widthFactor: 0.66,
+                  alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    widget.user.fullName,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
+                    AppLocalization.get(context, 'hero_body'),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Semantics(
+                  button: true,
+                  label: AppLocalization.get(context, 'new_order'),
+                  excludeSemantics: true,
+                  onTap: _openCreateOrder,
+                  child: ElevatedButton.icon(
+                    key: const Key('createOrderCta'),
+                    onPressed: _openCreateOrder,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(AppLocalization.get(context, 'new_order')),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ),
-      actions: [
-        BlocBuilder<NotificationBloc, NotificationState>(
-          builder: (context, nState) {
-            final unread = nState is NotificationsLoaded
-                ? nState.unreadCount
-                : 0;
-            return Stack(
-              children: [
-                IconButton(
-                  tooltip: AppLocalization.get(context, 'notifications'),
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BlocProvider.value(
-                          value: context.read<NotificationBloc>(),
-                          child: NotificationsScreen(token: widget.token),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                if (unread > 0)
-                  PositionedDirectional(
-                    end: 6,
-                    top: 6,
-                    child: Semantics(
-                      label: AppLocalization.get(
-                        context,
-                        'unread_notifications',
-                      ).replaceAll('%d', '$unread'),
-                      excludeSemantics: true,
-                      child: Container(
-                        padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
-                        decoration: BoxDecoration(
-                          color: scheme.error,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: scheme.surface, width: 1.5),
-                        ),
-                        child: Text(
-                          '$unread',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.onError,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-        BlocBuilder<AppBloc, AppState>(
-          builder: (context, appState) {
-            final isDark = appState.themeMode == ThemeMode.dark;
-            return IconButton(
-              tooltip: AppLocalization.get(context, 'theme'),
-              icon: Icon(
-                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              ),
-              onPressed: () => context.read<AppBloc>().add(ToggleTheme()),
-            );
-          },
-        ),
-        BlocBuilder<AppBloc, AppState>(
-          builder: (context, appState) {
-            final isAr = appState.locale.languageCode == 'ar';
-            return IconButton(
-              tooltip: AppLocalization.get(context, 'language'),
-              icon: Text(isAr ? 'EN' : 'ع', style: theme.textTheme.labelLarge),
-              onPressed: () => context.read<AppBloc>().add(ToggleLocale()),
-            );
-          },
-        ),
-        IconButton(
-          tooltip: AppLocalization.get(context, 'settings'),
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            );
-          },
-        ),
-        IconButton(
-          tooltip: AppLocalization.get(context, 'logout'),
-          icon: Icon(Icons.logout, color: scheme.error),
-          onPressed: () async {
-            final confirmed = await showLogoutConfirmation(context);
-            if (!confirmed || !context.mounted) {
-              return;
-            }
-
-            // Remove this device's push token while the session is still
-            // valid; revoking first made the removal fail with 401.
-            await PushNotificationService.instance.stop().timeout(
-              const Duration(seconds: 5),
-              onTimeout: () {},
-            );
-            if (!context.mounted) return;
-            unawaited(AuthService().revokeSession(widget.token));
-            SocketService.instance.disconnect();
-            context.read<AuthBloc>().add(LogoutEvent());
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (route) => false,
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPendingBanner(BuildContext context) {
-    final theme = Theme.of(context);
-    final tone = appToneStyle(context, AppTone.warning);
-
-    return Semantics(
-      button: true,
-      child: Material(
-        color: tone.background,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadiusDirectional.circular(AppRadius.md),
-          side: BorderSide(color: tone.border),
-        ),
-        child: InkWell(
-          onTap: _openMyOrders,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.pending_actions, color: tone.foreground),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    AppLocalization.get(
-                      context,
-                      'pending_items_alert',
-                    ).replaceAll('%d', '$_pendingOrdersCount'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: tone.foreground,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Directionality.of(context) == TextDirection.rtl
-                      ? Icons.chevron_left
-                      : Icons.chevron_right,
-                  size: AppSizes.iconSm,
-                  color: tone.foreground,
-                ),
-              ],
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }
 
+  /// Nearby drivers: the count, or why there is none (with a next step).
   Widget _buildAvailableDriversBanner(BuildContext context) {
     final theme = Theme.of(context);
-    final tone = appToneStyle(context, AppTone.info);
     final noDrivers = _availableDriversCount == 0;
     final hint = AppLocalization.get(context, 'recommend_driver_share_hint');
+    final area = LocationCatalog.localize(
+      context,
+      _user.governorate.trim().isNotEmpty ? _user.governorate : _user.area,
+    );
     final message = noDrivers
         ? AppLocalization.get(context, 'no_available_drivers')
-        : AppLocalization.get(
-            context,
-            'available_drivers_count',
-          ).replaceAll('%d', '${_availableDriversCount!}');
+        : AppLocalization.get(context, 'drivers_nearby_title');
+    final detail = noDrivers
+        ? hint
+        : [
+            if (area.trim().isNotEmpty) area,
+            AppLocalization.get(context, 'drivers_available_now'),
+          ].join(' • ');
+    final countLabel = AppLocalization.get(
+      context,
+      'available_drivers_count',
+    ).replaceAll('%d', '${_availableDriversCount!}');
 
     return Semantics(
       container: true,
-      label: '$message $hint',
+      label: noDrivers ? '$message $hint' : '$countLabel. $detail',
       excludeSemantics: true,
-      child: Material(
-        color: tone.background,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadiusDirectional.circular(AppRadius.md),
-          side: BorderSide(color: tone.border),
-        ),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.md,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.delivery_dining_outlined, color: tone.foreground),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: tone.foreground,
-                        fontWeight: FontWeight.w600,
-                      ),
+      child: SwiforaCard(
+        color: appToneStyle(
+          context,
+          noDrivers ? AppTone.warning : AppTone.info,
+        ).background.withValues(alpha: 0.55),
+        child: Row(
+          children: [
+            SwiforaIconTile(
+              icon: noDrivers
+                  ? Icons.person_search_outlined
+                  : Icons.location_on_outlined,
+              tone: noDrivers ? AppTone.warning : AppTone.info,
+              size: 52,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      hint,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: tone.foreground.withValues(alpha: 0.86),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(detail, style: theme.textTheme.bodySmall),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            SwiforaCountChip(
+              count: _availableDriversCount!,
+              tone: noDrivers ? AppTone.warning : AppTone.success,
+            ),
+          ],
         ),
       ),
     );
