@@ -508,6 +508,7 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
 [data-presentation="p014"] { margin-top:15px; }
 [data-presentation="p015"] { display:none; }
 [data-presentation="p016"] { color: #2ecc71; font-size: 10px; }
+.status-badge.live-off [data-presentation="p016"] { color: #f39c12; }
 [data-presentation="p017"] { color:#00d4ff; margin-bottom:15px; }
 [data-presentation="p018"] { color:#00d4ff; }
 [data-presentation="p019"] { color:#f39c12; font-weight:800; }

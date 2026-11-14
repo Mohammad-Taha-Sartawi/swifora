@@ -201,6 +201,7 @@ const AdminAuditLog = require('./models/AdminAuditLog');
 const Admin = require('./models/Admin');
 const AdStat = require('./models/AdStat');
 const AdEventUser = require('./models/AdEventUser');
+const { startLiveUpdates } = require('./services/liveUpdates');
 const { migrateAdminsFromUsers } = require('./services/adminMigration');
 const Ad = require('./models/Ad');
 const User = require('./models/User');
@@ -309,6 +310,17 @@ async function connectMongo() {
   } catch (err) {
     console.error('Location catalog seed failed:', String(err?.message || err).split('\n')[0]);
   }
+
+  ensureLiveUpdates();
+}
+
+// Live dashboard/app updates from database changes (services/liveUpdates.js).
+// Starts once both the database and the socket server are up.
+let liveUpdates = null;
+function ensureLiveUpdates() {
+  if (liveUpdates || !io || mongoose.connection.readyState !== 1) return;
+  liveUpdates = startLiveUpdates({ io, db: mongoose.connection.db });
+  console.log('Live updates started');
 }
 
 connectMongo();
@@ -448,6 +460,7 @@ io.on('connection', async (socket) => {
 
   if (socket.userRole === 'admin') {
     socket.join('support');
+    socket.join('admins');
     socket.join(`admin:${socket.userId}`);
     console.log('Admin socket connected (support room)');
   } else if (socket.userRole === 'provider') {
@@ -475,6 +488,10 @@ io.on('connection', async (socket) => {
     console.log(`Socket connected: ${socket.userId} (${socket.userRole})`);
   }
   socket.join(`user:${socket.userId}`);
+  if (socket.userRole === 'customer' || socket.userRole === 'provider') {
+    // Audience-wide live events (ads changed, available drivers changed).
+    socket.join(`role:${socket.userRole}`);
+  }
 });
 
   io.engine.on('connection_error', (err) => {
@@ -482,6 +499,7 @@ io.on('connection', async (socket) => {
   });
 
   app.set('io', io);
+  ensureLiveUpdates();
 };
 
 if (!isProduction) {

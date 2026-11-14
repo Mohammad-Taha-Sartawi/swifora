@@ -203,8 +203,11 @@ function updateClocks() {
 setInterval(updateClocks, 1000);
 updateClocks();
 
-// Keep the dashboard order counters current while it is the visible page.
+// Fallback while the live connection is down: keep the dashboard counters
+// current every 30 seconds. When connected, admin_update events refresh
+// pages as soon as data changes (see "Live updates" below).
 setInterval(() => {
+  if (supportSocket && supportSocket.connected) return;
   const dashboard = document.getElementById('page-dashboard');
   if (dashboard && dashboard.classList.contains('active-page')) {
     loadDashboardStats();
@@ -3878,6 +3881,71 @@ function initSupportChat() {
   if (!supportSocket || !supportSocket.connected) connectSupportSocket();
 }
 
+// ================================================
+// Live updates: the server sends admin_update { topics } whenever data
+// changes; the page on screen (and the sidebar badges) reload at once.
+// ================================================
+const LIVE_PAGE_LOADERS = {
+  dashboard: () => loadDashboardStats(),
+  orders: () => loadOrders(),
+  drivers: () => loadDriversList(),
+  users: () => loadUsersList(),
+  commissions: () => loadCommissions(),
+  'pending-providers': () => loadPendingProviders(),
+  'driver-reports': () => loadDriverReports(),
+  'user-reports': () => loadUserReports(),
+  areas: () => loadAreas(),
+  'support-chat': () => loadConversations(),
+  'broadcast-drivers': () => loadBroadcastArchive('drivers'),
+  'broadcast-users': () => loadBroadcastArchive('users'),
+  ads: () => {
+    const tracking = document.getElementById('adTrackingPanel');
+    if (tracking && !tracking.hidden) loadAdStats();
+    else loadAds();
+  },
+};
+
+// Topics whose changes move the sidebar badges or the main counters.
+const LIVE_BADGE_TOPICS = ['dashboard', 'pending-providers', 'driver-reports', 'user-reports'];
+
+let liveTopics = new Set();
+let liveRefreshTimer = null;
+
+function setLiveStatus(connected) {
+  const badge = document.getElementById('liveStatus');
+  const text = document.getElementById('liveStatusText');
+  if (!badge || !text) return;
+  badge.classList.toggle('live-off', !connected);
+  text.textContent = connected ? 'مباشر — يتحدث تلقائياً' : 'غير متصل — يعاد الاتصال…';
+}
+
+function activePageKey() {
+  const page = document.querySelector('.page-section.active-page');
+  return page ? page.id.replace(/^page-/, '') : 'dashboard';
+}
+
+function applyLiveTopics(topics) {
+  if (LIVE_BADGE_TOPICS.some((topic) => topics.has(topic))) {
+    loadDashboardStats();
+  }
+  const page = activePageKey();
+  if (page !== 'dashboard' && topics.has(page)) {
+    LIVE_PAGE_LOADERS[page]?.();
+  }
+}
+
+function onAdminUpdate(data) {
+  const topics = Array.isArray(data?.topics) ? data.topics : [];
+  topics.forEach((topic) => liveTopics.add(String(topic)));
+  // Coalesce several updates arriving together into one refresh.
+  clearTimeout(liveRefreshTimer);
+  liveRefreshTimer = setTimeout(() => {
+    const due = liveTopics;
+    liveTopics = new Set();
+    applyLiveTopics(due);
+  }, 300);
+}
+
 function connectSupportSocket() {
   if (supportSocket) {
     if (!supportSocket.connected) supportSocket.connect();
@@ -3885,7 +3953,14 @@ function connectSupportSocket() {
   }
 
   supportSocket = io({ transports: ['websocket'], withCredentials: true });
-  supportSocket.on('connect', () => console.log('Admin socket connected to support'));
+  supportSocket.on('connect', () => {
+    setLiveStatus(true);
+    // Catch up on anything that changed while disconnected.
+    applyLiveTopics(new Set(Object.keys(LIVE_PAGE_LOADERS)));
+  });
+  supportSocket.on('disconnect', () => setLiveStatus(false));
+  supportSocket.on('connect_error', () => setLiveStatus(false));
+  supportSocket.on('admin_update', onAdminUpdate);
   supportSocket.on('support_message', (data) => {
     const badge = document.getElementById('chatBadge');
     if (badge) {
