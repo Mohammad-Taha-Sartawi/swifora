@@ -1,0 +1,45 @@
+{
+  "skill": "swifora-ui-ux",
+  "version": "1.0",
+  "approved_on": "2026-11-14",
+  "screens": [
+    "login",
+    "customer-home",
+    "driver-home",
+    "create-order"
+  ],
+  "files": {
+    "create-order-dark.png": {
+      "sha256": "aa347ef352566f6c1b5c3594efcb6d5a66f95231a4e8f847b60d392d24e691c1",
+      "bytes": 226999
+    },
+    "create-order-day.png": {
+      "sha256": "8f07afbffac4a0c03b303ef858f3c74e6e81b9ef9691112d89ddf2426f3e5b85",
+      "bytes": 233139
+    },
+    "customer-home-dark.png": {
+      "sha256": "69f30cf856bcdc235cd6c750e11477e8a39668240a5d401bcf48e63846d58dd2",
+      "bytes": 388341
+    },
+    "customer-home-day.png": {
+      "sha256": "c7ed65c1ca4b57c8e1464e1a1dbb85e452cf3f390fc94acf596797445e146852",
+      "bytes": 453953
+    },
+    "driver-home-dark.png": {
+      "sha256": "11fae8c4b6a9d6973439d16114725663075abae554235a3e9da60bcd6bbb9ea9",
+      "bytes": 307214
+    },
+    "driver-home-day.png": {
+      "sha256": "9acac6c8ae8ae281d18b623f676bd1ab22cd3f60122393e4331961482b73b09e",
+      "bytes": 305715
+    },
+    "login-dark.png": {
+      "sha256": "1c7d49ac5cc49da87ae3e317434088260c2c39d9f1f1fc2ff91df7adac5310a1",
+      "bytes": 1586374
+    },
+    "login-day.png": {
+      "sha256": "4793661511d775e81267ea18fc0faa87516d32a2b723af43c4c393604fbc7de0",
+      "bytes": 1515288
+    }
+  }
+}
