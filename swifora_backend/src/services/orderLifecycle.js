@@ -13,9 +13,18 @@ const {
 } = require('./orderVisibility');
 
 const ACCEPTABLE_ORDER_STATUSES = ACCEPTABLE_OFFER_ORDER_STATES;
+// A driver whose offer is accepted takes no other order until the customer
+// confirms delivery, or until 15 minutes after the driver starts the delivery
+// (PROVIDER_ACCEPTANCE_BLOCK_MS). Before the delivery starts the hold has no
+// 15-minute limit; PROVIDER_ACCEPTED_HOLD_MS only caps it so a forgotten,
+// never-started order cannot lock a driver out for good.
 const PROVIDER_ACCEPTANCE_BLOCK_MS = 15 * 60 * 1000;
+const PROVIDER_ACCEPTED_HOLD_MS = 24 * 60 * 60 * 1000;
 const OFFER_VALIDITY_MS = 60 * 1000;
-const OFFER_COOLDOWN_MS = 60 * 1000;
+// No waiting between two offers: a driver may send a price offer on every
+// open order they see (owner decision). The cooldown mechanism stays in
+// place, set to zero, so it can be brought back by changing this value.
+const OFFER_COOLDOWN_MS = 0;
 const OFFER_SUSPENSION_MS = 300 * 1000;
 const CONFLICT_MESSAGES = {
   ORDER_NOT_AVAILABLE: 'The order is no longer available for this action.',
@@ -58,6 +67,47 @@ async function inTransaction(work) {
   return executeTransaction({ startSession: () => mongoose.startSession(), work });
 }
 
+/**
+ * Until when a driver stays reserved by their active orders: an accepted
+ * order holds them until it starts (capped), a started one for 15 minutes
+ * after the start. Null when nothing holds them.
+ */
+async function providerHoldUntil(providerId, session, now = new Date()) {
+  const activeOrders = await Order.find({
+    providerId,
+    status: { $in: ['accepted', 'fulfilling'] },
+  })
+    .select('status acceptedAt fulfillingAt')
+    .session(session)
+    .lean();
+
+  let holdUntil = null;
+  for (const order of activeOrders) {
+    let candidate = null;
+    if (order.status === 'accepted') {
+      const acceptedAt = order.acceptedAt ? new Date(order.acceptedAt) : now;
+      candidate = new Date(acceptedAt.getTime() + PROVIDER_ACCEPTED_HOLD_MS);
+    } else if (order.fulfillingAt) {
+      candidate = new Date(
+        new Date(order.fulfillingAt).getTime() + PROVIDER_ACCEPTANCE_BLOCK_MS,
+      );
+    }
+    if (candidate && candidate > now && (!holdUntil || candidate > holdUntil)) {
+      holdUntil = candidate;
+    }
+  }
+  return holdUntil;
+}
+
+async function refreshProviderHold(providerId, session) {
+  if (!providerId) return;
+  await User.updateOne(
+    { _id: providerId },
+    { $set: { blockedUntil: await providerHoldUntil(providerId, session) } },
+    { session },
+  );
+}
+
 async function suspendIfUnanswered(order, now = new Date()) {
   const activeOffer = await Offer.exists({
     orderId: order._id,
@@ -77,6 +127,9 @@ async function suspendIfUnanswered(order, now = new Date()) {
     orderId: order._id,
   }).distinct('providerId');
 
+  // A driver in the 60-second gap between two offers still counts: they can
+  // offer on this order in a moment, so the order must stay open for them.
+  // Only drivers held by an accepted order (blockedUntil) or paused do not.
   const responderFilter = {
     role: 'provider',
     status: 'active',
@@ -88,13 +141,6 @@ async function suspendIfUnanswered(order, now = new Date()) {
           { blockedUntil: null },
           { blockedUntil: { $exists: false } },
           { blockedUntil: { $lte: now } },
-        ],
-      },
-      {
-        $or: [
-          { offerCooldownUntil: null },
-          { offerCooldownUntil: { $exists: false } },
-          { offerCooldownUntil: { $lte: now } },
         ],
       },
     ],
@@ -273,7 +319,8 @@ async function acceptOffer({ offerId, customerId, commissionConfig }) {
         throw new LifecycleConflict('ORDER_NOT_AVAILABLE', order._id);
       }
 
-      const blockUntil = new Date(Date.now() + PROVIDER_ACCEPTANCE_BLOCK_MS);
+      // Held until the delivery starts (then 15 more minutes) or is confirmed.
+      const blockUntil = new Date(Date.now() + PROVIDER_ACCEPTED_HOLD_MS);
       const provider = await User.findOneAndUpdate({
         _id: offer.providerId,
         role: 'provider',
@@ -639,9 +686,9 @@ async function transitionOrder({ orderId, providerId, from, to }) {
         };
     const updated = await Order.findOneAndUpdate({ _id: orderId, providerId, status: from }, { $set: updates }, { new: true, session }).lean();
     if (!updated) throw new LifecycleConflict('INVALID_TRANSITION', orderId);
-    if (to === 'completed') {
-      await User.updateOne({ _id: providerId }, { $set: { blockedUntil: null } }, { session });
-    }
+    // Starting the delivery turns the open hold into 15 minutes from now;
+    // completing it releases the driver unless another order still holds them.
+    await refreshProviderHold(providerId, session);
     return updated;
   });
 }
@@ -697,11 +744,8 @@ async function confirmDelivery({ orderId, customerId }) {
     ).lean();
 
     if (!updated) throw new LifecycleConflict('INVALID_TRANSITION', orderId);
-    await User.updateOne(
-      { _id: updated.providerId },
-      { $set: { blockedUntil: null } },
-      { session },
-    );
+    // Confirmed: free the driver, unless another order still holds them.
+    await refreshProviderHold(updated.providerId, session);
     return updated;
   });
 }
@@ -734,8 +778,11 @@ async function rejectDelivery({ orderId, customerId, reason = '' }) {
 module.exports = {
   ACCEPTABLE_ORDER_STATUSES,
   PROVIDER_ACCEPTANCE_BLOCK_MS,
+  PROVIDER_ACCEPTED_HOLD_MS,
+  providerHoldUntil,
   OFFER_VALIDITY_MS,
   OFFER_SUSPENSION_MS,
+  OFFER_COOLDOWN_MS,
   LifecycleConflict,
   conflictResponse,
   isTransactionUnavailable,

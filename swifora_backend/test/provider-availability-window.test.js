@@ -11,14 +11,20 @@ function source(file) {
 }
 
 test(
-  'accepted offers reserve the provider for fifteen minutes',
+  'accepted offers reserve the provider until 15 minutes after the delivery starts',
   () => {
     assert.equal(
       lifecycle.PROVIDER_ACCEPTANCE_BLOCK_MS,
       15 * 60 * 1000,
     );
+    // Before the start there is no 15-minute limit, only a safety cap.
+    assert.equal(lifecycle.PROVIDER_ACCEPTED_HOLD_MS, 24 * 60 * 60 * 1000);
   },
 );
+
+test('drivers may send offers back to back, with no waiting time', () => {
+  assert.equal(lifecycle.OFFER_COOLDOWN_MS, 0);
+});
 
 test(
   'unavailable providers keep the pending counter but cannot receive or offer',
