@@ -17,9 +17,15 @@ const reportSchema = new mongoose.Schema({
   date: { type: String, default: () => new Date().toISOString().split('T')[0] },
   status: { type: String, enum: ['in-review', 'in-progress', 'resolved', 'rejected'], default: 'in-review' },
   content: { type: String, required: true, maxlength: 2000 },
-  replies: [replySchema]
+  replies: [replySchema],
+  // Cleared from the reported person's profile in the dashboard: the report
+  // stays (reports pages, reporter's history) but no longer counts against
+  // the profile.
+  clearedFromProfileAt: { type: Date, default: null },
+  clearedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
 }, { timestamps: true });
 
 reportSchema.index({ reportType: 1, status: 1 });
+reportSchema.index({ reportedUserId: 1, clearedFromProfileAt: 1 });
 
 module.exports = mongoose.model('Report', reportSchema);

@@ -3,10 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/app/app_bloc.dart';
 import '../models/offer_model.dart';
 import '../services/location_catalog.dart';
+import '../services/date_format.dart';
 import '../services/localization_service.dart';
 import '../services/offer_service.dart';
 import '../services/order_service.dart';
 import '../services/responsive.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 
@@ -29,6 +31,8 @@ class _OrderReportScreenState extends State<OrderReportScreen> {
 
   Map<String, dynamic>? _order;
   List<OfferModel> _offers = [];
+  // The order loaded but its offers did not: say so instead of "no offers".
+  bool _offersFailed = false;
   bool _loading = true;
   String? _error;
 
@@ -48,10 +52,13 @@ class _OrderReportScreenState extends State<OrderReportScreen> {
       final order = await _orderService.getOrder(widget.token, widget.orderId);
 
       var offers = <OfferModel>[];
+      var offersFailed = false;
 
       try {
         offers = await _offerService.getOffers(widget.token, widget.orderId);
-      } catch (_) {}
+      } catch (_) {
+        offersFailed = true;
+      }
 
       if (!mounted) {
         return;
@@ -60,6 +67,7 @@ class _OrderReportScreenState extends State<OrderReportScreen> {
       setState(() {
         _order = order;
         _offers = offers;
+        _offersFailed = offersFailed;
         _loading = false;
       });
     } catch (error) {
@@ -192,18 +200,7 @@ class _OrderReportScreenState extends State<OrderReportScreen> {
 
   String _formatDate(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '');
-
-    if (date == null) {
-      return '';
-    }
-
-    final local = date.toLocal();
-    final month = local.month.toString().padLeft(2, '0');
-    final day = local.day.toString().padLeft(2, '0');
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-
-    return '${local.year}-$month-$day $hour:$minute';
+    return date == null ? '' : formatDisplayDateTime(date);
   }
 
   Widget _infoRow(IconData icon, String label, String value) {
@@ -274,16 +271,7 @@ class _OrderReportScreenState extends State<OrderReportScreen> {
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ),
-      );
+      return AppErrorState(message: _error!, onRetry: _load);
     }
 
     final order = _order;
@@ -404,7 +392,28 @@ class _OrderReportScreenState extends State<OrderReportScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
         const SizedBox(height: 8),
-        if (_offers.isEmpty)
+        if (_offersFailed)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    AppLocalization.get(context, 'offers_load_failed'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(AppLocalization.get(context, 'retry')),
+                ),
+              ],
+            ),
+          )
+        else if (_offers.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text(

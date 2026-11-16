@@ -9,6 +9,7 @@ import '../services/localization_service.dart';
 import '../services/validators.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_password_toggle.dart';
 
 class ForgotPasswordScreen extends StatelessWidget {
   final String initialEmail;
@@ -34,6 +35,8 @@ class _ForgotPasswordView extends StatefulWidget {
 }
 
 class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
+  bool _hideNew = true;
+  bool _hideConfirm = true;
   final _formKey = GlobalKey<FormState>();
 
   final _emailController = TextEditingController();
@@ -264,12 +267,16 @@ class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
         TextFormField(
           key: const Key('recoveryNewPasswordField'),
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _hideNew,
           autofillHints: const [AutofillHints.newPassword],
           decoration: InputDecoration(
             labelText: AppLocalization.get(context, 'new_password'),
             prefixIcon: const Icon(Icons.lock_outline),
             border: const OutlineInputBorder(),
+            suffixIcon: AppPasswordToggle(
+              obscured: _hideNew,
+              onPressed: () => setState(() => _hideNew = !_hideNew),
+            ),
           ),
           validator: Validators.password,
         ),
@@ -277,12 +284,16 @@ class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
         TextFormField(
           key: const Key('recoveryConfirmPasswordField'),
           controller: _confirmPasswordController,
-          obscureText: true,
+          obscureText: _hideConfirm,
           autofillHints: const [AutofillHints.newPassword],
           decoration: InputDecoration(
             labelText: AppLocalization.get(context, 'confirm_password'),
             prefixIcon: const Icon(Icons.lock_outline),
             border: const OutlineInputBorder(),
+            suffixIcon: AppPasswordToggle(
+              obscured: _hideConfirm,
+              onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {

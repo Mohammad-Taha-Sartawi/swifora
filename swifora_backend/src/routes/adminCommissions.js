@@ -6,6 +6,21 @@ const Order = require('../models/Order');
 const CommissionPayment = require('../models/CommissionPayment');
 const { splitCommission, isCommissionDue } = require('../services/commissionLedger');
 const { serviceTypesLabel } = require('../services/providerServiceTypes');
+const crypto = require('crypto');
+const CommissionAction = require('../models/CommissionAction');
+const {
+  snapshot,
+  recordAction,
+  actionSummary,
+  undoCommissionAction,
+  undoResetBatch,
+  latestUndoableBatch,
+  CommissionUndoError,
+} = require('../services/commissionActions');
+
+function adminIdOf(req) {
+  return req.session?.admin?.id || null;
+}
 
 function primaryPhone(user) {
   const phones = Array.isArray(user.phoneNumbers) ? user.phoneNumbers : [];
@@ -25,6 +40,11 @@ router.get('/', async (req, res) => {
     }).lean();
     let totalUnpaid = 0, totalPaid = 0, unpaidDrivers = 0, paidDrivers = 0;
     const driverRows = [];
+    const lastActions = new Map((await CommissionAction.aggregate([
+      { $match: { undoneAt: null } },
+      { $sort: { at: -1, _id: -1 } },
+      { $group: { _id: '$driverId', action: { $first: '$$ROOT' } } },
+    ])).map((row) => [row._id.toString(), actionSummary(row.action)]));
 
     for (const driver of providers) {
       const orders = await Order.find({
@@ -54,6 +74,7 @@ router.get('/', async (req, res) => {
       }
 
       driverRows.push({
+        lastAction: lastActions.get(driver._id.toString()) || null,
         _id: driver._id.toString(),
         driverId: driver.publicId || driver._id.toString().slice(-8),
         name: driver.fullName || driver.name,
@@ -67,13 +88,20 @@ router.get('/', async (req, res) => {
     }
 
     driverRows.sort((a, b) => b.commission - a.commission);
-    res.json({ totalUnpaid, totalPaid, unpaidDrivers, paidDrivers, driverRows });
+    res.json({
+      totalUnpaid,
+      totalPaid,
+      unpaidDrivers,
+      paidDrivers,
+      driverRows,
+      lastResetAll: await latestUndoableBatch(),
+    });
   } catch (err) {
     sendInternalServerError(res);
   }
 });
 
-async function resetDriverCommissionById(driverId) {
+async function resetDriverCommissionById(driverId, { batchId = null, adminId = null } = {}) {
   const driver = await User.findById(driverId);
 
   if (!driver || driver.role !== 'provider') {
@@ -91,6 +119,7 @@ async function resetDriverCommissionById(driverId) {
   );
   const adjustmentAmount = Number(driver.commissionAdjustment) || 0;
   const now = new Date();
+  const previous = snapshot(driver);
 
   if (dueOrders.length > 0) {
     // Return the platform commission to the driver: move it from
@@ -123,17 +152,38 @@ async function resetDriverCommissionById(driverId) {
   driver.commissionAdjustment = 0;
   await driver.save();
 
+  const amount = Math.max(
+    0,
+    dueOrders.reduce(
+      (sum, order) => sum + (order.platformCommission || 0),
+      0,
+    ) + adjustmentAmount,
+  );
+
+  // Kept so the reset can be undone (only when it changed something).
+  let action = null;
+  if (dueOrders.length > 0 || adjustmentAmount !== 0) {
+    action = await recordAction({
+      driverId: driver._id,
+      type: 'reset',
+      batchId,
+      at: now,
+      amount,
+      previous,
+      orders: dueOrders.map((order) => ({
+        orderId: order._id,
+        amount: order.platformCommission || 0,
+      })),
+      createdBy: adminId,
+    });
+  }
+
   return {
     success: true,
     driverName: driver.fullName,
     orders: dueOrders.length,
-    amount: Math.max(
-      0,
-      dueOrders.reduce(
-        (sum, order) => sum + (order.platformCommission || 0),
-        0,
-      ) + adjustmentAmount,
-    ),
+    amount,
+    action: actionSummary(action),
   };
 }
 
@@ -143,9 +193,14 @@ router.put('/reset-all', async (req, res) => {
     let drivers = 0;
     let orders = 0;
     let amount = 0;
+    // One id for the whole "reset all", so it can be undone in one step.
+    const batchId = `reset-all-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
     for (const provider of providers) {
-      const result = await resetDriverCommissionById(provider._id);
+      const result = await resetDriverCommissionById(provider._id, {
+        batchId,
+        adminId: adminIdOf(req),
+      });
       if (result.success) {
         drivers++;
         orders += result.orders;
@@ -153,7 +208,7 @@ router.put('/reset-all', async (req, res) => {
       }
     }
 
-    res.json({ success: true, drivers, orders, amount });
+    res.json({ success: true, drivers, orders, amount, batchId });
   } catch (err) {
     sendInternalServerFailure(res);
   }
@@ -161,7 +216,9 @@ router.put('/reset-all', async (req, res) => {
 
 router.put('/reset/:id', async (req, res) => {
   try {
-    const result = await resetDriverCommissionById(req.params.id);
+    const result = await resetDriverCommissionById(req.params.id, {
+      adminId: adminIdOf(req),
+    });
     if (!result.success) {
       return res.status(404).json(result);
     }
@@ -181,28 +238,73 @@ router.put('/pay/:id', async (req, res) => {
       status: { $in: ['accepted', 'fulfilling', 'completed'] },
     }).lean();
     const { unpaid } = splitCommission(orders, driver);
+    const previous = snapshot(driver);
+    const now = new Date();
 
+    let payment = null;
     if (unpaid > 0) {
-      await CommissionPayment.create({
+      payment = await CommissionPayment.create({
         driverId: driver._id,
         amount: unpaid,
         method: 'manual_admin',
         note: 'تم تأكيد الدفع من لوحة التحكم',
+        paidAt: now,
       });
     }
 
     driver.commissionPaid = true;
-    driver.commissionPaidAt = new Date();
+    driver.commissionPaidAt = now;
     driver.commissionResetAt = null;
     driver.commissionAdjustment = 0;
     await driver.save();
+
+    // Kept so the payment can be undone.
+    const action = payment
+      ? await recordAction({
+        driverId: driver._id,
+        type: 'payment',
+        at: now,
+        amount: unpaid,
+        previous,
+        paymentId: payment._id,
+        createdBy: adminIdOf(req),
+      })
+      : null;
+
     res.json({
       success: true,
       amount: unpaid,
+      action: actionSummary(action),
       message: `تم تحديث حالة السائق (${driver.fullName}) إلى مدفوع`,
     });
   } catch (err) {
     sendInternalServerFailure(res);
+  }
+});
+
+// Undo the driver's latest "paid" or "reset" (newest first).
+router.post('/undo/:actionId', async (req, res) => {
+  try {
+    const result = await undoCommissionAction(req.params.actionId, adminIdOf(req));
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    if (err instanceof CommissionUndoError) {
+      return res.status(err.status).json({ success: false, message: err.message });
+    }
+    return sendInternalServerFailure(res);
+  }
+});
+
+// Undo a "reset all" for every driver it still applies to.
+router.post('/undo-batch/:batchId', async (req, res) => {
+  try {
+    const result = await undoResetBatch(req.params.batchId, adminIdOf(req));
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    if (err instanceof CommissionUndoError) {
+      return res.status(err.status).json({ success: false, message: err.message });
+    }
+    return sendInternalServerFailure(res);
   }
 });
 

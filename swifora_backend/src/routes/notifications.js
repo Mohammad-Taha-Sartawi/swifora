@@ -1,5 +1,6 @@
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
@@ -36,6 +37,25 @@ router.put('/:id/read', async (req, res) => {
       await notif.save();
     }
     res.json({ message: 'Marked as read' });
+  } catch (err) {
+    sendInternalServerError(res);
+  }
+});
+
+// The user confirmed the pop-up of a broadcast message. The message stays
+// in the notifications list (pinned) until it expires; only the pop-up stops.
+router.put('/:id/ack', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const notif = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId, type: 'broadcast' },
+      { $set: { acknowledgedAt: new Date() } },
+      { new: true },
+    ).lean();
+    if (!notif) return res.status(404).json({ error: 'Not found' });
+    res.json({ acknowledgedAt: notif.acknowledgedAt });
   } catch (err) {
     sendInternalServerError(res);
   }

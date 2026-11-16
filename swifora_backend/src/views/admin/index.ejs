@@ -360,6 +360,32 @@
           </form>
           <p id="driverDisplaySettingsMessage" class="settings-message" role="status"></p>
         </div>
+        <% [
+          { key: 'privacy', icon: 'fa-user-shield', title: 'سياسة الخصوصية', hint: 'النص المحفوظ يظهر هنا في كل مرة؛ عدّل عليه أو امسحه واكتب نصاً جديداً، ثم اضغط حفظ.' },
+          { key: 'terms', icon: 'fa-file-contract', title: 'شروط الاستخدام', hint: 'النص المحفوظ يظهر هنا في كل مرة؛ عدّل عليه أو امسحه واكتب نصاً جديداً، ثم اضغط حفظ.' },
+        ].forEach(function (doc) { %>
+        <div class="settings-card legal-card">
+          <div class="legal-card-head">
+            <div class="icon"><i class="fas <%= doc.icon %>"></i></div>
+            <div>
+              <h3 id="legal-<%= doc.key %>-title"><%= doc.title %></h3>
+              <p><%= doc.hint %></p>
+            </div>
+          </div>
+          <form class="legal-form" data-legal-key="<%= doc.key %>">
+            <textarea id="legal-<%= doc.key %>-content" class="legal-editor" rows="12" maxlength="50000" dir="auto" aria-labelledby="legal-<%= doc.key %>-title" placeholder="اكتب النص هنا…"></textarea>
+            <div class="legal-meta">
+              <span id="legal-<%= doc.key %>-updated">لم يُحفظ نص بعد.</span>
+              <span id="legal-<%= doc.key %>-count" dir="ltr">0 / 50000</span>
+            </div>
+            <div class="legal-actions">
+              <button type="submit" class="btn-action reset"><i class="fas fa-save"></i> حفظ</button>
+              <button type="button" class="btn-action legal-clear" data-legal-clear="<%= doc.key %>"><i class="fas fa-eraser"></i> مسح النص</button>
+            </div>
+          </form>
+          <p id="legal-<%= doc.key %>-message" class="settings-message" role="status"></p>
+        </div>
+        <% }); %>
       </div>
     </div>
 

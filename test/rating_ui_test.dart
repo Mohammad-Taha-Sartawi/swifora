@@ -46,22 +46,32 @@ void main() {
     },
   );
 
-  test('provider dashboard shows cumulative stars and rating count', () {
-    final source = File(
+  test('the driver rating is in the profile, not on the home screen', () {
+    final home = File(
+      'lib/screens/provider_home_screen.dart',
+    ).readAsStringSync();
+    final profile = File('lib/screens/profile_screen.dart').readAsStringSync();
+
+    // Moved off the home screen (owner request, 2026-11-16).
+    expect(home, isNot(contains('_buildRatingCard')));
+    expect(home, contains('driverStats:'));
+
+    expect(profile, contains('_buildDriverRating'));
+    expect(profile, contains("'driver_rating'"));
+    expect(profile, contains('ratingStars'));
+    expect(profile, contains('ratingCount'));
+    expect(profile, contains("'rating_count'"));
+    expect(profile, contains("'rating_average'"));
+  });
+
+  test('the driver is asked to rate the customer right after approval', () {
+    final home = File(
       'lib/screens/provider_home_screen.dart',
     ).readAsStringSync();
 
-    expect(source, contains('_buildRatingCard'));
-
-    expect(source, contains("'driver_rating'"));
-
-    expect(source, contains('ratingStars'));
-
-    expect(source, contains("'rating_stars_total'"));
-
-    expect(source, contains('ratingCount'));
-
-    expect(source, contains("'rating_count'"));
+    expect(home, contains('_promptCustomerRating(orderId)'));
+    expect(home, contains("'rate_customer_title'"));
+    expect(home, contains('rateCustomer(widget.token, orderId, rating)'));
   });
 
   test('rating notifications use a dedicated icon and order route', () {

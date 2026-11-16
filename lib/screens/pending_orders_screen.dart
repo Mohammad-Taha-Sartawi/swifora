@@ -5,14 +5,15 @@ import '../bloc/offer/offer_bloc.dart';
 import '../bloc/app/app_bloc.dart';
 import '../services/responsive.dart';
 import '../services/location_catalog.dart';
-import '../widgets/ui/star_rating_dialog.dart';
 import '../services/localization_service.dart';
 import '../services/provider_service.dart';
 import '../services/socket_service.dart';
 import '../models/user_model.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_phone_link.dart';
 import '../widgets/ui/app_tone.dart';
+import '../widgets/ui/rating_summary_bar.dart';
 import '../widgets/ui/governorate_scope_warning.dart';
 import 'submit_offer_screen.dart';
 import '../services/list_screen_navigation.dart';
@@ -122,7 +123,7 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
     super.dispose();
   }
 
-  Future<void> _refreshOrders() async {
+  Future<void> _refreshOrders({bool userInitiated = false}) async {
     if (_refreshing) return;
     _refreshing = true;
 
@@ -137,6 +138,12 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
       });
     } catch (_) {
       // Keep the current list; the next refresh or pull-to-refresh retries.
+      if (userInitiated && mounted) {
+        AppFeedback.error(
+          context,
+          AppLocalization.get(context, 'refresh_failed'),
+        );
+      }
     } finally {
       _refreshing = false;
     }
@@ -457,7 +464,7 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
           top: false,
           child: RefreshIndicator(
             onRefresh: () async {
-              await _refreshOrders();
+              await _refreshOrders(userInitiated: true);
               await _loadCooldown();
             },
             child: Center(
@@ -522,9 +529,6 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
                           final customerPublicId = customer is Map
                               ? (customer['publicId'] ?? '').toString()
                               : '';
-                          final customerRating = ratingSummaryLabel(
-                            o['customerRatingSummary'],
-                          );
                           final phone = (o['phone'] ?? '').toString();
                           final area = LocationCatalog.localize(
                             context,
@@ -659,23 +663,21 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
                                             ),
                                           ),
                                         ],
-                                        if (customerRating.isNotEmpty) ...[
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            customerRating,
-                                            semanticsLabel:
-                                                '${AppLocalization.get(context, 'customer_rating_label')} $customerRating',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: appToneStyle(
-                                                context,
-                                                AppTone.warning,
-                                              ).foreground,
-                                            ),
-                                          ),
-                                        ],
                                       ],
+                                    ),
+                                  ),
+                                  // How other drivers rated this customer,
+                                  // like the driver's rating on an offer.
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      bottom: 12,
+                                    ),
+                                    child: RatingSummaryBar.fromSummary(
+                                      o['customerRatingSummary'],
+                                      key: const Key('customerRatingBar'),
+                                      positiveLabelKey:
+                                          'positive_ratings_by_drivers',
+                                      noRatingsKey: 'customer_no_ratings',
                                     ),
                                   ),
                                   _buildInfoRow(
@@ -685,18 +687,18 @@ class _PendingOrdersScreenState extends State<PendingOrdersScreen>
                                       context,
                                       'phone_number',
                                     ),
-                                    value: Text(
-                                      phone.isNotEmpty
-                                          ? phone
-                                          : AppLocalization.get(
+                                    value: phone.isNotEmpty
+                                        ? AppPhoneLink(phone: phone)
+                                        : Text(
+                                            AppLocalization.get(
                                               context,
                                               'hidden_phone',
                                             ),
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
                                   ),
                                   if (area.isNotEmpty)
                                     _buildInfoRow(

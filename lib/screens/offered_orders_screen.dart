@@ -6,14 +6,15 @@ import '../bloc/app/app_bloc.dart';
 import '../bloc/notification/notification_bloc.dart';
 import '../bloc/notification/notification_event.dart';
 import '../services/location_catalog.dart';
-import '../widgets/ui/star_rating_dialog.dart';
 import '../services/localization_service.dart';
 import '../services/provider_service.dart';
 import '../services/responsive.dart';
 import '../services/socket_service.dart';
+import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_notification_bell.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
+import '../widgets/ui/rating_summary_bar.dart';
 import 'rejected_orders_screen.dart';
 import '../services/list_screen_navigation.dart';
 
@@ -114,7 +115,7 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
     super.dispose();
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({bool userInitiated = false}) async {
     if (_refreshing) return;
     _refreshing = true;
 
@@ -129,6 +130,12 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
       });
     } catch (_) {
       // Keep the current list; the next refresh retries.
+      if (userInitiated && mounted) {
+        AppFeedback.error(
+          context,
+          AppLocalization.get(context, 'refresh_failed'),
+        );
+      }
     } finally {
       _refreshing = false;
     }
@@ -177,7 +184,7 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
           top: false,
           child: RefreshIndicator(
             onRefresh: () async {
-              await _refresh();
+              await _refresh(userInitiated: true);
               widget.onRefresh?.call();
             },
             child: Center(
@@ -255,7 +262,6 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
     final customerPublicId = customer is Map
         ? (customer['publicId'] ?? '').toString()
         : '';
-    final customerRating = ratingSummaryLabel(o['customerRatingSummary']);
     final phone = (o['phone'] ?? '').toString();
     final area = LocationCatalog.localize(
       context,
@@ -377,23 +383,16 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
                       ),
                     ),
                   ],
-                  if (customerRating.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      customerRating,
-                      semanticsLabel:
-                          '${AppLocalization.get(context, 'customer_rating_label')} $customerRating',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: appToneStyle(
-                          context,
-                          AppTone.warning,
-                        ).foreground,
-                      ),
-                    ),
-                  ],
                 ],
+              ),
+            ),
+            // How other drivers rated this customer.
+            Padding(
+              padding: const EdgeInsetsDirectional.only(bottom: 12),
+              child: RatingSummaryBar.fromSummary(
+                o['customerRatingSummary'],
+                positiveLabelKey: 'positive_ratings_by_drivers',
+                noRatingsKey: 'customer_no_ratings',
               ),
             ),
             _buildInfoRow(

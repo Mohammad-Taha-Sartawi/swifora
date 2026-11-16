@@ -32,8 +32,13 @@ void main() {
     ).readAsStringSync();
 
     expect(screen, contains('_buildProviderRating'));
-    expect(screen, contains("'rating_average'"));
-    expect(screen, contains("'positive_ratings_count'"));
+    // The bar is shared with the driver's view of the customer.
+    expect(screen, contains('RatingSummaryBar('));
+    final bar = File(
+      'lib/widgets/ui/rating_summary_bar.dart',
+    ).readAsStringSync();
+    expect(bar, contains("'rating_average'"));
+    expect(bar, contains("'positive_ratings_count'"));
     expect(screen, contains('providerRatingAverage'));
     expect(screen, contains('providerPositiveRatingCount'));
     expect(screen, contains('_driverCategoryLabel'));

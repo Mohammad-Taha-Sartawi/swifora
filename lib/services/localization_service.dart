@@ -20,6 +20,254 @@ class AppLocalization {
   }
 
   static final Map<String, Map<String, String>> _strings = {
+    // Sign in with Google
+    'continue_with_google': {'ar': 'المتابعة باستخدام Google', 'en': 'Continue with Google'},
+    'or_divider': {'ar': 'أو', 'en': 'or'},
+    'google_sign_in_failed': {'ar': 'تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.', 'en': "Couldn't sign in with Google. Please try again."},
+    'google_complete_title': {'ar': 'إكمال التسجيل', 'en': 'Complete sign-up'},
+    'google_complete_hint_customer': {'ar': 'خطوة أخيرة: أضف رقم هاتفك ومنطقتك ليصلك السائقون.', 'en': 'One last step: add your phone and area so drivers can reach you.'},
+    'google_complete_hint_driver': {'ar': 'أكمل بيانات السائق: الهاتف والمحافظة والمدينة ونوع الخدمات. يُراجع طلبك من الإدارة قبل التفعيل.', 'en': 'Complete your driver details: phone, governorate, city and services. Your request is reviewed before activation.'},
+    'google_complete_submit_customer': {'ar': 'إنشاء الحساب', 'en': 'Create account'},
+    'google_complete_submit_driver': {'ar': 'إرسال طلب التسجيل', 'en': 'Send sign-up request'},
+    'phone_invalid': {'ar': 'رقم الهاتف غير صحيح', 'en': 'Invalid phone number'},
+    // Privacy policy and terms of use
+    'privacy_policy': {'ar': 'سياسة الخصوصية', 'en': 'Privacy policy'},
+    'terms_of_use': {'ar': 'شروط الاستخدام', 'en': 'Terms of use'},
+    'legal_load_failed': {'ar': 'تعذّر تحميل النص. تحقق من الاتصال وحاول مرة أخرى.', 'en': "Couldn't load the text. Check your connection and try again."},
+    'legal_not_published': {'ar': 'لم يُنشر هذا النص بعد.', 'en': "This text hasn't been published yet."},
+    'legal_updated_at': {'ar': 'آخر تحديث: %s', 'en': 'Last updated: %s'},
+    // Ratings: clear numbered stars; customer rating for drivers
+    'rating_word_1': {'ar': 'سيء جداً', 'en': 'Very poor'},
+    'rating_word_2': {'ar': 'سيء', 'en': 'Poor'},
+    'rating_word_3': {'ar': 'مقبول', 'en': 'Okay'},
+    'rating_word_4': {'ar': 'جيد جداً', 'en': 'Very good'},
+    'rating_word_5': {'ar': 'ممتاز', 'en': 'Excellent'},
+    'rating_value_of_five': {'ar': '%d من 5', 'en': '%d out of 5'},
+    'rating_pick_hint': {'ar': 'اضغط على نجمة: 1 الأقل و5 الأفضل', 'en': 'Tap a star: 1 is lowest, 5 is best'},
+    'rating_send': {'ar': 'إرسال التقييم', 'en': 'Send rating'},
+    'positive_ratings_by_drivers': {'ar': 'أعجب به %d سائق', 'en': 'Liked by %d drivers'},
+    'customer_no_ratings': {'ar': 'زبون جديد — لا توجد تقييمات بعد', 'en': 'New customer — no ratings yet'},
+    // Home: availability, broadcast pop-up
+    'broadcast_confirm': {'ar': 'تم', 'en': 'OK'},
+    'broadcast_confirm_in': {'ar': '%s (%d)', 'en': '%s (%d)'},
+    'availability_title': {'ar': 'استقبال الطلبات', 'en': 'Receiving orders'},
+    'availability_on_short': {
+      'ar': 'مفعّل — تصلك الطلبات الجديدة',
+      'en': 'On — new orders reach you',
+    },
+    'availability_off_short': {
+      'ar': 'متوقف — لن تصلك طلبات جديدة',
+      'en': 'Paused — no new orders',
+    },
+    // UX safety: confirmations
+    'accept_offer_confirm_title': {
+      'ar': 'قبول هذا العرض؟',
+      'en': 'Accept this offer?',
+    },
+    'accept_offer_confirm_message': {
+      'ar': 'ستقبل عرض %s بسعر %s. بعد القبول يبدأ السائق بتنفيذ طلبك.',
+      'en':
+          'You\'re accepting %s\'s offer of %s. After you accept, the driver starts on your order.',
+    },
+    'accept_offer_confirm': {'ar': 'قبول العرض', 'en': 'Accept offer'},
+    'driver_generic': {'ar': 'السائق', 'en': 'the driver'},
+    'approve_delivery_confirm_title': {
+      'ar': 'تأكيد استلام الطلب؟',
+      'en': 'Confirm you received the order?',
+    },
+    'approve_delivery_confirm_message': {
+      'ar':
+          'أكّد فقط إذا وصلك الطلب. بعد التأكيد يُغلق الطلب ولا يمكن التراجع.',
+      'en':
+          'Only confirm if your order has arrived. Once confirmed, the order is closed and this can\'t be undone.',
+    },
+    'start_delivery_confirm_title': {
+      'ar': 'بدء التوصيل الآن؟',
+      'en': 'Start the delivery now?',
+    },
+    'start_delivery_confirm_message': {
+      'ar':
+          'سيعرف الزبون أنك في الطريق، ولن تستطيع قبول طلب آخر حتى تنتهي من هذا الطلب.',
+      'en':
+          'The customer will see that you\'re on your way, and you can\'t take another order until this one is done.',
+    },
+    'complete_delivery_confirm_title': {
+      'ar': 'هل سلّمت الطلب؟',
+      'en': 'Did you hand over the order?',
+    },
+    'complete_delivery_confirm_message': {
+      'ar': 'سنطلب من الزبون تأكيد الاستلام. اضغط فقط بعد تسليم الطلب.',
+      'en':
+          'We\'ll ask the customer to confirm receipt. Only tap this after you\'ve handed the order over.',
+    },
+    'conflict_title': {
+      'ar': 'تعذّر إكمال العملية',
+      'en': 'Couldn\'t complete this',
+    },
+    'conflict_delete': {'ar': 'لا، احذف الطلب', 'en': 'No, delete the order'},
+    'conflict_resend': {'ar': 'نعم، أعد الإرسال', 'en': 'Yes, resend'},
+    'delete_order': {'ar': 'حذف الطلب', 'en': 'Delete order'},
+    'delete_order_confirm_title': {
+      'ar': 'حذف الطلب؟',
+      'en': 'Delete this order?',
+    },
+    'delete_order_confirm_message': {
+      'ar': 'سيُحذف الطلب ولن يصل إلى السائقين. لا يمكن التراجع عن ذلك.',
+      'en':
+          'The order will be deleted and won\'t reach any drivers. This can\'t be undone.',
+    },
+    'delete_phone_confirm_title': {
+      'ar': 'حذف الرقم؟',
+      'en': 'Delete this number?',
+    },
+    'delete_phone_confirm_message': {
+      'ar': 'سيُحذف الرقم %s من حسابك.',
+      'en': 'The number %s will be removed from your account.',
+    },
+    // UX safety: loading, empty and error states
+    'refresh_failed': {
+      'ar': 'تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى.',
+      'en': 'Couldn\'t refresh. Check your connection and try again.',
+    },
+    'offers_load_failed': {
+      'ar': 'تعذّر تحميل العروض لهذا الطلب.',
+      'en': 'Couldn\'t load the offers for this order.',
+    },
+    'no_orders_customer_hint': {
+      'ar': 'عندما تنشئ طلباً سيظهر هنا مع حالته.',
+      'en': 'When you create an order, it\'ll show up here with its status.',
+    },
+    'no_active_orders_title': {
+      'ar': 'لا توجد طلبات نشطة',
+      'en': 'No active orders',
+    },
+    'no_active_orders_driver_hint': {
+      'ar': 'الطلبات التي يقبلها الزبائن منك ستظهر هنا.',
+      'en': 'Orders customers accept from you will appear here.',
+    },
+    'no_notifications_hint': {
+      'ar': 'سنخبرك هنا بالعروض الجديدة وتحديثات طلباتك.',
+      'en': 'We\'ll let you know here about new offers and order updates.',
+    },
+    'support_start_title': {
+      'ar': 'ابدأ محادثة مع فريق الدعم',
+      'en': 'Start a conversation with support',
+    },
+    'support_start_hint': {
+      'ar': 'اكتب سؤالك أو مشكلتك وسيرد عليك فريق الدعم هنا.',
+      'en':
+          'Write your question or problem and the support team will reply here.',
+    },
+    'support_history_failed': {
+      'ar': 'تعذّر تحميل المحادثة.',
+      'en': 'Couldn\'t load the conversation.',
+    },
+    'support_message_hint': {
+      'ar': 'اكتب رسالتك...',
+      'en': 'Write your message…',
+    },
+    'call_number': {'ar': 'اتصال بالرقم', 'en': 'Call'},
+    'call_failed': {
+      'ar': 'تعذّر فتح تطبيق الاتصال.',
+      'en': 'Couldn\'t open the phone app.',
+    },
+    'unknown': {'ar': 'غير معروف', 'en': 'Unknown'},
+    // Reports
+    'report_id_label': {'ar': 'رقم المستخدم (ID)', 'en': 'User ID'},
+    'report_id_hint': {
+      'ar': 'رقم ID للشخص الذي تبلغ عنه',
+      'en': 'The ID of the person you are reporting',
+    },
+    'report_content_label': {'ar': 'وصف المشكلة', 'en': 'What happened'},
+    'report_content_hint': {
+      'ar': 'اشرح المشكلة التي تواجهها',
+      'en': 'Describe the problem',
+    },
+    'report_submit': {'ar': 'إرسال البلاغ', 'en': 'Send report'},
+    'recent_reports': {'ar': 'آخر البلاغات', 'en': 'Recent reports'},
+    'no_previous_reports': {
+      'ar': 'لا توجد بلاغات سابقة',
+      'en': 'No previous reports',
+    },
+    'report_history_failed': {
+      'ar': 'تعذّر تحميل البلاغات السابقة.',
+      'en': 'Couldn\'t load your previous reports.',
+    },
+    'report_status_in_review': {'ar': 'قيد المراجعة', 'en': 'In review'},
+    'report_status_in_progress': {'ar': 'قيد المعالجة', 'en': 'In progress'},
+    'report_status_resolved': {'ar': 'تم الحل', 'en': 'Resolved'},
+    'report_status_rejected': {'ar': 'مرفوض', 'en': 'Rejected'},
+    // Profile
+    'profile_title': {'ar': 'الملف الشخصي', 'en': 'Profile'},
+    'profile_name': {'ar': 'الاسم', 'en': 'Name'},
+    'profile_name_updated': {'ar': 'تم تحديث الاسم', 'en': 'Name updated'},
+    'profile_confirm_email_change': {
+      'ar': 'تأكيد تغيير البريد',
+      'en': 'Confirm email change',
+    },
+    'profile_email_unchanged': {
+      'ar': 'البريد لم يتغير',
+      'en': 'The email hasn\'t changed',
+    },
+    'profile_email_updated': {
+      'ar': 'تم تحديث البريد. سجّل الدخول مجدداً بالبريد الجديد.',
+      'en': 'Email updated. Sign in again with the new email.',
+    },
+    'profile_enter_current_password': {
+      'ar': 'أدخل كلمة المرور الحالية',
+      'en': 'Enter your current password',
+    },
+    'profile_password_changed': {
+      'ar': 'تم تغيير كلمة المرور',
+      'en': 'Password changed',
+    },
+    'profile_phones': {'ar': 'أرقام الهاتف', 'en': 'Phone numbers'},
+    'profile_add_phone_hint': {
+      'ar': 'أضف رقم هاتف',
+      'en': 'Add a phone number',
+    },
+    'profile_make_primary': {'ar': 'اجعله أساسياً', 'en': 'Make primary'},
+    'profile_primary_phone': {'ar': 'الرقم الأساسي', 'en': 'Primary number'},
+    'profile_location_title': {
+      'ar': 'المحافظة والقرية / المدينة',
+      'en': 'Governorate and town/city',
+    },
+    'profile_location_hint': {
+      'ar': 'تُستخدم هذه المنطقة في إرسال واستقبال الطلبات داخل التطبيق.',
+      'en': 'This area is used to send and receive orders in the app.',
+    },
+    'profile_areas_failed': {
+      'ar': 'تعذر تحميل قائمة المناطق. حاول فتح الصفحة مرة أخرى.',
+      'en': 'Couldn\'t load the list of areas. Try opening this page again.',
+    },
+    'profile_pick_location_first': {
+      'ar': 'يرجى اختيار المحافظة والقرية/المدينة أولاً.',
+      'en': 'Please choose your governorate and town/city first.',
+    },
+    'profile_location_updated': {
+      'ar':
+          'تم تحديث المحافظة والقرية. الطلبات الجديدة ستستخدم المنطقة الجديدة.',
+      'en': 'Location updated. New orders will use the new area.',
+    },
+    'profile_whole_governorate': {'ar': 'من %s نفسها', 'en': 'Anywhere in %s'},
+    'profile_scope_carried': {
+      'ar':
+          'خيار العمل على مستوى المحافظة مفعّل، وسيُطبّق تلقائياً على المحافظة الجديدة.',
+      'en':
+          'Governorate-wide work is on and will apply to the new governorate automatically.',
+    },
+    'profile_location_note': {
+      'ar':
+          'تغيير المنطقة يؤثر على الطلبات الجديدة فقط. الطلبات الحالية تبقى في منطقتها الأصلية.',
+      'en':
+          'Changing the area only affects new orders. Current orders stay in their original area.',
+    },
+    'profile_save_location': {
+      'ar': 'حفظ المحافظة والقرية',
+      'en': 'Save location',
+    },
+    'town_city': {'ar': 'القرية / المدينة', 'en': 'Town / city'},
+    'saving': {'ar': 'جاري الحفظ...', 'en': 'Saving…'},
     // App
     'app_title': {'ar': 'سويفورا', 'en': 'Swifora'},
     'app_name': {'ar': 'سويفورا دليفري', 'en': 'Swifora Delivery'},

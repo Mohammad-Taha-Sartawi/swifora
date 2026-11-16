@@ -13,11 +13,11 @@ const backendRoot = path.resolve(__dirname, '..');
 
 const protectedFiles = new Map([
   ['src/index.js', 1],
-  ['src/routes/auth.js', 3],
+  ['src/routes/auth.js', 5],
   ['src/routes/passwordRecovery.js', 1],
   ['src/routes/chat.js', 12],
   ['src/routes/adminChat.js', 2],
-  ['src/routes/notifications.js', 4],
+  ['src/routes/notifications.js', 5],
   ['src/routes/offers.js', 5],
   ['src/routes/orders.js', 9],
   ['src/routes/provider.js', 7],
@@ -102,7 +102,7 @@ test('all STARS-009A HTTP 500 sites use the safe helper', () => {
     total += calls.length;
   }
 
-  assert.equal(total, 64);
+  assert.equal(total, 67);
 });
 
 test('controlled non-500 application errors remain intact', () => {
@@ -261,7 +261,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     [
       'src/routes/adminApi.js',
       // +2: driver display settings (commission card) get/put.
-      { error: 7, failure: 0 },
+      // +2: privacy policy / terms of use get/put.
+      { error: 9, failure: 0 },
     ],
     [
       'src/routes/adminAreas.js',
@@ -277,11 +278,13 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     ],
     [
       'src/routes/adminCommissions.js',
-      { error: 1, failure: 3 },
+      // +2: undo a "paid"/"reset", undo a "reset all".
+      { error: 1, failure: 5 },
     ],
     [
       'src/routes/adminDrivers.js',
-      { error: 7, failure: 9 },
+      // +1: clear reports from the driver's profile.
+      { error: 8, failure: 9 },
     ],
     [
       'src/routes/adminOrders.js',
@@ -293,7 +296,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     ],
     [
       'src/routes/adminUsers.js',
-      { error: 2, failure: 4 },
+      // +1: clear reports from the customer's profile.
+      { error: 3, failure: 4 },
     ],
   ]);
 
@@ -338,11 +342,11 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     failureTotal += failureCalls.length;
   }
 
-  assert.equal(errorTotal, 24);
-  assert.equal(failureTotal, 25);
+  assert.equal(errorTotal, 28);
+  assert.equal(failureTotal, 27);
   assert.equal(
     errorTotal + failureTotal,
-    49,
+    55,
   );
 });
 

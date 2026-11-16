@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'dart:async';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_event.dart';
+import '../models/provider_stats.dart';
 import '../models/user_model.dart';
 import '../services/api_config.dart';
 import '../services/mobile_api_client.dart';
@@ -12,18 +13,26 @@ import '../services/validators.dart';
 import '../services/responsive.dart';
 import '../services/localization_service.dart';
 import '../services/socket_service.dart';
+import '../services/theme_service.dart';
+import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_password_toggle.dart';
+import '../widgets/ui/app_tone.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel user;
   final String token;
   final ValueChanged<UserModel>? onUserUpdated;
 
+  /// The driver's rating (shown under the name); null for customers.
+  final ProviderStats? driverStats;
+
   const ProfileScreen({
     super.key,
     required this.user,
     required this.token,
     this.onUserUpdated,
+    this.driverStats,
   });
 
   @override
@@ -39,6 +48,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Map<String, dynamic>> _phones = [];
   final _phoneCtrl = TextEditingController();
   bool _loadingPhones = true;
+  bool _hideCurrentPass = true;
+  bool _hideNewPass = true;
+  bool _hideConfirmPass = true;
 
   late UserModel _currentUser = widget.user;
   late final _cityFieldKey = GlobalKey<FormFieldState<String>>();
@@ -122,7 +134,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final area = _selectedArea;
 
     if (governorate == null || area == null) {
-      AppFeedback.error(context, 'يرجى اختيار المحافظة والقرية/المدينة أولاً.');
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'profile_pick_location_first'),
+      );
       return;
     }
 
@@ -143,7 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.onUserUpdated?.call(updated);
       AppFeedback.success(
         context,
-        'تم تحديث المحافظة والقرية. الطلبات الجديدة ستستخدم المنطقة الجديدة.',
+        AppLocalization.get(context, 'profile_location_updated'),
       );
     } catch (e) {
       if (!mounted) return;
@@ -231,17 +246,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _removePhone(String number) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'delete_phone_confirm_title'),
+      message: AppLocalization.get(
+        context,
+        'delete_phone_confirm_message',
+      ).replaceFirst('%s', number),
+      confirmLabel: AppLocalization.get(context, 'delete'),
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
     try {
       await _client().delete('/users/phones', data: {'number': number});
       _loadPhones();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) AppFeedback.error(context, _requestError(e));
+    }
   }
 
   Future<void> _setPrimaryPhone(String number) async {
     try {
       await _client().put('/users/phones/primary', data: {'number': number});
       _loadPhones();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) AppFeedback.error(context, _requestError(e));
+    }
   }
 
   Future<void> _saveName() async {
@@ -251,7 +281,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final dio = _client();
       await dio.put('/users/profile', data: {'fullName': name});
       if (!mounted) return;
-      AppFeedback.success(context, 'تم تحديث الاسم');
+      AppFeedback.success(
+        context,
+        AppLocalization.get(context, 'profile_name_updated'),
+      );
     } catch (e) {
       if (!mounted) return;
       AppFeedback.error(context, e.toString());
@@ -265,14 +298,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return await showDialog<String>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('تأكيد تغيير البريد'),
+          title: Text(
+            AppLocalization.get(dialogContext, 'profile_confirm_email_change'),
+          ),
           content: TextField(
             controller: controller,
             obscureText: true,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'كلمة المرور الحالية',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: AppLocalization.get(dialogContext, 'current_password'),
+              border: const OutlineInputBorder(),
             ),
             onSubmitted: (value) {
               if (value.isNotEmpty) {
@@ -283,7 +318,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('إلغاء'),
+              child: Text(AppLocalization.get(dialogContext, 'cancel')),
             ),
             ElevatedButton(
               onPressed: () {
@@ -293,7 +328,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.of(dialogContext).pop(value);
                 }
               },
-              child: const Text('تأكيد'),
+              child: Text(AppLocalization.get(dialogContext, 'confirm')),
             ),
           ],
         ),
@@ -314,7 +349,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     if (email == _currentUser.email.trim().toLowerCase()) {
-      AppFeedback.info(context, 'البريد لم يتغير');
+      AppFeedback.info(
+        context,
+        AppLocalization.get(context, 'profile_email_unchanged'),
+      );
       return;
     }
 
@@ -342,7 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       AppFeedback.success(
         context,
-        'تم تحديث البريد. سجّل الدخول مجدداً بالبريد الجديد.',
+        AppLocalization.get(context, 'profile_email_updated'),
       );
 
       context.read<AuthBloc>().add(LogoutEvent());
@@ -359,7 +397,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirmPassword = _confirmPassCtrl.text;
 
     if (currentPassword.isEmpty) {
-      AppFeedback.error(context, 'أدخل كلمة المرور الحالية');
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'profile_enter_current_password'),
+      );
       return;
     }
 
@@ -371,7 +412,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     if (newPassword != confirmPassword) {
-      AppFeedback.error(context, 'كلمتا المرور غير متطابقتين');
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'password_mismatch'),
+      );
       return;
     }
 
@@ -397,7 +441,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
-      AppFeedback.success(context, 'تم تغيير كلمة المرور');
+      AppFeedback.success(
+        context,
+        AppLocalization.get(context, 'profile_password_changed'),
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -420,7 +467,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isProvider = widget.user.role == 'provider';
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('الملف الشخصي'), centerTitle: true),
+      appBar: AppBar(
+        title: Text(AppLocalization.get(context, 'profile_title')),
+        centerTitle: true,
+      ),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
@@ -432,25 +482,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             constraints: const BoxConstraints(maxWidth: 500),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 45,
-                  backgroundColor: isProvider
-                      ? scheme.secondaryContainer
-                      : scheme.primaryContainer,
-                  child: Text(
-                    _currentUser.fullName[0].toUpperCase(),
-                    style: TextStyle(
-                      color: isProvider
-                          ? scheme.onSecondaryContainer
-                          : scheme.onPrimaryContainer,
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Text(
                   _currentUser.fullName,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -469,10 +503,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontSize: 13,
                   ),
                 ),
+                if (isProvider && widget.driverStats != null) ...[
+                  const SizedBox(height: 12),
+                  _buildDriverRating(context, widget.driverStats!),
+                ],
                 const SizedBox(height: 24),
-                _buildSection('الاسم', _nameCtrl, onSave: _saveName),
                 _buildSection(
-                  'البريد الإلكتروني',
+                  AppLocalization.get(context, 'profile_name'),
+                  _nameCtrl,
+                  onSave: _saveName,
+                ),
+                _buildSection(
+                  AppLocalization.get(context, 'email'),
                   _emailCtrl,
                   onSave: _saveEmail,
                   latin: true,
@@ -480,9 +522,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 12),
                 _buildLocationSection(context),
                 const SizedBox(height: 12),
-                const Text(
-                  'أرقام الهاتف',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  AppLocalization.get(context, 'profile_phones'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -491,9 +533,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: TextField(
                         controller: _phoneCtrl,
                         textDirection: TextDirection.ltr,
-                        decoration: const InputDecoration(
-                          hintText: 'أضف رقم هاتف',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: AppLocalization.get(
+                            context,
+                            'profile_add_phone_hint',
+                          ),
+                          border: const OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.phone,
                         onSubmitted: (_) => _addPhone(),
@@ -528,24 +573,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               size: 20,
                             )
                           : const SizedBox(width: 20),
-                      title: Text(number, style: const TextStyle(fontSize: 14)),
+                      title: Text(number, textDirection: TextDirection.ltr),
+                      subtitle: isPrimary
+                          ? Text(
+                              AppLocalization.get(
+                                context,
+                                'profile_primary_phone',
+                              ),
+                            )
+                          : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            tooltip: AppLocalization.get(
-                              context,
-                              'edit_phone',
-                            ),
+                            tooltip: AppLocalization.get(context, 'edit_phone'),
                             icon: const Icon(Icons.edit_outlined, size: 18),
                             onPressed: () => _editPhone(number),
                           ),
                           if (!isPrimary)
                             TextButton(
                               onPressed: () => _setPrimaryPhone(number),
-                              child: const Text(
-                                'أساسي',
-                                style: TextStyle(fontSize: 11),
+                              child: Text(
+                                AppLocalization.get(
+                                  context,
+                                  'profile_make_primary',
+                                ),
                               ),
                             ),
                           if (!isPrimary)
@@ -563,35 +615,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     );
                   }),
                 const SizedBox(height: 12),
-                const Text(
-                  'تغيير كلمة المرور',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  AppLocalization.get(context, 'change_password'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _currentPassCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'كلمة المرور الحالية',
-                    border: OutlineInputBorder(),
+                  obscureText: _hideCurrentPass,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: InputDecoration(
+                    labelText: AppLocalization.get(context, 'current_password'),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: AppPasswordToggle(
+                      obscured: _hideCurrentPass,
+                      onPressed: () =>
+                          setState(() => _hideCurrentPass = !_hideCurrentPass),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _newPassCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'كلمة مرور جديدة',
-                    border: OutlineInputBorder(),
+                  obscureText: _hideNewPass,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: AppLocalization.get(context, 'new_password'),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: AppPasswordToggle(
+                      obscured: _hideNewPass,
+                      onPressed: () =>
+                          setState(() => _hideNewPass = !_hideNewPass),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _confirmPassCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'تأكيد كلمة المرور',
-                    border: OutlineInputBorder(),
+                  obscureText: _hideConfirmPass,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: AppLocalization.get(context, 'confirm_password'),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: AppPasswordToggle(
+                      obscured: _hideConfirmPass,
+                      onPressed: () =>
+                          setState(() => _hideConfirmPass = !_hideConfirmPass),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -599,7 +669,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: _changePassword,
-                    child: const Text('تغيير كلمة المرور'),
+                    child: Text(
+                      AppLocalization.get(context, 'change_password'),
+                    ),
                   ),
                 ),
               ],
@@ -630,15 +702,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Icon(Icons.location_on_outlined, color: scheme.primary),
               const SizedBox(width: 8),
-              const Text(
-                'المحافظة والقرية / المدينة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Expanded(
+                child: Text(
+                  AppLocalization.get(context, 'profile_location_title'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'تُستخدم هذه المنطقة في إرسال واستقبال الطلبات داخل التطبيق.',
+            AppLocalization.get(context, 'profile_location_hint'),
             style: TextStyle(
               color: scheme.onSurfaceVariant,
               fontSize: 12,
@@ -655,7 +732,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             )
           else if (_governorates.isEmpty)
             Text(
-              'تعذر تحميل قائمة المناطق. حاول فتح الصفحة مرة أخرى.',
+              AppLocalization.get(context, 'profile_areas_failed'),
               style: TextStyle(color: scheme.error, fontSize: 13),
             )
           else ...[
@@ -663,9 +740,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               key: const Key('profileGovernorateDropdown'),
               initialValue: _selectedGovernorate,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'المحافظة',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: AppLocalization.get(context, 'governorate'),
+                border: const OutlineInputBorder(),
               ),
               items: _governorates
                   .map(
@@ -690,16 +767,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               key: _cityFieldKey,
               initialValue: _selectedArea,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'القرية / المدينة',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: AppLocalization.get(context, 'town_city'),
+                border: const OutlineInputBorder(),
               ),
               items: governorate == null
                   ? const <DropdownMenuItem<String>>[]
                   : [
                       DropdownMenuItem(
                         value: governorate.areaValue,
-                        child: Text('من ${governorate.nativeName} نفسها'),
+                        child: Text(
+                          AppLocalization.get(
+                            context,
+                            'profile_whole_governorate',
+                          ).replaceFirst('%s', governorate.nativeName),
+                        ),
                       ),
                       ...governorate
                           .citiesSortedFor(
@@ -741,7 +823,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'خيار العمل على مستوى المحافظة مفعّل، وسيُطبّق تلقائياً على المحافظة الجديدة.',
+                        AppLocalization.get(context, 'profile_scope_carried'),
                         style: TextStyle(
                           color: scheme.onSecondaryContainer,
                           fontSize: 12,
@@ -755,7 +837,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
             const SizedBox(height: 8),
             Text(
-              'تغيير المنطقة يؤثر على الطلبات الجديدة فقط. الطلبات الحالية تبقى في منطقتها الأصلية.',
+              AppLocalization.get(context, 'profile_location_note'),
               style: TextStyle(
                 color: scheme.onSurfaceVariant,
                 fontSize: 11.5,
@@ -768,11 +850,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: _savingLocation ? null : _saveLocation,
               icon: const Icon(Icons.save_outlined, size: 18),
               label: Text(
-                _savingLocation ? 'جاري الحفظ...' : 'حفظ المحافظة والقرية',
+                _savingLocation
+                    ? AppLocalization.get(context, 'saving')
+                    : AppLocalization.get(context, 'profile_save_location'),
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// The driver's rating as a small chip under the name (moved here from
+  /// the home screen).
+  Widget _buildDriverRating(BuildContext context, ProviderStats stats) {
+    final theme = Theme.of(context);
+    final tone = appToneStyle(context, AppTone.accent);
+    final String label;
+    if (stats.ratingCount == 0) {
+      label = AppLocalization.get(context, 'no_ratings_yet');
+    } else {
+      final average = (stats.ratingStars / stats.ratingCount).toStringAsFixed(
+        1,
+      );
+      label =
+          '${AppLocalization.get(context, 'rating_average').replaceAll('%s', average)}'
+          ' · '
+          '${AppLocalization.get(context, 'rating_count').replaceAll('%d', '${stats.ratingCount}')}';
+    }
+    return Semantics(
+      key: const Key('profileDriverRating'),
+      label: '${AppLocalization.get(context, 'driver_rating')}: $label',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: tone.background,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(color: tone.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.star_rounded, size: AppSizes.iconSm, color: tone.solid),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: tone.foreground,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -216,6 +216,9 @@ class SwiforaRoundButton extends StatelessWidget {
   final int badgeCount;
   final String? badgeLabel;
 
+  /// Side of the square; 48 keeps three header buttons on small phones.
+  final double size;
+
   const SwiforaRoundButton({
     super.key,
     required this.child,
@@ -224,6 +227,7 @@ class SwiforaRoundButton extends StatelessWidget {
     this.highlighted = false,
     this.badgeCount = 0,
     this.badgeLabel,
+    this.size = 52,
   });
 
   @override
@@ -248,8 +252,8 @@ class SwiforaRoundButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           child: SizedBox(
-            width: 52,
-            height: 52,
+            width: size,
+            height: size,
             child: Center(
               child: IconTheme(
                 data: IconThemeData(

@@ -27,6 +27,7 @@ const {
   orderResponderFilter,
 } = require('../services/orderVisibility');
 const { arabicAreaName } = require('../services/locationCatalog');
+const { attachCustomerRatings } = require('../services/customerRatings');
 const {
   createUserNotification,
 } = require('../services/mobileNotifications');
@@ -305,6 +306,8 @@ router.get('/:id', auth, async (req, res) => {
 
       order.myOffer = offer || null;
       order.rejected = Boolean(rejected);
+      // How other drivers rated this customer (as on the new-orders list).
+      await attachCustomerRatings([order]);
       order.offerCooldownUntil =
         req.authUser.offerCooldownUntil
         && req.authUser.offerCooldownUntil > new Date()

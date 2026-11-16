@@ -5,6 +5,9 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const BroadcastMessage = require('../models/BroadcastMessage');
 
+// Broadcast messages stay pinned in the apps' notifications for 72 hours.
+const BROADCAST_PIN_MS = 72 * 60 * 60 * 1000;
+
 router.post('/:target', async (req, res) => {
   try {
     const { title, body } = req.body;
@@ -47,7 +50,8 @@ router.post('/:target', async (req, res) => {
       title: normalizedTitle,
       body: normalizedBody,
       pinned: true,
-      expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      // Pinned in the notifications list for 72 hours.
+      expireAt: new Date(Date.now() + BROADCAST_PIN_MS),
     }));
 
     if (notifications.length > 0) {
@@ -74,7 +78,7 @@ router.post('/:target', async (req, res) => {
       message: `تم إرسال الرسالة بنجاح إلى ${users.length} ${label}`,
       title: normalizedTitle,
       count: users.length,
-      sentAt: new Date().toLocaleString('ar-EG'),
+      sentAt: new Date().toISOString(),
       archiveId: archiveEntry._id.toString(),
     });
   } catch (err) {

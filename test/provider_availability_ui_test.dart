@@ -32,17 +32,15 @@ void main() {
 
     expect(home, contains('providerAvailabilityToggle'));
 
-    expect(home, contains('ListTile('));
-
+    // One compact row (owner request, 2026-11-16): what it controls, its
+    // state in a few words, and a switch; the whole row is the tap target.
     expect(home, isNot(contains('SwitchListTile')));
 
-    expect(home, contains("'driver_availability'"));
+    expect(home, contains("'availability_title'"));
 
-    expect(home, contains("'driver_availability_off'"));
+    expect(home, contains("'availability_on_short'"));
 
-    expect(home, contains("'driver_available'"));
-
-    expect(home, contains("'driver_unavailable'"));
+    expect(home, contains("'availability_off_short'"));
 
     final service = File(
       'lib/services/provider_service.dart',

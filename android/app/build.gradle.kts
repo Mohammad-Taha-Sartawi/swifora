@@ -92,7 +92,8 @@ android {
         applicationId = "com.swifora.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = maxOf(flutter.minSdkVersion, 23)
+        // 24: required by Sign in with Google (google_sign_in_android).
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

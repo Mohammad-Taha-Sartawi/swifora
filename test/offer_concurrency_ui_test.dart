@@ -90,7 +90,7 @@ void main() {
 
       expect(pending, contains('Duration(seconds: 15)'));
 
-      expect(pending, contains('await _refreshOrders()'));
+      expect(pending, contains('await _refreshOrders(userInitiated: true)'));
 
       expect(providerHome, contains('onConnected'));
 

@@ -6,7 +6,9 @@ import '../../bloc/app/app_event.dart';
 import '../../bloc/notification/notification_bloc.dart';
 import '../../bloc/notification/notification_state.dart';
 import '../../screens/notifications_screen.dart';
+import '../../screens/legal_document_screen.dart';
 import '../../screens/settings_screen.dart';
+import '../../services/legal_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/theme_service.dart';
 import 'swifora_brand.dart';
@@ -30,8 +32,13 @@ Future<void> openSwiforaNotifications(BuildContext context, String token) {
 /// Notifications bell with the unread count.
 class SwiforaNotificationButton extends StatelessWidget {
   final String token;
+  final double size;
 
-  const SwiforaNotificationButton({super.key, required this.token});
+  const SwiforaNotificationButton({
+    super.key,
+    required this.token,
+    this.size = SwiforaHeaderAction.size,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +52,7 @@ class SwiforaNotificationButton extends StatelessWidget {
           badgeLabel:
               '$tooltip. ${AppLocalization.get(context, 'unread_notifications').replaceAll('%d', '$unread')}',
           onPressed: () => openSwiforaNotifications(context, token),
+          size: size,
           child: const Icon(Icons.notifications_none_rounded),
         );
       },
@@ -52,33 +60,40 @@ class SwiforaNotificationButton extends StatelessWidget {
   }
 }
 
-/// The account button: the user's initial, opening the account menu.
-class SwiforaAccountButton extends StatelessWidget {
-  final String fullName;
-  final VoidCallback onPressed;
+/// A header action next to the notifications (support, report). The account
+/// menu is in the bottom bar ("Account"), so the header has no initial-letter
+/// button.
+class SwiforaHeaderAction extends StatelessWidget {
+  static const double size = 48;
 
-  const SwiforaAccountButton({
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final int badgeCount;
+  final String? badgeLabel;
+
+  const SwiforaHeaderAction({
     super.key,
-    required this.fullName,
+    required this.icon,
+    required this.tooltip,
     required this.onPressed,
+    this.badgeCount = 0,
+    this.badgeLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    final initial = fullName.trim().isNotEmpty
-        ? fullName.trim().characters.first.toUpperCase()
-        : '?';
     return SwiforaRoundButton(
-      key: const Key('accountMenuButton'),
-      tooltip: AppLocalization.get(context, 'nav_account'),
-      highlighted: true,
+      tooltip: tooltip,
+      badgeCount: badgeCount,
+      badgeLabel: badgeLabel,
       onPressed: onPressed,
-      child: Text(initial),
+      size: size,
+      child: Icon(icon),
     );
   }
 }
 
-/// Account menu: profile, theme, language, settings and logout.
 Future<void> showSwiforaAccountSheet(
   BuildContext context, {
   required String fullName,
@@ -178,6 +193,24 @@ Future<void> showSwiforaAccountSheet(
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
+                },
+              ),
+              tile(
+                key: const Key('accountPrivacyPolicy'),
+                icon: Icons.privacy_tip_outlined,
+                label: AppLocalization.get(sheetContext, 'privacy_policy'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  LegalDocumentScreen.open(context, LegalService.privacy);
+                },
+              ),
+              tile(
+                key: const Key('accountTermsOfUse'),
+                icon: Icons.description_outlined,
+                label: AppLocalization.get(sheetContext, 'terms_of_use'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  LegalDocumentScreen.open(context, LegalService.terms);
                 },
               ),
               const Divider(),

@@ -122,7 +122,7 @@ test('legacy chat, report detail, and report replies encode message text', () =>
     '${escapeHtml(msg.time)}',
     '${escapeHtml(report.reporter)}',
     '${escapeHtml(report.category)}',
-    '${escapeHtml(report.date)}',
+    '${escapeHtml(formatDisplayDate(report.date))}',
     '${escapeHtml(report.content)}',
   ]) {
     assert.ok(
@@ -154,7 +154,7 @@ test('commission and area HTML builders encode displayed database values', () =>
 
 test('report table builders encode reporter, category, ids, dates, and preview content', () => {
   const hardenedPrefix =
-    'rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(report.date)}</td>';
+    'rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td>';
 
   assert.equal(
     source.split(
@@ -182,16 +182,16 @@ test('documents, financial rows, orders, broadcast, and pending providers encode
     '${escapeHtml(documentStatusText)}',
     '${escapeHtml(t.id.slice(-8))}',
     '${escapeHtml(t.desc)}',
-    '${escapeHtml(t.date)}',
+    '${escapeHtml(formatDisplayDate(t.date))}',
     '${escapeHtml(t.amount)}',
     '${escapeHtml(o.orderId)}',
     '${escapeHtml(o.type)}',
-    '${escapeHtml(o.date)}',
+    '${escapeHtml(formatDisplayDate(o.date))}',
     '${escapeHtml(o.status)}',
     '${escapeHtml(o.amount)}',
     '${escapeHtml(data.count)}',
     '${escapeHtml(title)}',
-    '${escapeHtml(data.sentAt)}',
+    '${escapeHtml(formatDisplayDateTime(data.sentAt))}',
     '${escapeHtml(provider.fullName)}',
     '${escapeHtml(provider.email)}',
     '${escapeHtml(provider.phone)}',

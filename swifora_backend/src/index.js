@@ -58,6 +58,7 @@ const adminBroadcastRoutes = require('./routes/adminBroadcast');
 const adminChatRoutes = require('./routes/adminChat');
 const adminOrderRoutes = require('./routes/adminOrders');
 const adminApiRoutes = require('./routes/adminApi');
+const legalRoutes = require('./routes/legal');
 const adminAdRoutes = require('./routes/adminAds');
 
 const app = express();
@@ -556,6 +557,10 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ads', adRoutes);
 app.use('/api/locations', locationRoutes);
+// Privacy policy and terms of use (public, read-only).
+app.use('/api/legal', legalRoutes);
+app.get('/privacy', legalRoutes.legalPage('privacy'));
+app.get('/terms', legalRoutes.legalPage('terms'));
 
 app.use('/admin', adminAuthRoutes);
 

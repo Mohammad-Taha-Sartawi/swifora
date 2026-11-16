@@ -20,12 +20,12 @@ import '../services/order_service.dart';
 import '../services/notification_router.dart';
 import '../services/push_notification_service.dart';
 import '../services/support_chat_service.dart';
-import '../widgets/ui/app_action_tile.dart';
 import '../widgets/ui/ad_banner_carousel.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/brand/swifora_brand.dart';
+import '../widgets/ui/broadcast_popup.dart';
 import '../widgets/brand/swifora_home_chrome.dart';
 import '../services/ad_repository.dart';
 import 'create_order_screen.dart';
@@ -53,7 +53,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver, BroadcastPopupHost {
   final OrderService _orderService = OrderService();
   Timer? _notifTimer;
   int _pendingOrdersCount = 0;
@@ -84,6 +85,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Messages sent from the dashboard while the app was closed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(showPendingBroadcasts(widget.token));
+    });
     // Ad banner: views/taps go to the dashboard's tracking tab; a tap opens
     // the screen or web page chosen in the dashboard.
     _adEvents = ApiAdEvents(
@@ -217,11 +222,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _broadcastSub = SocketService.instance.onBroadcast.listen((_) {
       if (!mounted) return;
-      // Admin broadcasts are notification-only; do not show a home snackbar
-      // and do not touch the support-chat unread counter.
+      // A message from the dashboard: refresh the list and show it as a
+      // pop-up (it stays pinned in the notifications for 72 hours). It does
+      // not touch the support-chat unread counter.
       context.read<NotificationBloc>().add(
         LoadNotifications(token: widget.token),
       );
+      unawaited(showPendingBroadcasts(widget.token));
     });
 
     _accountDeletedSub = SocketService.instance.onAccountDeleted.listen((_) {
@@ -238,6 +245,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// profile, chat) or a dialog, and never when that screen is already the
   /// one on top ([alreadyShowing]).
   bool _canOpenForLiveEvent(Set<String> alreadyShowing) {
+    // A dashboard message is on screen: do not cover it.
+    if (isBroadcastDialogShowing) return false;
     if (!mounted) return false;
     final visibleList = VisibleListScreen.tag;
     if (visibleList != null && alreadyShowing.contains(visibleList)) {
@@ -426,6 +435,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _loadOrderCounts();
       _loadAvailableDriversCount();
       _loadSupportUnreadCount();
+      unawaited(showPendingBroadcasts(widget.token));
 
       Future.delayed(const Duration(seconds: 3), () {
         if (!mounted) return;
@@ -558,9 +568,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       SwiforaHeader(
                         actions: [
                           SwiforaNotificationButton(token: widget.token),
-                          SwiforaAccountButton(
-                            fullName: _user.fullName,
-                            onPressed: _openAccountMenu,
+                          SwiforaHeaderAction(
+                            key: const Key('headerSupportButton'),
+                            icon: Icons.headset_mic_outlined,
+                            tooltip: AppLocalization.get(
+                              context,
+                              'contact_support',
+                            ),
+                            badgeCount: _supportUnreadCount,
+                            onPressed: _openSupport,
+                          ),
+                          SwiforaHeaderAction(
+                            key: const Key('headerReportButton'),
+                            icon: Icons.report_outlined,
+                            tooltip: AppLocalization.get(
+                              context,
+                              'report_driver',
+                            ),
+                            onPressed: _openReportDriver,
                           ),
                         ],
                       ),
@@ -575,6 +600,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
+                      // The full name, as on the driver's home.
+                      Text(
+                        _user.fullName,
+                        key: const Key('homeFullName'),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       Text(
                         AppLocalization.get(context, 'home_subtitle'),
                         style: theme.textTheme.bodyLarge?.copyWith(
@@ -587,8 +621,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         const SizedBox(height: AppSpacing.md),
                         _buildAvailableDriversBanner(context),
                       ],
-                      // Advertisements stay below the main action, never
-                      // in place of it.
+                      // Advertisements: right after the main card and before
+                      // the orders (same place on the driver's home).
                       AdBannerCarousel(
                         token: widget.token,
                         refreshTick: _adRefreshTick,
@@ -658,50 +692,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onTap: _openOnTheWay,
                         ),
                       ],
-                      const SizedBox(height: AppSpacing.lg),
-                      SwiforaSectionTitle(
-                        title: AppLocalization.get(
-                          context,
-                          'help_and_report_section',
-                        ),
-                      ),
-                      AppActionWrap(
-                        children: [
-                          AppActionTile(
-                            icon: Icons.report_outlined,
-                            title: AppLocalization.get(
-                              context,
-                              'report_driver',
-                            ),
-                            tone: AppTone.danger,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ReportScreen(
-                                    token: widget.token,
-                                    reportType: 'driver',
-                                    title: AppLocalization.get(
-                                      context,
-                                      'report_driver',
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          AppActionTile(
-                            icon: Icons.headset_mic_outlined,
-                            title: AppLocalization.get(
-                              context,
-                              'contact_support',
-                            ),
-                            tone: AppTone.accent,
-                            badgeCount: _supportUnreadCount,
-                            onTap: _openSupport,
-                          ),
-                        ],
-                      ),
                       const SizedBox(height: AppSpacing.xl),
                     ],
                   ),
@@ -727,6 +717,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (_) {
       // Session failures are handled by the session listeners.
     }
+  }
+
+  void _openReportDriver() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportScreen(
+          token: widget.token,
+          reportType: 'driver',
+          title: AppLocalization.get(context, 'report_driver'),
+        ),
+      ),
+    );
   }
 
   Future<void> _openSupport() async {
@@ -791,6 +794,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
         ),
       ),
+    );
+  }
+
+  @override
+  void onBroadcastsConfirmed() {
+    context.read<NotificationBloc>().add(
+      LoadNotifications(token: widget.token),
     );
   }
 

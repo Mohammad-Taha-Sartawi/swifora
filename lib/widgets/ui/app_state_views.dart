@@ -52,7 +52,7 @@ class AppEmptyState extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -113,7 +113,7 @@ class AppErrorState extends StatelessWidget {
     final tone = appToneStyle(context, AppTone.danger);
 
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,

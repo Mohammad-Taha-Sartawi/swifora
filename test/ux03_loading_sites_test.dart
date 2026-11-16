@@ -76,7 +76,8 @@ void main() {
     await tester.enterText(fields.at(1), 'Problem description');
 
     final semantics = tester.ensureSemantics();
-    await tester.tap(find.text('إرسال البلاغ'));
+    // The screen follows the app language now (English in this harness).
+    await tester.tap(find.text('Send report'));
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byType(AppButtonLoadingIndicator), findsOneWidget);

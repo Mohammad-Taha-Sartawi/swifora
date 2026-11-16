@@ -6,6 +6,9 @@ class NotificationModel {
   final String body;
   final bool read;
   final bool pinned;
+
+  /// The user already confirmed this broadcast's pop-up.
+  final bool acknowledged;
   final String createdAt;
 
   NotificationModel({
@@ -17,6 +20,7 @@ class NotificationModel {
     required this.read,
     required this.createdAt,
     this.pinned = false,
+    this.acknowledged = false,
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,7 @@ class NotificationModel {
       body: json['body'] ?? '',
       read: json['read'] ?? false,
       pinned: json['pinned'] ?? false,
+      acknowledged: json['acknowledgedAt'] != null,
       createdAt: json['createdAt']?.toString() ?? '',
     );
   }

@@ -8,6 +8,7 @@ import '../services/localization_service.dart';
 import '../services/provider_service.dart';
 import '../services/responsive.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/ui/star_rating_dialog.dart';
@@ -143,29 +144,16 @@ class _RejectedOrdersScreenState extends State<RejectedOrdersScreen>
 
     if (_error != null) {
       return ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(40),
-            child: Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: scheme.error),
-            ),
-          ),
-        ],
+        children: [AppErrorState(message: _error!, onRetry: _load)],
       );
     }
 
     if (_orders.isEmpty) {
       return ListView(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(40),
-            child: Text(
-              AppLocalization.get(context, 'no_rejected_orders'),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant),
-            ),
+          AppEmptyState(
+            icon: Icons.block_outlined,
+            title: AppLocalization.get(context, 'no_rejected_orders'),
           ),
         ],
       );

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> — سويفورا دليفري</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/legal.css">
+</head>
+<body>
+  <main class="legal-page">
+    <header>
+      <p class="legal-brand">سويفورا دليفري</p>
+      <h1><%= title %></h1>
+      <% if (updatedLabel) { %><p class="legal-updated">آخر تحديث: <span dir="ltr"><%= updatedLabel %></span></p><% } %>
+    </header>
+    <% if (paragraphs.length === 1 && paragraphs[0].join('').trim() === '') { %>
+      <p class="legal-empty">لم يُنشر هذا النص بعد.</p>
+    <% } else { %>
+      <% paragraphs.forEach(function (lines) { %>
+        <p dir="auto"><% lines.forEach(function (line, i) { %><% if (i > 0) { %><br><% } %><%= line %><% }); %></p>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>

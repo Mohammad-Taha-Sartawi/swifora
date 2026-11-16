@@ -33,6 +33,7 @@ const {
   findActiveAccountByPublicId,
 } = require('../services/accountRelease');
 const { isValidAdminPublicId } = require('../utils/publicId');
+const { profileReportStatus, clearProfileReports } = require('../services/profileReports');
 const {
   normalizePhoneNumber,
   isValidPhoneNumber,
@@ -117,6 +118,8 @@ router.get('/search', async (req, res) => {
       status: user.status === 'blocked' ? 'inactive' : user.status,
       publicId: user.publicId || '',
       rating: ratingSummary,
+      // Reports filed against the customer (profile status).
+      profileStatus: await profileReportStatus(user),
       orders: orders.map(o => ({
         fullId: o._id.toString(),
         orderId: o._id.toString().slice(-8),
@@ -133,6 +136,36 @@ router.get('/search', async (req, res) => {
     res.json({ user: mappedUser });
   } catch (err) {
     sendInternalServerError(res);
+  }
+});
+
+// Profile status: clear the reports filed against this customer from the
+// profile (the reports themselves stay in the reports pages).
+router.post('/:id/profile-reports/clear', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
+    }
+    const person = await User.findOne({
+      _id: req.params.id,
+      role: 'customer',
+      deleted: { $ne: true },
+    }).select('_id role publicId').lean();
+    if (!person) {
+      return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });
+    }
+    const adminId = req.session?.admin?.id;
+    const cleared = await clearProfileReports(
+      person,
+      mongoose.isValidObjectId(adminId) ? adminId : null,
+    );
+    return res.json({
+      success: true,
+      cleared,
+      profileStatus: await profileReportStatus(person),
+    });
+  } catch (err) {
+    return sendInternalServerError(res);
   }
 });
 

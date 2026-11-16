@@ -91,7 +91,7 @@ function adminDialog({ message, kind, danger = false, password = false }) {
 }
 
 function adminConfirm(message) {
-  const danger = /حذف|رفض|إلغاء|تصفير/.test(String(message));
+  const danger = /حذف|رفض|إلغاء|تصفير|مسح/.test(String(message));
   return adminDialog({ message, kind: 'confirm', danger });
 }
 
@@ -313,6 +313,7 @@ function loadPageData(page) {
     if (page === 'settings') {
       loadCommissionSettings();
       loadDriverDisplaySettings();
+      loadLegalDocuments();
     }
     if (page === 'driver-reports') loadDriverReports();
       if (page === 'user-reports') loadUserReports();
@@ -540,6 +541,9 @@ const adminActionHandlers = Object.freeze({
   openEditDriver,
   openInlineDriverEdit,
   closeDriverEdit,
+  clearProfileReports,
+  undoCommissionAction,
+  undoResetAll,
   openEditUser,
   closeUserEdit,
   openListModal,
@@ -1307,6 +1311,65 @@ if (driverResultElement) {
   });
 }
 
+// ---- Profile status: reports filed against a driver or a customer ----
+// role: 'driver' | 'user'. Cleared reports stay in the reports pages; they
+// only stop counting against the profile.
+function profileStatusSection(status, role, id) {
+  const s = status || {};
+  const total = Number(s.total) || 0;
+  const badge = total > 0
+    ? `<span class="profile-reports-count has-reports">${escapeHtml(total)} بلاغ</span>`
+    : '<span class="profile-reports-count">لا توجد بلاغات</span>';
+  const breakdown = total > 0
+    ? `<div class="row"><span class="label">تفاصيل البلاغات</span><span class="value">قيد المراجعة ${escapeHtml(Number(s.open) || 0)} · تم الحل ${escapeHtml(Number(s.resolved) || 0)} · مرفوضة ${escapeHtml(Number(s.rejected) || 0)}</span></div>
+       <div class="row"><span class="label">آخر بلاغ</span><span class="value">${escapeHtml(formatDisplayDate(s.lastReportedAt))}</span></div>`
+    : '';
+  const cleared = Number(s.cleared) > 0
+    ? `<div class="row"><span class="label">بلاغات مُسحت من الملف سابقاً</span><span class="value">${escapeHtml(Number(s.cleared))}</span></div>`
+    : '';
+  const button = total > 0
+    ? `<button class="action-btn clear-reports" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="clearProfileReports" data-admin-arg-count="2" data-admin-arg-1="${escapeHtml(role)}" data-admin-arg-2="${escapeHtml(String(id))}"><i class="fas fa-broom"></i> مسح البلاغات من الملف</button>`
+    : '<button class="action-btn clear-reports" disabled><i class="fas fa-broom"></i> مسح البلاغات من الملف</button>';
+  return `
+    <div class="profile-status" role="group" aria-label="حالة الملف الشخصي">
+      <h5>حالة الملف الشخصي</h5>
+      <div class="row"><span class="label">عدد البلاغات ضده</span><span class="value">${badge}</span></div>
+      ${breakdown}
+      ${cleared}
+      <div class="profile-status-actions">${button}</div>
+    </div>`;
+}
+
+async function clearProfileReports(role, id) {
+  const isDriver = role === 'driver';
+  const confirmed = await adminConfirm(
+    `مسح البلاغات من ملف ${isDriver ? 'السائق' : 'المستخدم'}؟ سيصبح عدد البلاغات ضده صفراً. `
+    + 'البلاغات نفسها تبقى في صفحة البلاغات ولا تُحذف.',
+  );
+  if (!confirmed) return;
+  try {
+    const base = isDriver ? '/admin/drivers' : '/admin/users';
+    const res = await adminFetch(`${base}/${encodeURIComponent(id)}/profile-reports/clear`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      await adminAlert(data.message || 'تعذر مسح البلاغات.');
+      return;
+    }
+    // Redraw the card with the fresh figures.
+    const again = await adminFetch(`${base}/search?id=${encodeURIComponent(id)}`);
+    const fresh = await again.json();
+    if (!fresh.error) {
+      if (isDriver) renderDriverResultFromDB(fresh);
+      else renderUserResultFromDB(fresh.user);
+    }
+    await adminAlert(data.cleared > 0
+      ? `تم مسح ${data.cleared} بلاغ من الملف.`
+      : 'لا توجد بلاغات لمسحها.');
+  } catch (err) {
+    await adminAlert('تعذر مسح البلاغات. حاول مرة أخرى.');
+  }
+}
+
 function renderDriverResultFromDB(data) {
   const {
     driver,
@@ -1344,10 +1407,12 @@ function renderDriverResultFromDB(data) {
     <div class="row"><span class="label">إجمالي الطلبات غير المقبولة</span><span class="value">${escapeHtml(notAcceptedOrdersCount ?? 0)}</span></div>
     <div class="driver-orders-note">المقبولة: الطلبات التي قبلها الزبون وأُسندت للسائق. غير المقبولة: الطلبات التي رفضها السائق، أو لم يقبل الزبون عرضه، أو انتهت مهلة قبول عرض السعر.</div>
     <div class="row"><span class="label">حالة الدفع</span><span class="value">${paymentLabel}</span></div>
-    ${Array.isArray(driver.financial.payments) && driver.financial.payments.length > 0 ? `<div class="row"><span class="label">آخر دفعة مسجلة</span><span class="value">${escapeHtml(driver.financial.payments[0].amount)} شيكل — ${escapeHtml(new Date(driver.financial.payments[0].paidAt).toLocaleString('ar-EG'))}</span></div>` : ''}
+    ${Array.isArray(driver.financial.payments) && driver.financial.payments.length > 0 ? `<div class="row"><span class="label">آخر دفعة مسجلة</span><span class="value">${escapeHtml(driver.financial.payments[0].amount)} شيكل — ${escapeHtml(formatDisplayDateTime(driver.financial.payments[0].paidAt))}</span></div>` : ''}
     <div class="row"><span class="label">إجمالي الأرباح (صافي)</span><span class="value" data-presentation="p002">${escapeHtml(netProfit)} </div>
     <div class="row"><span class="label">أرباح آخر 30 يوم (صافي)</span><span class="value" data-presentation="p018">${escapeHtml(last30Profit)} </div>
     <div class="row"><span class="label">عمولة المنصة المستحقة</span><span class="value" data-presentation="p019">${escapeHtml(commission)} </div>
+    ${driver.lastCommissionAction ? `<div class="row commission-last-action"><span class="label">آخر عملية على العمولة</span><span class="value">${commissionActionLabel(driver.lastCommissionAction)} ${commissionUndoButton(driver.lastCommissionAction, driver._id)}</span></div>` : ''}
+    ${profileStatusSection(driver.profileStatus, 'driver', driver._id)}
     <div class="action-buttons">
       <button class="action-btn change-password" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openInlineDriverEdit" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تعديل بيانات السائق</button>
       <button class="action-btn chat" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openChat" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(driver._id))}">مراسلة</button>
@@ -1405,12 +1470,13 @@ function renderUserResultFromDB(user) {
     <div class="row"><span class="label">الاسم الكامل</span><span class="value">${escapeHtml(user.name)}</span></div>
     <div class="row"><span class="label">البريد الإلكتروني</span><span class="value">${escapeHtml(user.email)}</span></div>
     <div class="row"><span class="label">رقم الجوال</span><span class="value">${escapeHtml(user.phone)}</span></div>
-    <div class="row"><span class="label">تاريخ التسجيل</span><span class="value">${escapeHtml(user.joinDate)}</span></div>
+    <div class="row"><span class="label">تاريخ التسجيل</span><span class="value">${escapeHtml(formatDisplayDate(user.joinDate))}</span></div>
     <div class="row"><span class="label">المحافظة</span><span class="value">${escapeHtml(user.governorate || 'غير محدد')}</span></div>
     <div class="row"><span class="label">المدينة / القرية</span><span class="value">${escapeHtml(user.city || user.area || 'غير محدد')}</span></div>
     <div class="row"><span class="label">الحالة</span><span class="value">${getStatusBadge(user.status)}</span></div>
     <div class="row"><span class="label">عدد الطلبات</span><span class="value">${escapeHtml(orderCount)}</span></div>
     <div class="row"><span class="label">تقييم السائقين له</span><span class="value">${user.rating && user.rating.count > 0 ? `⭐ ${escapeHtml(user.rating.average)} من 5 (${escapeHtml(user.rating.count)} تقييم)` : 'لا توجد تقييمات بعد'}</span></div>
+    ${profileStatusSection(user.profileStatus, 'user', user._id)}
     <div class="action-buttons">
       <button class="action-btn chat" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openChat" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(user._id))}">مراسلة</button>
       <button class="action-btn edit" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openEditUser" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(user._id))}">تعديل البيانات</button>
@@ -1739,6 +1805,122 @@ if (driverDisplaySettingsForm) {
   driverDisplaySettingsForm.addEventListener('submit', saveDriverDisplaySettings);
 }
 
+// ---- Privacy policy and terms of use ----
+// The editor always opens with the saved text; the admin edits it, or
+// clears it and writes a new one, then saves. Unsaved edits are never
+// replaced when the settings page is opened again.
+const LEGAL_KEYS = ['privacy', 'terms'];
+
+function legalElements(key) {
+  return {
+    editor: document.getElementById(`legal-${key}-content`),
+    updated: document.getElementById(`legal-${key}-updated`),
+    count: document.getElementById(`legal-${key}-count`),
+    message: document.getElementById(`legal-${key}-message`),
+  };
+}
+
+function legalIsDirty(editor) {
+  return editor.value !== (editor.dataset.savedValue ?? '');
+}
+
+function renderLegalMeta(key) {
+  const { editor, updated, count } = legalElements(key);
+  if (!editor) return;
+  if (count) count.textContent = `${editor.value.length} / ${editor.maxLength}`;
+  if (!updated) return;
+  const savedAt = editor.dataset.savedAt;
+  const savedLabel = savedAt
+    ? `آخر حفظ: ${formatDisplayDateTime(savedAt)}`
+    : editor.dataset.isDefault === 'true'
+      ? 'هذا هو النص الحالي في التطبيق (لم يُعدَّل من لوحة التحكم بعد).'
+      : 'لم يُحفظ نص بعد.';
+  updated.textContent = legalIsDirty(editor)
+    ? `${savedLabel} — تغييرات غير محفوظة`
+    : savedLabel;
+  updated.classList.toggle('legal-dirty', legalIsDirty(editor));
+}
+
+function setLegalMessage(key, text, kind) {
+  const { message } = legalElements(key);
+  if (!message) return;
+  message.textContent = text;
+  message.className = `settings-message${kind ? ` ${kind}` : ''}`;
+}
+
+function applySavedLegal(key, data) {
+  const { editor } = legalElements(key);
+  if (!editor) return;
+  editor.value = data.content || '';
+  editor.dataset.savedValue = editor.value;
+  editor.dataset.savedAt = data.updatedAt || '';
+  editor.dataset.isDefault = data.isDefault ? 'true' : 'false';
+  renderLegalMeta(key);
+}
+
+async function loadLegalDocuments() {
+  for (const key of LEGAL_KEYS) {
+    const { editor } = legalElements(key);
+    if (!editor) continue;
+    // Keep what the admin is in the middle of writing.
+    if (editor.dataset.savedValue !== undefined && legalIsDirty(editor)) continue;
+    try {
+      const res = await adminFetch(`/admin/api/legal/${key}`);
+      if (!res.ok) throw new Error('load');
+      applySavedLegal(key, await res.json());
+      setLegalMessage(key, '', '');
+    } catch (err) {
+      setLegalMessage(key, 'تعذر تحميل النص المحفوظ. أعد فتح الصفحة.', 'error');
+    }
+  }
+}
+
+async function saveLegalDocument(event) {
+  event.preventDefault();
+  const key = event.currentTarget.dataset.legalKey;
+  const { editor } = legalElements(key);
+  if (!editor) return;
+  const submit = event.currentTarget.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const res = await adminFetch(`/admin/api/legal/${key}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: editor.value }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      setLegalMessage(key, data.message || 'تعذر حفظ النص.', 'error');
+      return;
+    }
+    applySavedLegal(key, data);
+    setLegalMessage(key, data.content ? 'تم حفظ النص.' : 'تم مسح النص المحفوظ.', 'success');
+  } catch (err) {
+    setLegalMessage(key, 'تعذر حفظ النص. لم يتغير النص المحفوظ.', 'error');
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+document.querySelectorAll('.legal-form[data-legal-key]').forEach((form) => {
+  const key = form.dataset.legalKey;
+  form.addEventListener('submit', saveLegalDocument);
+  const { editor } = legalElements(key);
+  if (editor) editor.addEventListener('input', () => renderLegalMeta(key));
+});
+
+document.querySelectorAll('[data-legal-clear]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const key = button.dataset.legalClear;
+    const { editor } = legalElements(key);
+    if (!editor) return;
+    editor.value = '';
+    editor.focus();
+    renderLegalMeta(key);
+    setLegalMessage(key, 'تم مسح النص من المحرر. اكتب نصاً جديداً ثم اضغط حفظ (لن يتغير النص المحفوظ قبل الحفظ).', '');
+  });
+});
+
 async function loadCommissions() {
   try {
     const res = await adminFetch('/admin/commissions');
@@ -1759,11 +1941,17 @@ async function loadCommissions() {
         ? `<button class="action-btn pay-now" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="markPaid" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}" data-presentation="p020">تحديد كمدفوع</button>`
         : '';
       const resetAction = `<button class="action-btn reset-commissions" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resetDriverCommission" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تصفير العداد</button>`;
-      const actionHtml = `<div class="table-actions">${payAction}${resetAction}</div>`;
+      const undoAction = commissionUndoButton(driver.lastAction, driver._id);
+      const actionHtml = `<div class="table-actions">${payAction}${resetAction}${undoAction}</div>`;
       rows += `<tr><td><strong>${escapeHtml(driver.name)}</strong><br><small data-presentation="p008">${escapeHtml(driver.driverId)}</small></td><td>${escapeHtml(driver.phone || 'غير متوفر')}</td><td>${escapeHtml(driver.serviceType)}</td><td>${escapeHtml(driver.commission)}</td><td>${statusText}</td><td>${actionHtml}</td></tr>`;
     });
 
+    const resetAll = data.lastResetAll;
+    const resetAllBar = resetAll
+      ? `<div class="undo-reset-all" role="status"><span>آخر «تصفير الكل»: ${escapeHtml(resetAll.drivers)} سائق، ${escapeHtml(resetAll.amount)} شيكل — ${escapeHtml(formatDisplayDateTime(resetAll.at))}</span><button class="action-btn undo-commission" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="undoResetAll" data-admin-arg-count="3" data-admin-arg-1="${escapeHtml(resetAll.batchId)}" data-admin-arg-2="${escapeHtml(resetAll.drivers)}" data-admin-arg-3="${escapeHtml(resetAll.amount)}"><i class="fas fa-rotate-left"></i> تراجع عن تصفير الكل</button></div>`
+      : '';
     document.getElementById('commissionsContent').innerHTML = `
+      ${resetAllBar}
       <div class="commissions-summary">
         <div class="summary-card"><div class="label">إجمالي العمولات المستحقة</div><div class="number red">${escapeHtml(data.totalUnpaid)} </div></div>
         <div class="summary-card"><div class="label">عدد السائقين المستحقين</div><div class="number orange">${escapeHtml(data.unpaidDrivers)}</div></div>
@@ -1783,13 +1971,82 @@ async function loadCommissions() {
   }
 }
 
+// ---- Undo a commission "paid" / "reset" (newest first) ----
+function commissionActionLabel(action) {
+  if (!action) return '';
+  const amount = `${escapeHtml(action.amount)} شيكل`;
+  const when = escapeHtml(formatDisplayDateTime(action.at));
+  return action.type === 'payment'
+    ? `تسجيل دفع ${amount} — ${when}`
+    : `تصفير العداد (${amount}) — ${when}`;
+}
+
+function commissionUndoButton(action, driverId) {
+  if (!action) return '';
+  const label = action.type === 'payment' ? 'تراجع عن الدفع' : 'تراجع عن التصفير';
+  return `<button class="action-btn undo-commission" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="undoCommissionAction" data-admin-arg-count="4" data-admin-arg-1="${escapeHtml(action.id)}" data-admin-arg-2="${escapeHtml(String(driverId))}" data-admin-arg-3="${escapeHtml(action.type)}" data-admin-arg-4="${escapeHtml(action.amount)}"><i class="fas fa-rotate-left"></i> ${label}</button>`;
+}
+
+function refreshAfterCommissionChange(driverId) {
+  loadCommissions();
+  loadDashboardStats();
+  const driversPage = document.getElementById('page-drivers');
+  if (driverId && driversPage && driversPage.classList.contains('active-page')) {
+    searchDriverById(driverId);
+  }
+  refreshPayoutsModal();
+}
+
+async function undoCommissionAction(actionId, driverId, type, amount) {
+  const message = type === 'payment'
+    ? `التراجع عن تسجيل دفع ${amount} شيكل؟ سيعود المبلغ مستحقاً على السائق كما كان قبل الدفع.`
+    : `التراجع عن تصفير العداد؟ ستعود عمولة المنصة (${amount} شيكل) مستحقة على السائق كما كانت قبل التصفير.`;
+  if (!await adminConfirm(message)) return;
+  try {
+    const res = await adminFetch(`/admin/commissions/undo/${encodeURIComponent(actionId)}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      adminAlert(data.message || 'تعذر التراجع عن العملية.');
+      refreshAfterCommissionChange(driverId);
+      return;
+    }
+    adminAlert(data.type === 'payment'
+      ? `تم التراجع عن الدفع. عاد ${data.amount} شيكل مستحقاً على السائق.`
+      : `تم التراجع عن التصفير. عادت عمولة ${data.amount} شيكل مستحقة على السائق.`);
+    refreshAfterCommissionChange(driverId);
+  } catch (err) {
+    adminAlert('حدث خطأ أثناء التراجع. لم يتغير شيء.');
+  }
+}
+
+async function undoResetAll(batchId, drivers, amount) {
+  if (!await adminConfirm(`التراجع عن «تصفير الكل»؟ ستعود عمولة ${drivers} سائق (${amount} شيكل) مستحقة كما كانت.`)) return;
+  try {
+    const res = await adminFetch(`/admin/commissions/undo-batch/${encodeURIComponent(batchId)}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      adminAlert(data.message || 'تعذر التراجع عن تصفير الكل.');
+      return;
+    }
+    adminAlert(
+      `تم التراجع عن التصفير لـ ${data.undone} سائق (${data.amount} شيكل).`
+      + (data.skipped > 0 ? ` لم يُتراجع عن ${data.skipped} سائق لأن لديهم عمليات أحدث.` : ''),
+    );
+    refreshAfterCommissionChange(null);
+  } catch (err) {
+    adminAlert('حدث خطأ أثناء التراجع. لم يتغير شيء.');
+  }
+}
+
 async function markPaid(driverId) {
   if (!await adminConfirm('هل أنت متأكد من تحديد السائق كمدفوع؟')) return;
   try {
     const res = await adminFetch(`/admin/commissions/pay/${driverId}`, { method: 'PUT' });
     const data = await res.json();
     if (data.success) {
-      adminAlert(data.message);
+      adminAlert(data.action
+        ? `${data.message}. يمكنك التراجع من بطاقة السائق أو صفحة العمولات.`
+        : data.message);
       loadCommissions();
       loadDashboardStats();
 
@@ -1838,7 +2095,8 @@ async function resetDriverCommission(driverId) {
       'تم تصفير عداد العمولة' +
         (Number(data.amount) > 0
           ? ` وإرجاع ${data.amount} شيكل للسائق.`
-          : '.'),
+          : '.') +
+        (data.action ? ' يمكنك التراجع من بطاقة السائق أو صفحة العمولات.' : ''),
     );
     loadCommissions();
     loadDashboardStats();
@@ -1874,7 +2132,7 @@ async function resetAllCommissions() {
     }
 
     adminAlert(
-      `تم تصفير ${data.drivers} سائق وإرجاع ${data.amount} شيكل لهم.`,
+      `تم تصفير ${data.drivers} سائق وإرجاع ${data.amount} شيكل لهم. يمكنك التراجع من صفحة العمولات.`,
     );
     loadCommissions();
     loadDashboardStats();
@@ -1972,7 +2230,7 @@ async function loadDriverReports() {
       const replyCount = report.replies ? report.replies.length : 0;
       const reporterName = report.reporterId?.fullName || report.reporter || 'غير معروف';
       const targetId = report.reportedPublicId || '';
-      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(report.date)}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
+      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
     });
     document.getElementById('driverReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات السائقين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID السائق</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading driver reports:', err); }
@@ -1987,7 +2245,7 @@ async function loadUserReports() {
       const replyCount = report.replies ? report.replies.length : 0;
       const reporterName = report.reporterId?.fullName || report.reporter || 'غير معروف';
       const targetId = report.reportedPublicId || '';
-      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(report.date)}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
+      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
     });
     document.getElementById('userReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات المستخدمين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID المستخدم</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading user reports:', err); }
@@ -2004,7 +2262,7 @@ async function openReplyModal(type, reportId) {
     const report = data.report;
 
     document.getElementById('reportDetailTitle').textContent = `إبلاغ رقم ${report.reportId} - ${report.category}`;
-    document.getElementById('reportDetailContent').innerHTML = `<div data-presentation="p023"><div class="row"><span class="label">المرسل:</span><span class="value">${escapeHtml(report.reporter)}</span></div><div class="row"><span class="label">النوع:</span><span class="value">${escapeHtml(report.category)}</span></div><div class="row"><span class="label">التاريخ:</span><span class="value">${escapeHtml(report.date)}</span></div><div class="row"><span class="label">الحالة:</span><span class="value">${getReportStatusBadge(report.status)}</span></div><div data-presentation="p024"><span data-presentation="p025">المحتوى الكامل:</span><p data-presentation="p026">${escapeHtml(report.content)}</p></div></div>`;
+    document.getElementById('reportDetailContent').innerHTML = `<div data-presentation="p023"><div class="row"><span class="label">المرسل:</span><span class="value">${escapeHtml(report.reporter)}</span></div><div class="row"><span class="label">النوع:</span><span class="value">${escapeHtml(report.category)}</span></div><div class="row"><span class="label">التاريخ:</span><span class="value">${escapeHtml(formatDisplayDate(report.date))}</span></div><div class="row"><span class="label">الحالة:</span><span class="value">${getReportStatusBadge(report.status)}</span></div><div data-presentation="p024"><span data-presentation="p025">المحتوى الكامل:</span><p data-presentation="p026">${escapeHtml(report.content)}</p></div></div>`;
     renderChatThread(report);
     document.getElementById('reportDetailModal').classList.add('show');
     document.getElementById('replyInput').value = '';
@@ -2099,7 +2357,7 @@ async function sendBroadcast(target) {
     const data = await res.json();
     if (data.success) {
       resultDiv.className = 'broadcast-result success';
-      resultDiv.innerHTML = `تم إرسال الرسالة بنجاح إلى <strong>${escapeHtml(data.count)}</strong> ${target === 'drivers' ? 'سائق' : 'مستخدم'}.<br><span data-presentation="p028">العنوان: ${escapeHtml(title)}</span><br><span data-presentation="p028">تم الإرسال في: ${escapeHtml(data.sentAt)}</span>`;
+      resultDiv.innerHTML = `تم إرسال الرسالة بنجاح إلى <strong>${escapeHtml(data.count)}</strong> ${target === 'drivers' ? 'سائق' : 'مستخدم'}.<br><span data-presentation="p028">العنوان: ${escapeHtml(title)}</span><br><span data-presentation="p028">تم الإرسال في: ${escapeHtml(formatDisplayDateTime(data.sentAt))}</span>`;
       loadBroadcastArchive(target);
     } else {
       resultDiv.className = 'broadcast-result error';
@@ -2130,7 +2388,7 @@ async function loadBroadcastArchive(target) {
     container.innerHTML = messages
       .map((message) => {
         const sentAt = message.sentAt
-          ? new Date(message.sentAt).toLocaleString('ar-EG')
+          ? formatDisplayDateTime(message.sentAt)
           : '';
 
         return `<div class="archive-item">
@@ -2419,9 +2677,7 @@ function formatProviderDocumentDate(value) {
     return 'غير معروف';
   }
 
-  return parsed.toLocaleString(
-    'ar-EG',
-  );
+  return formatDisplayDateTime(parsed);
 }
 
 function providerDocumentDownloadUrl(
@@ -2664,7 +2920,7 @@ async function viewDriverOrdersViaDB(driverId) {
     if (driver.financial && driver.financial.transactions && driver.financial.transactions.length > 0) {
       let rows = '';
       driver.financial.transactions.forEach(t => {
-        rows += `<tr><td>${escapeHtml(t.id.slice(-8))}</td><td>${escapeHtml(t.desc)}</td><td>${escapeHtml(t.date)}</td><td class="amount">${escapeHtml(t.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(t.id))}">عرض</button></td></tr>`;
+        rows += `<tr><td>${escapeHtml(t.id.slice(-8))}</td><td>${escapeHtml(t.desc)}</td><td>${escapeHtml(formatDisplayDate(t.date))}</td><td class="amount">${escapeHtml(t.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(t.id))}">عرض</button></td></tr>`;
       });
       content.innerHTML = `
         <div class="invoice-box">
@@ -2690,7 +2946,7 @@ async function viewUserOrdersViaDB(userId) {
     if (user.orders && user.orders.length > 0) {
       let rows = '';
       user.orders.forEach(o => {
-        rows += `<tr><td>${escapeHtml(o.orderId)}</td><td>${escapeHtml(o.type)}</td><td>${escapeHtml(o.date)}</td><td>${escapeHtml(o.status)}</td><td class="amount">${escapeHtml(o.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(o.fullId || ''))}">عرض</button></td></tr>`;
+        rows += `<tr><td>${escapeHtml(o.orderId)}</td><td>${escapeHtml(o.type)}</td><td>${escapeHtml(formatDisplayDate(o.date))}</td><td>${escapeHtml(o.status)}</td><td class="amount">${escapeHtml(o.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(o.fullId || ''))}">عرض</button></td></tr>`;
       });
       content.innerHTML = `<div class="invoice-box"><table class="invoice-table"><thead><tr><th>رقم الطلب</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المبلغ</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     } else {
@@ -2760,7 +3016,7 @@ function adminOrderProvider(order) {
 function adminOrderDate(value) {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ar-EG');
+  return Number.isNaN(date.getTime()) ? '' : formatDisplayDateTime(date);
 }
 
 async function loadOrders() {
@@ -3542,10 +3798,7 @@ function formatAdDate(value) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '—';
 
-  return date.toLocaleString('ar-EG', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return formatDisplayDateTime(date);
 }
 
 function toDateTimeLocal(value) {
@@ -4038,7 +4291,7 @@ async function showAdDaily(id, title) {
       ? '<tr><td colspan="4">لا توجد مشاهدات أو ضغطات في هذه الفترة.</td></tr>'
       : days.map((day) => `
         <tr>
-          <td>${escapeHtml(day.day)}</td>
+          <td>${escapeHtml(formatDisplayDate(day.day))}</td>
           <td class="ad-stats-num">${escapeHtml(formatAdCount(day.impressions))} <small>(${escapeHtml(formatAdCount(day.viewers))} مستخدم)</small></td>
           <td class="ad-stats-num">${escapeHtml(formatAdCount(day.taps))} <small>(${escapeHtml(formatAdCount(day.tappers))} مستخدم)</small></td>
           <td class="ad-stats-num">${escapeHtml(Number(day.ctr || 0).toLocaleString('ar-EG'))}%</td>
@@ -4481,6 +4734,35 @@ async function resolveChat(userId) {
   } catch (err) { console.error(err); }
 }
 
+// Dates are shown as numbers everywhere: DD/MM/YYYY, plus HH:mm when the
+// time matters. Values that are not dates (e.g. "غير محدد") are shown as is.
+function toDisplayDateValue(value) {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(value);
+}
+
+function formatDisplayDate(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${date.getFullYear()}`;
+}
+
+function formatDisplayDateTime(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${formatDisplayDate(date)} ${hours}:${minutes}`;
+}
+
 function escapeHtml(value) {
   return String(
     value ?? '',
@@ -4660,7 +4942,7 @@ async function loadPendingProviders() {
           + `<td>${escapeHtml(providerServiceTypesLabel(provider.serviceTypes))}</td>`
           + `<td>${escapeHtml(provider.governorate || 'غير محدد')}</td>`
           + `<td>${escapeHtml(provider.city || provider.area || 'غير محدد')}</td>`
-          + `<td>${escapeHtml(new Date(provider.createdAt).toLocaleDateString('ar-EG'))}</td>`
+          + `<td>${escapeHtml(formatDisplayDate(provider.createdAt))}</td>`
           + `<td><span class="${statusClass}">${escapeHtml(documentStatusText)}</span></td>`
           + `<td>`
           + `<button class="action-btn info" `

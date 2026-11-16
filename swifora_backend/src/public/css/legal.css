@@ -1,0 +1,13 @@
+/* Public privacy policy / terms of use pages. */
+:root { color-scheme: light dark; --bg: #f8f8f5; --text: #10273b; --muted: #526b7b; --accent: #007d89; --card: #ffffff; --border: #d7e2e6; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #061624; --text: #f5fafc; --muted: #b3c8d2; --accent: #0bcbd0; --card: #102838; --border: #345366; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, "Segoe UI", Tahoma, Arial, sans-serif; line-height: 1.9; }
+.legal-page { max-width: 760px; margin: 0 auto; padding: 32px 16px 48px; }
+.legal-page header { border-bottom: 1px solid var(--border); margin-bottom: 24px; padding-bottom: 12px; }
+.legal-brand { margin: 0; color: var(--accent); font-weight: 700; }
+h1 { margin: 4px 0; font-size: 28px; }
+.legal-updated, .legal-empty { color: var(--muted); }
+.legal-page p { margin: 0 0 16px; overflow-wrap: anywhere; }
