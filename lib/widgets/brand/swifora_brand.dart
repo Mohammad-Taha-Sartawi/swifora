@@ -6,82 +6,55 @@ import '../ui/app_tone.dart';
 
 /// Brand and layout pieces of the owner-approved Swifora Delivery screens
 /// (Login, Customer Home, Driver Dashboard, Create Order).
-///
-/// The "S" mark is drawn in code as a stand-in: the approved images show a
-/// concept logo, and a production vector asset is still to be supplied.
 
 bool _isDark(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark;
 
-/// The "S" mark: a cyan-to-gold S with a small parcel.
+/// The Swifora logo (the same image as the app icon and the splash screen),
+/// a rounded navy tile. Decorative: the name next to it is what is read out.
 class SwiforaMark extends StatelessWidget {
+  static const asset = 'assets/branding/logo_tile.png';
+
   final double size;
 
-  /// Shows the mark on a raised rounded tile (Day login), otherwise bare.
+  /// Lifts the logo off the page with a soft shadow (Day login).
   final bool tile;
 
   const SwiforaMark({super.key, this.size = 48, this.tile = false});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final dark = _isDark(context);
-    final mark = SizedBox(
+    final logo = Image.asset(
+      asset,
       width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          ShaderMask(
-            shaderCallback: (rect) => LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: dark
-                  ? const [AppColors.darkPrimary, AppColors.darkAccent]
-                  : const [AppColors.primary, AppColors.primaryDark],
-            ).createShader(rect),
-            child: Text(
-              'S',
-              textDirection: TextDirection.ltr,
-              style: TextStyle(
-                fontSize: size * 0.92,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                fontStyle: FontStyle.italic,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          PositionedDirectional(
-            bottom: size * 0.16,
-            end: size * 0.12,
-            child: Icon(
-              Icons.inventory_2_rounded,
-              size: size * 0.3,
-              color: dark ? AppColors.darkAccent : AppColors.accent,
-            ),
-          ),
-        ],
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      // Decode at the size it is drawn, not the 512 px source.
+      cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round().clamp(
+        1,
+        512,
       ),
     );
 
-    if (!tile) return ExcludeSemantics(child: mark);
+    if (!tile) return ExcludeSemantics(child: logo);
 
+    final scheme = Theme.of(context).colorScheme;
     return ExcludeSemantics(
-      child: Container(
-        padding: EdgeInsets.all(size * 0.22),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(size * 0.36),
+          borderRadius: BorderRadius.circular(size * 0.3),
           boxShadow: [
             BoxShadow(
-              color: scheme.shadow.withValues(alpha: dark ? 0.4 : 0.08),
+              color: scheme.shadow.withValues(
+                alpha: _isDark(context) ? 0.4 : 0.14,
+              ),
               blurRadius: 24,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: mark,
+        child: logo,
       ),
     );
   }

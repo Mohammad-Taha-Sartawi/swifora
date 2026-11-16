@@ -1,0 +1,17 @@
+# App icon generated from assets/branding/app_icon.png (the Swifora logo).
+# Regenerate after changing the logo: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/branding/app_icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  min_sdk_android: 23
+  # Android 8+ adaptive icon: the logo tile on the logo's own navy.
+  adaptive_icon_background: "#031432"
+  adaptive_icon_foreground: "assets/branding/app_icon_foreground.png"
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false

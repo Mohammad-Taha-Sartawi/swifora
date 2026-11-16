@@ -1,0 +1,12 @@
+# Native splash screen (shown while the app starts), from the Swifora logo.
+# Regenerate after changing it: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#031432"
+  image: assets/branding/splash_logo.png
+  android_12:
+    image: assets/branding/splash_logo_android12.png
+    color: "#031432"
+    icon_background_color: "#031432"
+  android: true
+  ios: true
+  web: false
