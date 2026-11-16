@@ -254,7 +254,8 @@ test('the driver rates the customer once, after the order is completed', async (
     .expect(403);
 
   const summary = (await customerRatingSummaries([customer.user._id])).get(customer.user._id.toString());
-  assert.deepEqual(summary, { average: 4, count: 1 });
+  // A 4-star rating counts as positive ("liked by" on the driver's screens).
+  assert.deepEqual(summary, { average: 4, count: 1, positiveCount: 1 });
   assert.equal(await Notification.countDocuments({ userId: customer.user._id, type: 'new_rating' }), 1);
 });
 
