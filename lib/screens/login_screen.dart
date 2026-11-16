@@ -8,6 +8,9 @@ import '../bloc/app/app_event.dart';
 import '../bloc/provider/provider_bloc.dart';
 import '../services/responsive.dart';
 import '../services/guest_support_service.dart';
+import '../services/auth_service.dart';
+import '../services/google_auth_api.dart';
+import '../services/google_sign_in_service.dart';
 import '../services/legal_defaults.dart';
 import '../services/legal_service.dart';
 import '../services/localization_service.dart';
@@ -16,11 +19,13 @@ import '../services/validators.dart';
 import '../services/theme_service.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/google_sign_in_button.dart';
 import '../widgets/ui/legal_consent_dialog.dart';
 import '../widgets/brand/swifora_brand.dart';
 import 'home_screen.dart';
 import 'provider_home_screen.dart';
 import 'forgot_password_screen.dart';
+import 'google_complete_profile_screen.dart';
 import 'legal_document_screen.dart';
 import 'force_change_password_screen.dart';
 import 'guest_support_screen.dart';
@@ -42,6 +47,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final Set<String> _serviceTypes = {'product', 'people', 'goods'};
 
   final GuestSupportService _guestSupport = GuestSupportService();
+  final GoogleSignInService _googleSignIn = GoogleSignInService();
+  // Created on first use (the server address is ready by then).
+  late final GoogleAuthApi _googleAuthApi = GoogleAuthApi();
+  bool _googleLoading = false;
   bool _isLogin = true;
   bool _obscurePassword = true;
   String _selectedRole = 'customer';
@@ -698,6 +707,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 },
               ),
+              // Sign in / sign up with Google (shown once it is configured).
+              if (GoogleSignInService.isAvailable) ...[
+                const SizedBox(height: AppSpacing.md),
+                _buildOrDivider(context),
+                const SizedBox(height: AppSpacing.md),
+                GoogleSignInButton(
+                  onPressed: _continueWithGoogle,
+                  loading: _googleLoading,
+                ),
+              ],
               const SizedBox(height: AppSpacing.sm),
               TextButton(
                 onPressed: _toggleAuthMode,
@@ -806,6 +825,73 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildOrDivider(BuildContext context) {
+    final theme = Theme.of(context);
+    final line = Expanded(
+      child: Divider(color: theme.colorScheme.outlineVariant),
+    );
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.md,
+          ),
+          child: Text(
+            AppLocalization.get(context, 'or_divider'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        line,
+      ],
+    );
+  }
+
+  /// Google for the selected role (customer or driver). Existing accounts
+  /// sign in; someone new completes phone, governorate, city (and, for a
+  /// driver, the services) first.
+  Future<void> _continueWithGoogle() async {
+    if (_googleLoading) return;
+    setState(() => _googleLoading = true);
+    try {
+      final idToken = await _googleSignIn.signInForIdToken();
+      if (idToken == null || !mounted) return;
+      final role = _selectedRole;
+      final result = await _googleAuthApi.signIn(idToken: idToken, role: role);
+      if (!mounted) return;
+      var session = result.session;
+      if (result.needsProfile) {
+        session = await Navigator.of(context).push<Map<String, dynamic>>(
+          MaterialPageRoute(
+            builder: (_) => GoogleCompleteProfileScreen(
+              role: role,
+              registrationToken: result.registrationToken!,
+              fullName: result.fullName,
+              email: result.email,
+              api: _googleAuthApi,
+            ),
+          ),
+        );
+        if (session == null || !mounted) return;
+      }
+      // The same path as the email sign-in: home, or "under review".
+      context.read<AuthBloc>().add(AuthResponseReceivedEvent(session!));
+    } on AuthRequestException catch (error) {
+      if (mounted) AppFeedback.error(context, error.message);
+    } catch (_) {
+      if (mounted) {
+        AppFeedback.error(
+          context,
+          AppLocalization.get(context, 'google_sign_in_failed'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
   }
 
   String get selectedRole => _selectedRole;

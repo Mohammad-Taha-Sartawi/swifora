@@ -357,7 +357,8 @@ test(
           /const sessionVersion\s*=/g,
         ) || []
       ).length,
-      2,
+      // register, login and issueMobileSession (Sign in with Google).
+      3,
     );
 
     assert.equal(
@@ -366,7 +367,13 @@ test(
           /mobileSessionVersion\(user\)/g,
         ) || []
       ).length,
-      2,
+      3,
+    );
+
+    // Google sign-in issues its sessions only through issueMobileSession.
+    assert.equal(
+      (source.match(/jwt\.sign\(\s*\{ id: user\._id, role: user\.role, sessionVersion \}/g) || []).length,
+      1,
     );
 
     const loginStart =

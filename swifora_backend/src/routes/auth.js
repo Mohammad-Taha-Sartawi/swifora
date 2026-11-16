@@ -5,6 +5,7 @@ const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const PendingProvider = require('../models/PendingProvider');
 const auth = require('../middleware/auth');
@@ -26,6 +27,11 @@ const {
 } = require('../services/mobileSession');
 const { governorateKey } = require('../services/registrationLocation');
 const { findActiveAccountByEmail } = require('../services/accountRelease');
+const {
+  isGoogleSignInConfigured,
+  verifyGoogleIdToken,
+  GoogleTokenError,
+} = require('../services/googleSignIn');
 const PushToken = require('../models/PushToken');
 const {
   MIN_MOBILE_PASSWORD_LENGTH,
@@ -265,6 +271,250 @@ router.post('/login', mobileLoginLimiter, mobileLoginAccountLimiter, async (req,
     });
   } catch (err) {
     sendInternalServerError(res);
+  }
+});
+
+// ---- Sign in with Google ----------------------------------------------
+//
+// POST /google { idToken, role }
+//   existing account (same Google account, or same verified email): signs
+//   in, linking Google to it; a driver still under review gets "pending";
+//   a new person gets { needsProfile, registrationToken } so the app can
+//   ask for the details every account needs (phone, governorate, city and,
+//   for drivers, the service types).
+// POST /google/complete { registrationToken, fullName, phone, governorate,
+//   area, serviceTypes, privacyPolicy }: creates the customer account (and
+//   signs in) or the driver's sign-up request (admin review, as usual).
+const GOOGLE_REGISTRATION_PURPOSE = 'google-registration';
+const GOOGLE_PENDING_MESSAGE =
+  'حسابك قيد المراجعة من قبل الإدارة. ستتمكن من تسجيل الدخول بعد الموافقة عليه.';
+
+function issueMobileSession(user) {
+  const sessionVersion = mobileSessionVersion(user);
+  if (sessionVersion === null) {
+    throw new Error('Invalid mobile session version');
+  }
+  const token = jwt.sign(
+    { id: user._id, role: user.role, sessionVersion },
+    JWT_SECRET,
+    { expiresIn: '7d' },
+  );
+  return {
+    token,
+    user: {
+      ...publicMobileUser(user),
+      mustChangePassword: user.mustChangePassword === true,
+    },
+  };
+}
+
+/** A password nobody knows: Google accounts sign in with Google (or set
+ *  a password later through "forgot password"). */
+async function unusablePasswordHash() {
+  return bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+}
+
+function roleMismatchMessage(accountRole) {
+  return accountRole === 'provider'
+    ? 'هذا الحساب مسجّل كسائق. اختر «سائق» ثم سجّل الدخول.'
+    : 'هذا الحساب مسجّل كزبون. اختر «زبون» ثم سجّل الدخول.';
+}
+
+router.post('/google', mobileLoginLimiter, async (req, res) => {
+  try {
+    if (!isGoogleSignInConfigured()) {
+      return res.status(503).json({
+        error: 'تسجيل الدخول عبر Google غير متاح حالياً.',
+        code: 'GOOGLE_NOT_CONFIGURED',
+      });
+    }
+    const { idToken, role } = req.body || {};
+    if (!isMobileRole(role)) {
+      return res.status(400).json({ error: 'Invalid login role' });
+    }
+
+    let profile;
+    try {
+      profile = await verifyGoogleIdToken(idToken);
+    } catch (error) {
+      if (!(error instanceof GoogleTokenError)) throw error;
+      return res.status(401).json({
+        error: 'تعذّر التحقق من حساب Google. حاول مرة أخرى.',
+        code: 'GOOGLE_TOKEN_INVALID',
+      });
+    }
+
+    const email = normalizeMobileEmail(profile.email);
+    if (!isValidMobileEmail(email) || isReservedGuestEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    // Same Google account, or an account with the same verified email.
+    let user = await User.findOne({ googleId: profile.sub, deleted: { $ne: true } });
+    if (!user) {
+      user = await findActiveAccountByEmail(email);
+      if (user && user.googleId && user.googleId !== profile.sub) {
+        return res.status(409).json({
+          error: 'هذا البريد مرتبط بحساب Google آخر.',
+          code: 'GOOGLE_ACCOUNT_MISMATCH',
+        });
+      }
+    }
+
+    if (user) {
+      if (user.role !== role) {
+        return res.status(400).json({
+          error: roleMismatchMessage(user.role),
+          code: 'ROLE_MISMATCH',
+        });
+      }
+      if (!isActiveMobileAccount(user, role)) {
+        return res.status(403).json({
+          error: user.deleted
+            ? 'تم حذف هذا الحساب. يرجى إنشاء حساب جديد.'
+            : 'هذا الحساب غير نشط حالياً.',
+          code: 'ACCOUNT_INACTIVE',
+        });
+      }
+      if (!user.googleId) {
+        await User.updateOne({ _id: user._id }, { $set: { googleId: profile.sub } });
+      }
+      return res.json(issueMobileSession(user));
+    }
+
+    const pending = await PendingProvider.findOne({
+      $or: [{ googleId: profile.sub }, { email }],
+    }).lean();
+    if (pending) {
+      if (role !== 'provider') {
+        return res.status(400).json({
+          error: roleMismatchMessage('provider'),
+          code: 'ROLE_MISMATCH',
+        });
+      }
+      return res.json({
+        pending: true,
+        code: 'ACCOUNT_PENDING_APPROVAL',
+        message: GOOGLE_PENDING_MESSAGE,
+      });
+    }
+
+    // New: the app asks for the remaining details, then calls /complete.
+    const registrationToken = jwt.sign(
+      { purpose: GOOGLE_REGISTRATION_PURPOSE, sub: profile.sub, email, name: profile.name, role },
+      JWT_SECRET,
+      { expiresIn: '30m' },
+    );
+    return res.json({
+      needsProfile: true,
+      registrationToken,
+      profile: { fullName: profile.name, email, role },
+    });
+  } catch (err) {
+    return sendInternalServerError(res);
+  }
+});
+
+router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
+  try {
+    let claims;
+    try {
+      claims = jwt.verify(String(req.body?.registrationToken || ''), JWT_SECRET);
+    } catch (_) {
+      claims = null;
+    }
+    if (!claims || claims.purpose !== GOOGLE_REGISTRATION_PURPOSE || !isMobileRole(claims.role)) {
+      return res.status(401).json({
+        error: 'انتهت صلاحية التسجيل عبر Google. ابدأ من جديد.',
+        code: 'GOOGLE_REGISTRATION_EXPIRED',
+      });
+    }
+
+    const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+    const fullName = text(req.body.fullName, 80) || text(claims.name, 80);
+    const phone = text(req.body.phone, 30);
+    const governorate = text(req.body.governorate, 100);
+    const area = text(req.body.area, 100);
+    const serviceTypes = claims.role === 'provider'
+      ? normalizeServiceTypes(req.body.serviceTypes)
+      : [];
+
+    const missing = [];
+    if (fullName.length < 2) missing.push('fullName');
+    if (!/^\+?[0-9]{7,15}$/.test(phone.replace(/[\s-]/g, ''))) missing.push('phone');
+    if (!governorate) missing.push('governorate');
+    if (!area) missing.push('area');
+    if (claims.role === 'provider' && serviceTypes.length === 0) missing.push('serviceTypes');
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: 'أكمل البيانات المطلوبة.',
+        code: 'PROFILE_INCOMPLETE',
+        fields: missing,
+      });
+    }
+    if (req.body.privacyPolicy !== true) {
+      return res.status(400).json({
+        error: 'يجب الموافقة على شروط الاستخدام وسياسة الخصوصية.',
+        code: 'TERMS_REQUIRED',
+      });
+    }
+
+    const email = claims.email;
+    if (
+      await User.exists({ googleId: claims.sub, deleted: { $ne: true } })
+      || await findActiveAccountByEmail(email)
+    ) {
+      return res.status(409).json({
+        error: 'يوجد حساب بهذا البريد. سجّل الدخول عبر Google.',
+        code: 'ACCOUNT_EXISTS',
+      });
+    }
+    if (await PendingProvider.exists({ $or: [{ googleId: claims.sub }, { email }] })) {
+      return res.status(409).json({ error: 'Email already pending review', code: 'ACCOUNT_PENDING_APPROVAL' });
+    }
+
+    const password = await unusablePasswordHash();
+    const cleanPhone = phone.replace(/[\s-]/g, '');
+
+    if (claims.role === 'provider') {
+      await PendingProvider.create({
+        fullName,
+        email,
+        phone: cleanPhone,
+        password,
+        googleId: claims.sub,
+        area,
+        governorate,
+        serviceTypes,
+      });
+      return res.status(201).json({
+        pending: true,
+        message: 'تم تقديم طلب التسجيل بنجاح. حسابك قيد المراجعة من قبل الإدارة.',
+      });
+    }
+
+    const user = await User.create({
+      fullName,
+      email,
+      password,
+      googleId: claims.sub,
+      role: 'customer',
+      area,
+      governorate,
+      governorateLevel: false,
+      publicId: await generatePublicId(),
+      phoneNumbers: [{ number: cleanPhone, primary: true }],
+      privacyPolicy: true,
+    });
+    return res.status(201).json(issueMobileSession(user));
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({
+        error: 'يوجد حساب بهذا البريد. سجّل الدخول عبر Google.',
+        code: 'ACCOUNT_EXISTS',
+      });
+    }
+    return sendInternalServerError(res);
   }
 });
 

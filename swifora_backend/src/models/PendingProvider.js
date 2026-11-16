@@ -45,6 +45,8 @@ const pendingProviderSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, required: true },
   password: { type: String, required: true, select: false },
+  // Google account id (the token's "sub") for "Sign in with Google".
+  googleId: { type: String },
   area: { type: String, default: '' },
   governorate: { type: String, default: '' },
   licenseNotAvailable: { type: Boolean, default: false },

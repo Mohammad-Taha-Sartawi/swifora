@@ -14,7 +14,7 @@
     "offers:audit-duplicates": "node src/scripts/auditOfferDuplicates.js",
     "data:cleanup-orphans": "node src/scripts/cleanupOrphanRecords.js",
     "contacts:audit-legacy-users": "node src/scripts/auditLegacyContactUsers.js",
-    "test:integration": "node --test integration/mobile-auth.integration.js integration/locations.integration.js integration/account-release.integration.js integration/account-and-support.integration.js integration/admins.integration.js integration/ad-tracking.integration.js integration/driver-hold.integration.js integration/live-updates.integration.js integration/driver-display.integration.js integration/commission-undo.integration.js",
+    "test:integration": "node --test integration/mobile-auth.integration.js integration/locations.integration.js integration/account-release.integration.js integration/account-and-support.integration.js integration/admins.integration.js integration/ad-tracking.integration.js integration/driver-hold.integration.js integration/live-updates.integration.js integration/driver-display.integration.js integration/commission-undo.integration.js integration/google-signin.integration.js",
     "ops:backup": "node src/scripts/backupRestore.js backup",
     "ops:restore": "node src/scripts/backupRestore.js restore",
     "locations:seed": "node src/scripts/seedLocations.js"
@@ -35,6 +35,7 @@
     "express-rate-limit": "^8.6.2",
     "express-session": "^1.19.0",
     "firebase-admin": "^14.5.0",
+    "google-auth-library": "10.5.0",
     "helmet": "8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.24.9",

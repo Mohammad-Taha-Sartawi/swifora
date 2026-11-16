@@ -245,6 +245,8 @@ class _HomeScreenState extends State<HomeScreen>
   /// profile, chat) or a dialog, and never when that screen is already the
   /// one on top ([alreadyShowing]).
   bool _canOpenForLiveEvent(Set<String> alreadyShowing) {
+    // A dashboard message is on screen: do not cover it.
+    if (isBroadcastDialogShowing) return false;
     if (!mounted) return false;
     final visibleList = VisibleListScreen.tag;
     if (visibleList != null && alreadyShowing.contains(visibleList)) {

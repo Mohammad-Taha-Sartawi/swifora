@@ -25,6 +25,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ToggleAuthModeEvent>(_onToggle);
     on<LogoutEvent>(_onLogout);
     on<SessionUpdatedEvent>(_onSessionUpdated);
+    on<AuthResponseReceivedEvent>(_onAuthResponseReceived);
 
     if (checkOnStart) {
       add(CheckAuthEvent());
@@ -142,6 +143,28 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthSuccess(user: user, token: token));
     } on AuthRequestException catch (e) {
       emit(AuthError(message: e.message, code: e.code));
+    } catch (e) {
+      emit(AuthError(message: e.toString().replaceFirst('Exception: ', '')));
+    }
+  }
+
+  Future<void> _onAuthResponseReceived(
+    AuthResponseReceivedEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    final data = event.data;
+    try {
+      if (data['pending'] == true) {
+        emit(AuthPendingApproval(message: _pendingMessage(data)));
+        return;
+      }
+      final user = UserModel.fromJson(Map<String, dynamic>.from(data['user']));
+      final token = data['token'].toString();
+      if (!JwtToken.isRestorable(token)) {
+        throw Exception('Server returned an invalid session token.');
+      }
+      await _sessionStorage.writeToken(token);
+      emit(AuthSuccess(user: user, token: token));
     } catch (e) {
       emit(AuthError(message: e.toString().replaceFirst('Exception: ', '')));
     }

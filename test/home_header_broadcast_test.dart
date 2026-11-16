@@ -138,6 +138,43 @@ void main() {
     expect(find.text('Provider One'), findsOneWidget);
   });
 
+  testWidgets('new orders wait until the driver confirms the message', (
+    tester,
+  ) async {
+    harness.api.notifications = [_broadcast('n9')];
+    harness.api.statsJson = {
+      ...harness.api.statsJson,
+      'pendingOrdersCount': 1,
+      'isAvailable': true,
+    };
+    harness.api.pendingOrders = [
+      {
+        '_id': 'order-1',
+        'status': 'pending',
+        'type': 'product',
+        'description': 'Bread',
+        'area': 'Jerusalem',
+        'phone': '0591234***',
+        'customerId': {'fullName': 'Customer One', 'publicId': 'CUS-1'},
+      },
+    ];
+    await harness.pumpProviderHome(tester);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // The message is on top, the new orders have not covered it.
+    expect(find.byKey(const Key('broadcastConfirmButton')), findsOneWidget);
+    expect(find.text('New Orders'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.tap(find.byKey(const Key('broadcastConfirmButton')));
+    await tester.pumpAndSettle();
+
+    // Then the new orders open.
+    expect(find.byKey(const Key('broadcastConfirmButton')), findsNothing);
+    expect(find.text('Bread'), findsOneWidget);
+  });
+
   test('dates are numbers: DD/MM/YYYY', () {
     expect(formatDisplayDate(DateTime(2026, 11, 5, 9, 7)), '05/11/2026');
     expect(

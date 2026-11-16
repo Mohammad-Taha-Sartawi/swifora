@@ -1299,6 +1299,7 @@ router.post('/pending/:id/approve', async (req, res) => {
                 }],
                 password:
                   pending.password,
+                ...(pending.googleId ? { googleId: pending.googleId } : {}),
                 role:
                   'provider',
                 area:

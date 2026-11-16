@@ -675,33 +675,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                             state.pendingOrders != null &&
                             state.pendingOrders!.isNotEmpty) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (!mounted) return;
-                            // Do not cover the customer-rating question; the
-                            // pending banner on the home still leads there.
-                            if (_customerRatingOpen) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PendingOrdersScreen(
-                                  orders: state.pendingOrders!,
-                                  token: widget.token,
-                                  user: _user,
-                                  onRefresh: () {
-                                    context.read<ProviderBloc>().add(
-                                      LoadPendingOrders(token: widget.token),
-                                    );
-                                    context.read<ProviderBloc>().add(
-                                      LoadProviderStats(token: widget.token),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ).then((_) {
-                              if (!context.mounted) return;
-                              context.read<ProviderBloc>().add(
-                                LoadProviderStats(token: widget.token),
-                              );
-                            });
+                            _autoOpenPendingOrders();
                           });
                         }
                       },
@@ -781,6 +755,55 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   /// While the rating question is open, new orders do not open on top of it.
   bool _customerRatingOpen = false;
 
+  /// New orders arrived while a question or a message was on screen; they
+  /// open once it is answered.
+  bool _pendingOpenDeferred = false;
+
+  /// Opens the new orders by themselves (driver available, orders waiting),
+  /// unless a rating question or a dashboard message is on screen: opening
+  /// now would cover it, so it waits until that is answered.
+  void _autoOpenPendingOrders() {
+    if (!mounted) return;
+    if (_customerRatingOpen || isBroadcastDialogShowing) {
+      _pendingOpenDeferred = true;
+      return;
+    }
+    final state = context.read<ProviderBloc>().state;
+    if (state is! ProviderStatsLoaded ||
+        !state.stats.isAvailable ||
+        state.pendingOrders == null ||
+        state.pendingOrders!.isEmpty) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PendingOrdersScreen(
+          orders: state.pendingOrders!,
+          token: widget.token,
+          user: _user,
+          onRefresh: () {
+            context.read<ProviderBloc>().add(
+              LoadPendingOrders(token: widget.token),
+            );
+            context.read<ProviderBloc>().add(
+              LoadProviderStats(token: widget.token),
+            );
+          },
+        ),
+      ),
+    ).then((_) {
+      if (!mounted) return;
+      context.read<ProviderBloc>().add(LoadProviderStats(token: widget.token));
+    });
+  }
+
+  void _openDeferredPendingOrders() {
+    if (!_pendingOpenDeferred || !mounted) return;
+    _pendingOpenDeferred = false;
+    _autoOpenPendingOrders();
+  }
+
   Future<void> _promptCustomerRating(String orderId) async {
     if (!_customerRatingAsked.add(orderId)) return;
     _customerRatingOpen = true;
@@ -793,6 +816,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
       );
     } finally {
       _customerRatingOpen = false;
+      _openDeferredPendingOrders();
     }
     if (rating == null || !mounted) return;
     try {
@@ -816,6 +840,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     context.read<NotificationBloc>().add(
       LoadNotifications(token: widget.token),
     );
+    _openDeferredPendingOrders();
   }
 
   void _openAccountMenu() {

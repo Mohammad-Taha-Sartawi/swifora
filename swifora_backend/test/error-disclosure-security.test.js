@@ -13,7 +13,7 @@ const backendRoot = path.resolve(__dirname, '..');
 
 const protectedFiles = new Map([
   ['src/index.js', 1],
-  ['src/routes/auth.js', 3],
+  ['src/routes/auth.js', 5],
   ['src/routes/passwordRecovery.js', 1],
   ['src/routes/chat.js', 12],
   ['src/routes/adminChat.js', 2],
@@ -102,7 +102,7 @@ test('all STARS-009A HTTP 500 sites use the safe helper', () => {
     total += calls.length;
   }
 
-  assert.equal(total, 65);
+  assert.equal(total, 67);
 });
 
 test('controlled non-500 application errors remain intact', () => {

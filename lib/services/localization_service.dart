@@ -20,6 +20,16 @@ class AppLocalization {
   }
 
   static final Map<String, Map<String, String>> _strings = {
+    // Sign in with Google
+    'continue_with_google': {'ar': 'المتابعة باستخدام Google', 'en': 'Continue with Google'},
+    'or_divider': {'ar': 'أو', 'en': 'or'},
+    'google_sign_in_failed': {'ar': 'تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.', 'en': "Couldn't sign in with Google. Please try again."},
+    'google_complete_title': {'ar': 'إكمال التسجيل', 'en': 'Complete sign-up'},
+    'google_complete_hint_customer': {'ar': 'خطوة أخيرة: أضف رقم هاتفك ومنطقتك ليصلك السائقون.', 'en': 'One last step: add your phone and area so drivers can reach you.'},
+    'google_complete_hint_driver': {'ar': 'أكمل بيانات السائق: الهاتف والمحافظة والمدينة ونوع الخدمات. يُراجع طلبك من الإدارة قبل التفعيل.', 'en': 'Complete your driver details: phone, governorate, city and services. Your request is reviewed before activation.'},
+    'google_complete_submit_customer': {'ar': 'إنشاء الحساب', 'en': 'Create account'},
+    'google_complete_submit_driver': {'ar': 'إرسال طلب التسجيل', 'en': 'Send sign-up request'},
+    'phone_invalid': {'ar': 'رقم الهاتف غير صحيح', 'en': 'Invalid phone number'},
     // Privacy policy and terms of use
     'privacy_policy': {'ar': 'سياسة الخصوصية', 'en': 'Privacy policy'},
     'terms_of_use': {'ar': 'شروط الاستخدام', 'en': 'Terms of use'},

@@ -54,6 +54,8 @@ const userSchema = new mongoose.Schema({
     primary: { type: Boolean, default: false },
   }],
   password: { type: String, required: true, select: false },
+  // Google account id (the token's "sub") for "Sign in with Google".
+  googleId: { type: String },
   sessionVersion: { type: Number, default: 0, min: 0 },
   mustChangePassword: { type: Boolean, default: false },
   adminTotpSecret: { type: String, default: '', select: false },
@@ -106,5 +108,11 @@ const userSchema = new mongoose.Schema({
   governorate: { type: String },
   messages: [messageSchema]
 });
+
+// One account per Google account (only accounts that have one).
+userSchema.index(
+  { googleId: 1 },
+  { unique: true, partialFilterExpression: { googleId: { $type: 'string' } } },
+);
 
 module.exports = mongoose.model('User', userSchema);

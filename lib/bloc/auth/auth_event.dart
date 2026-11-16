@@ -76,6 +76,17 @@ class ToggleAuthModeEvent extends AuthEvent {
 
 class LogoutEvent extends AuthEvent {}
 
+/// A sign-in reply obtained outside the email form (Sign in with Google):
+/// `token`/`user` signs in; `pending` shows the "under review" state.
+class AuthResponseReceivedEvent extends AuthEvent {
+  final Map<String, dynamic> data;
+
+  const AuthResponseReceivedEvent(this.data);
+
+  @override
+  List<Object?> get props => [data];
+}
+
 class SessionUpdatedEvent extends AuthEvent {
   final UserModel user;
   final String token;

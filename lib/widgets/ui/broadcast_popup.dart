@@ -127,6 +127,12 @@ mixin BroadcastPopupHost<T extends StatefulWidget> on State<T> {
   final Set<String> _confirmedBroadcasts = <String>{};
   bool _broadcastPopupOpen = false;
   bool _broadcastCheckAgain = false;
+  bool _broadcastDialogShowing = false;
+
+  /// A message pop-up is on screen: screens that open by themselves must
+  /// wait, or they would cover it (the home calls them after
+  /// [onBroadcastsConfirmed]).
+  bool get isBroadcastDialogShowing => _broadcastDialogShowing;
 
   /// Called after the user confirmed one or more pop-ups (e.g. to refresh
   /// the notifications badge).
@@ -163,11 +169,16 @@ mixin BroadcastPopupHost<T extends StatefulWidget> on State<T> {
 
         for (final message in pending) {
           if (!mounted) return;
-          await showBroadcastPopup(
-            context,
-            title: message.title,
-            body: message.body,
-          );
+          _broadcastDialogShowing = true;
+          try {
+            await showBroadcastPopup(
+              context,
+              title: message.title,
+              body: message.body,
+            );
+          } finally {
+            _broadcastDialogShowing = false;
+          }
           _confirmedBroadcasts.add(message.id);
           confirmedAny = true;
           try {
