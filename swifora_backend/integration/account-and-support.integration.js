@@ -2,6 +2,8 @@
 // minimum offer price, signing in while a driver sign-up is pending, editing
 // a phone number, permanent account deletion, drivers rating customers,
 // two-way guest support and the platform commission report.
+// Sign-up checks email domains in DNS; these tests use example.* addresses.
+process.env.EMAIL_DOMAIN_CHECK = 'off';
 const { after, afterEach, before, test } = require('node:test');
 const assert = require('node:assert/strict');
 const os = require('node:os');

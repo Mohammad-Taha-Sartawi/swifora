@@ -40,6 +40,7 @@ const CommissionPayment = require('../models/CommissionPayment');
 const {
   normalizePhoneNumber,
   isValidPhoneNumber,
+  primaryPhoneOf,
   replacePrimaryPhone,
   INVALID_PHONE_MESSAGE,
 } = require('../services/phoneNumbers');
@@ -61,6 +62,7 @@ const {
   normalizeMobileEmail,
   isValidMobileEmail,
 } = require('../security/mobileEmail');
+const { newAccountEmailProblem } = require('../services/emailCheck');
 
 router.put('/:id/availability', async (req, res) => {
   try {
@@ -423,6 +425,17 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // A complete, real email and a valid mobile number.
+    const newDriverEmail = normalizeMobileEmail(driverEmail);
+    const newDriverPhone = normalizePhoneNumber(driverPhone);
+    const driverEmailProblem = await newAccountEmailProblem(newDriverEmail);
+    if (driverEmailProblem) {
+      return res.json({ success: false, message: driverEmailProblem.error });
+    }
+    if (!isValidPhoneNumber(newDriverPhone)) {
+      return res.json({ success: false, message: INVALID_PHONE_MESSAGE });
+    }
+
     if (!isValidProviderBootstrapPassword(password)) {
       return res.json({
         success: false,
@@ -456,7 +469,7 @@ router.post('/', async (req, res) => {
 
     const exists =
       await findActiveAccountByEmail(
-        driverEmail.toLowerCase(),
+        newDriverEmail,
       );
 
     if (exists) {
@@ -504,10 +517,10 @@ router.post('/', async (req, res) => {
       new User({
         fullName: driverName,
         name: driverName,
-        email: driverEmail.toLowerCase(),
+        email: newDriverEmail,
         phoneNumbers: [
           {
-            number: driverPhone,
+            number: newDriverPhone,
             primary: true,
           },
         ],
@@ -582,8 +595,14 @@ router.put('/:id/profile', async (req, res) => {
         message: 'البريد الإلكتروني غير صالح.',
       });
     }
+    // A changed email must be complete and real; the current one is kept
+    // as it is.
+    if (email !== driver.email) {
+      const emailProblem = await newAccountEmailProblem(email);
+      if (emailProblem) return res.json({ success: false, message: emailProblem.error });
+    }
 
-    if (!isValidPhoneNumber(phone)) {
+    if (!isValidPhoneNumber(phone) && phone !== primaryPhoneOf(driver)) {
       return res.json({
         success: false,
         message: INVALID_PHONE_MESSAGE,

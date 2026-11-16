@@ -1,3 +1,5 @@
+// Sign-up checks email domains in DNS; these tests use example.* addresses.
+process.env.EMAIL_DOMAIN_CHECK = 'off';
 const {
   after,
   afterEach,

@@ -28,6 +28,7 @@ const {
   normalizeMobileEmail,
   isValidMobileEmail,
 } = require('../security/mobileEmail');
+const { newAccountEmailProblem } = require('../services/emailCheck');
 const {
   findActiveAccountByEmail,
   findActiveAccountByPublicId,
@@ -37,6 +38,7 @@ const { profileReportStatus, clearProfileReports } = require('../services/profil
 const {
   normalizePhoneNumber,
   isValidPhoneNumber,
+  primaryPhoneOf,
   INVALID_PHONE_MESSAGE,
   replacePrimaryPhone,
 } = require('../services/phoneNumbers');
@@ -200,7 +202,13 @@ router.put('/:id/profile', async (req, res) => {
     if (!isValidMobileEmail(email)) {
       return res.json({ success: false, message: 'البريد الإلكتروني غير صالح.' });
     }
-    if (!isValidPhoneNumber(phone)) {
+    // A changed email must be complete and real; the current one is kept
+    // as it is.
+    if (email !== customer.email) {
+      const emailProblem = await newAccountEmailProblem(email);
+      if (emailProblem) return res.json({ success: false, message: emailProblem.error });
+    }
+    if (!isValidPhoneNumber(phone) && phone !== primaryPhoneOf(customer)) {
       return res.json({ success: false, message: INVALID_PHONE_MESSAGE });
     }
     if (!governorate || !requestedArea || !isValidAreaForGovernorate(governorate, requestedArea)) {

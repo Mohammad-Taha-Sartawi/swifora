@@ -15,6 +15,12 @@ const { generatePublicId } = require('../utils/publicId');
 const { isMobileRole } = require('../middleware/mobileRole');
 const { loadSecurityConfig } = require('../config');
 const { isReservedGuestEmail } = require('../services/contactRequest');
+const { newAccountEmailProblem } = require('../services/emailCheck');
+const {
+  normalizePhoneNumber,
+  isValidPhoneNumber,
+  INVALID_PHONE_MESSAGE,
+} = require('../services/phoneNumbers');
 const {
   normalizeMobileEmail,
   isValidMobileEmail,
@@ -62,13 +68,13 @@ router.post('/register', mobileRegistrationLimiter, async (req, res) => {
     const {
       fullName,
       email,
-      phone,
       password,
       role,
       area,
       governorate,
       privacyPolicy,
     } = req.body;
+    const phone = normalizePhoneNumber(req.body.phone);
     const registrationArea =
       typeof area === 'string' ? area.trim() : '';
     const registrationGovernorate =
@@ -87,6 +93,14 @@ router.post('/register', mobileRegistrationLimiter, async (req, res) => {
       return res.status(400).json({
         error: 'Invalid email address',
       });
+    }
+
+    // A complete address on a domain that really receives mail.
+    const emailProblem = await newAccountEmailProblem(normalizedEmail);
+    if (emailProblem) return res.status(400).json(emailProblem);
+
+    if (!isValidPhoneNumber(phone)) {
+      return res.status(400).json({ error: INVALID_PHONE_MESSAGE, code: 'INVALID_PHONE' });
     }
 
     if (!isValidMobilePassword(password)) {
@@ -432,7 +446,7 @@ router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
 
     const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
     const fullName = text(req.body.fullName, 80) || text(claims.name, 80);
-    const phone = text(req.body.phone, 30);
+    const phone = normalizePhoneNumber(text(req.body.phone, 30));
     const governorate = text(req.body.governorate, 100);
     const area = text(req.body.area, 100);
     const serviceTypes = claims.role === 'provider'
@@ -441,13 +455,15 @@ router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
 
     const missing = [];
     if (fullName.length < 2) missing.push('fullName');
-    if (!/^\+?[0-9]{7,15}$/.test(phone.replace(/[\s-]/g, ''))) missing.push('phone');
+    if (!isValidPhoneNumber(phone)) missing.push('phone');
     if (!governorate) missing.push('governorate');
     if (!area) missing.push('area');
     if (claims.role === 'provider' && serviceTypes.length === 0) missing.push('serviceTypes');
     if (missing.length > 0) {
       return res.status(400).json({
-        error: 'أكمل البيانات المطلوبة.',
+        error: missing.length === 1 && missing[0] === 'phone'
+          ? INVALID_PHONE_MESSAGE
+          : 'أكمل البيانات المطلوبة.',
         code: 'PROFILE_INCOMPLETE',
         fields: missing,
       });
