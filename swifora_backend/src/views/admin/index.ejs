@@ -98,10 +98,10 @@
 
     <!-- السائقين -->
     <div id="page-drivers" class="page-section">
-      <div class="top-header"><h1>إدارة السائقين <small>بحث برقم السائق (أرقام فقط)</small></h1></div>
+      <div class="top-header"><h1>إدارة السائقين <small>بحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم</small></h1></div>
       <div class="search-container">
         <div class="search-box">
-          <input type="text" id="driverSearchInput" placeholder="أدخل ID السائق أو الاسم">
+          <input type="search" dir="auto" id="driverSearchInput" placeholder="ابحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم" aria-label="بحث عن سائق">
           <button id="driverSearchBtn"><i class="fas fa-search"></i> بحث</button>
         </div>
         <div id="driverResult" class="result-card"></div>
@@ -111,10 +111,10 @@
 
     <!-- المستخدمين -->
     <div id="page-users" class="page-section">
-      <div class="top-header"><h1>إدارة المستخدمين <small>بحث برقم المستخدم (أرقام فقط)</small></h1></div>
+      <div class="top-header"><h1>إدارة المستخدمين <small>بحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم</small></h1></div>
       <div class="search-container">
         <div class="search-box">
-          <input type="text" id="userSearchInput" placeholder="أدخل ID المستخدم أو الاسم">
+          <input type="search" dir="auto" id="userSearchInput" placeholder="ابحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم" aria-label="بحث عن مستخدم">
           <button id="userSearchBtn"><i class="fas fa-search"></i> بحث</button>
         </div>
         <div id="userResult" class="result-card"></div>
@@ -125,6 +125,12 @@
     <!-- العمولات -->
     <div id="page-commissions" class="page-section">
       <div class="top-header"><h1>إدارة العمولات <small>أرباح المنصة من العمولات المستحقة</small></h1></div>
+      <div class="search-container compact-search">
+        <div class="search-box">
+          <input type="search" dir="auto" id="commissionSearchInput" placeholder="ابحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم" aria-label="بحث عن سائق في العمولات" autocomplete="off">
+        </div>
+        <p id="commissionSearchStatus" class="search-status" role="status"></p>
+      </div>
       <div id="commissionsContent"></div>
     </div>
 
@@ -197,6 +203,12 @@
     <!-- محادثات الدعم -->
     <div id="page-support-chat" class="page-section">
       <div class="top-header"><h1>محادثات الدعم <small>الدردشة المباشرة مع المستخدمين والسائقين</small></h1></div>
+      <div class="search-container compact-search">
+        <div class="search-box">
+          <input type="search" dir="auto" id="conversationSearchInput" placeholder="ابحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم" aria-label="بحث في محادثات الدعم" autocomplete="off">
+        </div>
+        <p id="conversationSearchStatus" class="search-status" role="status"></p>
+      </div>
       <div class="chat-layout">
         <div class="chat-conversations" id="chatConversations">
           <p data-presentation="p006">جاري تحميل المحادثات...</p>
@@ -324,6 +336,13 @@
     <div id="page-areas" class="page-section">
       <div class="top-header"><h1>المناطق <small>توزيع المستخدمين والسائقين حسب المحافظات والمدن</small></h1></div>
       <div class="areas-legend"><span class="legend-drivers"><i class="fas fa-car"></i> السائقون</span><span class="legend-users"><i class="fas fa-user"></i> المستخدمون</span><span class="sort-note">اختر محافظة لعرض قرىها وأسماء المسجلين — مرتبة حسب الإجمالي تنازلياً</span></div>
+      <div class="search-container compact-search">
+        <div class="search-box">
+          <input type="search" dir="auto" id="areaSearchInput" placeholder="ابحث بالـ ID أو رقم الهاتف أو البريد الإلكتروني أو الاسم" aria-label="بحث عن سائق أو مستخدم في المناطق" autocomplete="off">
+        </div>
+        <p id="areaSearchStatus" class="search-status" role="status"></p>
+        <div id="areaSearchResults" class="area-search-results"></div>
+      </div>
       <div id="areasContainer" class="areas-container"></div>
     </div>
 

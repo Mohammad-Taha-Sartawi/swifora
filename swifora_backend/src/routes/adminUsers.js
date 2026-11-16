@@ -28,6 +28,7 @@ const {
   normalizeMobileEmail,
   isValidMobileEmail,
 } = require('../security/mobileEmail');
+const { findAccounts, accountSummary } = require('../services/accountSearch');
 const { newAccountEmailProblem } = require('../services/emailCheck');
 const {
   findActiveAccountByEmail,
@@ -79,25 +80,22 @@ router.get('/', async (req, res) => {
 
 router.get('/search', async (req, res) => {
   try {
-    const { id } = req.query;
-    if (!id) return res.json({ error: 'الرجاء إدخال ID المستخدم أو الاسم' });
-
-    const searchTerms = [
-      { publicId: id },
-      { fullName: { $regex: id, $options: 'i' } },
-    ];
-
-    if (mongoose.isValidObjectId(id)) {
-      searchTerms.push({ _id: id });
+    const id = typeof req.query.id === 'string' ? req.query.id : '';
+    if (!id.trim()) {
+      return res.json({ error: 'الرجاء إدخال ID المستخدم أو رقم الهاتف أو البريد الإلكتروني أو الاسم' });
     }
 
-    const user = await User.findOne({
-      role: 'customer',
-      deleted: { $ne: true },
-      $or: searchTerms,
-    }).lean();
-
-    if (!user) return res.json({ error: 'لم يتم العثور على مستخدم' });
+    // ID, email, any phone number of the account, or part of the name.
+    const found = await findAccounts(
+      User,
+      { role: 'customer', deleted: { $ne: true } },
+      id,
+    );
+    if (found.accounts.length === 0) return res.json({ error: 'لم يتم العثور على مستخدم' });
+    if (found.accounts.length > 1) {
+      return res.json({ matches: found.accounts.map(accountSummary), more: found.more });
+    }
+    const user = found.accounts[0];
 
     const orders = await Order.find({ customerId: user._id }).lean();
     const ratingSummary =

@@ -87,10 +87,10 @@ test('areas stats group by governorate and sort by totals', () => {
         users: 1,
         total: 2,
         driverAccounts: [
-          { id: '', fullName: 'غير محدد', publicId: '' },
+          { id: '', fullName: 'غير محدد', publicId: '', email: '', phones: [] },
         ],
         userAccounts: [
-          { id: '', fullName: 'غير محدد', publicId: '' },
+          { id: '', fullName: 'غير محدد', publicId: '', email: '', phones: [] },
         ],
       },
       {
@@ -99,7 +99,7 @@ test('areas stats group by governorate and sort by totals', () => {
         users: 0,
         total: 1,
         driverAccounts: [
-          { id: '', fullName: 'غير محدد', publicId: '' },
+          { id: '', fullName: 'غير محدد', publicId: '', email: '', phones: [] },
         ],
         userAccounts: [],
       },
@@ -111,13 +111,15 @@ test('areas stats group by governorate and sort by totals', () => {
   assert.ok(governorateOrder.includes('غزة'));
 });
 
-test('area details list user and driver names under each village', () => {
+test('area details list user and driver names (with email and numbers for the search) under each village', () => {
   const { stats } = buildGovernorateStats(
     [
       {
         _id: { toString: () => 'driver-1' },
         fullName: 'Driver One',
         publicId: 'DRV-1',
+        email: 'driver1@example.test',
+        phoneNumbers: [{ number: '0599111222', primary: true }, { number: '0568111222' }],
         governorate: 'رام الله والبيرة',
         area: 'Al-Bireh',
       },
@@ -136,10 +138,16 @@ test('area details list user and driver names under each village', () => {
   const city = stats['رام الله والبيرة'].cities[0];
   assert.equal(city.name, 'Al-Bireh');
   assert.deepEqual(city.driverAccounts, [
-    { id: 'driver-1', fullName: 'Driver One', publicId: 'DRV-1' },
+    {
+      id: 'driver-1',
+      fullName: 'Driver One',
+      publicId: 'DRV-1',
+      email: 'driver1@example.test',
+      phones: ['0599111222', '0568111222'],
+    },
   ]);
   assert.deepEqual(city.userAccounts, [
-    { id: 'user-1', fullName: 'User One', publicId: 'USR-1' },
+    { id: 'user-1', fullName: 'User One', publicId: 'USR-1', email: '', phones: [] },
   ]);
 });
 

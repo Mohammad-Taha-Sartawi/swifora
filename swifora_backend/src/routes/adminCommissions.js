@@ -79,6 +79,9 @@ router.get('/', async (req, res) => {
         driverId: driver.publicId || driver._id.toString().slice(-8),
         name: driver.fullName || driver.name,
         phone: primaryPhone(driver),
+        // Every number and the email, for the search box above the table.
+        phones: (driver.phoneNumbers || []).map((entry) => entry && entry.number).filter(Boolean),
+        email: driver.email || '',
         serviceType: serviceTypesLabel(driver.serviceTypes),
         commission: unpaid,
         paidCommission: paid,

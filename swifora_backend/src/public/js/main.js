@@ -847,6 +847,72 @@ async function addNewDriver() {
 }
 
 // ================================================
+// البحث عن الحسابات: نفس قواعد السيرفر (services/accountSearch.js)
+// ID أو البريد أو أي رقم هاتف (بأي كتابة) أو جزء من الاسم.
+// ================================================
+function toLatinDigits(value) {
+  return String(value ?? '')
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
+}
+
+// 0599123456 و +970599123456 و +972599123456 كلها تعطي 599123456.
+function searchPhoneCore(value) {
+  let digits = toLatinDigits(value).replace(/[\s\-().\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  digits = digits.replace(/^\+/, '');
+  if (/^97[02]\d{6,}$/.test(digits)) digits = digits.slice(3);
+  else if (digits.startsWith('0')) digits = digits.slice(1);
+  return digits;
+}
+
+function cleanAccountQuery(raw) {
+  const text = String(raw ?? '').trim();
+  return text.replace(/^(?:id\b[\s:#-]*|#)/i, '').trim() || text;
+}
+
+// account: { name, publicId, email, phones: [] }
+function accountMatches(account, raw) {
+  const query = cleanAccountQuery(raw);
+  if (!query) return true;
+  const lower = toLatinDigits(query).toLowerCase();
+  const publicId = String(account.publicId || '').toLowerCase();
+  if (publicId && publicId.includes(lower)) return true;
+  if (String(account.name || '').toLowerCase().includes(query.toLowerCase())) return true;
+  if (String(account.email || '').toLowerCase().includes(lower)) return true;
+  const core = searchPhoneCore(query);
+  if (/^\d{4,}$/.test(core)) {
+    return (account.phones || []).some((phone) => searchPhoneCore(phone).includes(core));
+  }
+  return false;
+}
+
+// عدة حسابات تطابق البحث: قائمة يختار منها المشرف.
+function renderAccountMatches(container, matches, more, role) {
+  const rows = matches.map((account) => {
+    const id = escapeHtml(String(account._id));
+    const place = [account.governorate, account.area].filter(Boolean).join(' / ');
+    const button = role === 'provider'
+      ? `<button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="selectDriverFromList" data-admin-arg-count="1" data-admin-arg-1="${id}"><i class="fas fa-eye"></i> عرض</button>`
+      : `<button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="selectUserFromList" data-admin-arg-count="1" data-admin-arg-1="${id}"><i class="fas fa-eye"></i> عرض</button>`;
+    return `<tr>
+      <td><strong>${escapeHtml(account.fullName || 'غير محدد')}</strong>${account.publicId ? `<br><small>ID ${escapeHtml(account.publicId)}</small>` : ''}</td>
+      <td dir="ltr">${escapeHtml(account.phone || '')}</td>
+      <td dir="ltr">${escapeHtml(account.email || '')}</td>
+      <td>${escapeHtml(place || 'غير محدد')}</td>
+      <td>${adminAccountStatusBadge(account.status)}</td>
+      <td>${button}</td>
+    </tr>`;
+  }).join('');
+  container.innerHTML = `<div class="search-matches">
+    <h4>${escapeHtml(matches.length)} ${role === 'provider' ? 'سائقين' : 'مستخدمين'} يطابقون البحث — اختر الحساب</h4>
+    <table class="orders-table"><thead><tr><th>الاسم</th><th>الجوال</th><th>البريد</th><th>المحافظة / المدينة</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table>
+    ${more ? '<p class="more-matches">توجد نتائج أخرى. اكتب الرقم أو البريد كاملاً لتضييق البحث.</p>' : ''}
+  </div>`;
+  container.classList.add('show');
+}
+
+// ================================================
 // 6. البحث عن سائق
 // ================================================
 document.getElementById('driverSearchBtn').addEventListener('click', searchDriver);
@@ -855,7 +921,7 @@ document.getElementById('driverSearchInput').addEventListener('keypress', e => {
 async function searchDriver() {
   const input = document.getElementById('driverSearchInput');
   const raw = input.value.trim();
-  if (!raw) return adminAlert('الرجاء إدخال ID السائق أو الاسم');
+  if (!raw) return adminAlert('الرجاء إدخال ID السائق أو رقم الهاتف أو البريد الإلكتروني أو الاسم');
 
   const resultElement = document.getElementById('driverResult');
   resultElement.removeAttribute('data-driver-id');
@@ -866,6 +932,10 @@ async function searchDriver() {
     if (data.error) {
       document.getElementById('driverResult').innerHTML = `<div class="not-found">${escapeHtml(data.error)}</div>`;
       document.getElementById('driverResult').classList.add('show');
+      return;
+    }
+    if (Array.isArray(data.matches)) {
+      renderAccountMatches(resultElement, data.matches, data.more, 'provider');
       return;
     }
     renderDriverResultFromDB(data);
@@ -1444,7 +1514,7 @@ document.getElementById('userSearchInput').addEventListener('keypress', e => { i
 async function searchUser() {
   const input = document.getElementById('userSearchInput');
   const raw = input.value.trim();
-  if (!raw) return adminAlert('الرجاء إدخال ID المستخدم أو الاسم');
+  if (!raw) return adminAlert('الرجاء إدخال ID المستخدم أو رقم الهاتف أو البريد الإلكتروني أو الاسم');
 
   try {
     const res = await adminFetch(`/admin/users/search?id=${encodeURIComponent(raw)}`);
@@ -1452,6 +1522,10 @@ async function searchUser() {
     if (data.error) {
       document.getElementById('userResult').innerHTML = `<div class="not-found">${escapeHtml(data.error)}</div>`;
       document.getElementById('userResult').classList.add('show');
+      return;
+    }
+    if (Array.isArray(data.matches)) {
+      renderAccountMatches(document.getElementById('userResult'), data.matches, data.more, 'customer');
       return;
     }
     renderUserResultFromDB(data.user);
@@ -1921,12 +1995,15 @@ document.querySelectorAll('[data-legal-clear]').forEach((button) => {
   });
 });
 
+let commissionRowsForSearch = [];
+
 async function loadCommissions() {
   try {
     const res = await adminFetch('/admin/commissions');
     const data = await res.json();
+    commissionRowsForSearch = Array.isArray(data.driverRows) ? data.driverRows : [];
     let rows = '';
-    data.driverRows.forEach(driver => {
+    data.driverRows.forEach((driver, index) => {
       const isPaid = driver.paymentStatus === 'paid';
       const isReset = driver.paymentStatus === 'reset';
       const hasDue = Number(driver.commission) > 0;
@@ -1943,7 +2020,7 @@ async function loadCommissions() {
       const resetAction = `<button class="action-btn reset-commissions" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resetDriverCommission" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تصفير العداد</button>`;
       const undoAction = commissionUndoButton(driver.lastAction, driver._id);
       const actionHtml = `<div class="table-actions">${payAction}${resetAction}${undoAction}</div>`;
-      rows += `<tr><td><strong>${escapeHtml(driver.name)}</strong><br><small data-presentation="p008">${escapeHtml(driver.driverId)}</small></td><td>${escapeHtml(driver.phone || 'غير متوفر')}</td><td>${escapeHtml(driver.serviceType)}</td><td>${escapeHtml(driver.commission)}</td><td>${statusText}</td><td>${actionHtml}</td></tr>`;
+      rows += `<tr data-commission-row="${escapeHtml(index)}"><td><strong>${escapeHtml(driver.name)}</strong><br><small data-presentation="p008">${escapeHtml(driver.driverId)}</small></td><td dir="${driver.phone ? 'ltr' : 'auto'}">${escapeHtml(driver.phone || 'غير متوفر')}</td><td>${escapeHtml(driver.serviceType)}</td><td>${escapeHtml(driver.commission)}</td><td>${statusText}</td><td>${actionHtml}</td></tr>`;
     });
 
     const resetAll = data.lastResetAll;
@@ -1966,10 +2043,48 @@ async function loadCommissions() {
         </table>
       </div>
     `;
+    applyCommissionSearch();
   } catch (err) {
     console.error('Error loading commissions:', err);
   }
 }
+
+// يُخفي من جدول العمولات السائقين الذين لا يطابقون البحث.
+function applyCommissionSearch() {
+  const input = document.getElementById('commissionSearchInput');
+  const status = document.getElementById('commissionSearchStatus');
+  const body = document.querySelector('#commissionsContent .commissions-table tbody');
+  if (!input || !body) return;
+  const query = input.value;
+  let shown = 0;
+  body.querySelectorAll('tr[data-commission-row]').forEach((row) => {
+    const driver = commissionRowsForSearch[Number(row.dataset.commissionRow)] || {};
+    const match = accountMatches({
+      name: driver.name,
+      publicId: driver.driverId,
+      email: driver.email,
+      phones: [driver.phone, ...(driver.phones || [])],
+    }, query);
+    row.hidden = !match;
+    if (match) shown += 1;
+  });
+  body.querySelector('tr.search-empty')?.remove();
+  if (!query.trim()) {
+    if (status) status.textContent = '';
+    return;
+  }
+  if (status) status.textContent = `${shown} من ${commissionRowsForSearch.length} سائق يطابقون البحث.`;
+  if (shown === 0) {
+    const empty = document.createElement('tr');
+    empty.className = 'search-empty';
+    const cell = document.createElement('td');
+    cell.colSpan = 6;
+    cell.textContent = 'لا يوجد سائق يطابق البحث.';
+    empty.appendChild(cell);
+    body.appendChild(empty);
+  }
+}
+document.getElementById('commissionSearchInput')?.addEventListener('input', applyCommissionSearch);
 
 // ---- Undo a commission "paid" / "reset" (newest first) ----
 function commissionActionLabel(action) {
@@ -2178,10 +2293,87 @@ async function loadAreas() {
     document.getElementById('areasContainer').innerHTML = `<div class="areas-list">${listHtml}</div><div class="areas-detail" id="areasDetail">${detailHtml}</div>`;
     const firstItem = document.getElementById('areasContainer').querySelector('.area-item');
     if (firstItem) firstItem.classList.add('active');
+    applyAreaSearch();
   } catch (err) {
     console.error('Error loading areas:', err);
   }
 }
+
+// يبحث عن سائق أو مستخدم في كل المحافظات ويعرض مكانه؛ الضغط يفتح محافظته.
+function applyAreaSearch() {
+  const input = document.getElementById('areaSearchInput');
+  const status = document.getElementById('areaSearchStatus');
+  const results = document.getElementById('areaSearchResults');
+  if (!input || !results) return;
+  const query = input.value;
+  results.innerHTML = '';
+  document.querySelectorAll('#areasDetail .account-chip.search-hit')
+    .forEach((chip) => chip.classList.remove('search-hit'));
+  if (!query.trim()) {
+    if (status) status.textContent = '';
+    return;
+  }
+
+  const hits = [];
+  for (const [gov, stats] of Object.entries(governorateStats || {})) {
+    for (const city of stats.cities || []) {
+      const add = (accounts, role) => (accounts || []).forEach((account) => {
+        if (accountMatches({
+          name: account.fullName,
+          publicId: account.publicId,
+          email: account.email,
+          phones: account.phones,
+        }, query)) {
+          hits.push({ gov, city: city.name, role, account });
+        }
+      });
+      add(city.driverAccounts, 'سائق');
+      add(city.userAccounts, 'مستخدم');
+    }
+  }
+
+  if (status) {
+    status.textContent = hits.length === 0
+      ? 'لا يوجد سائق أو مستخدم يطابق البحث.'
+      : `${hits.length} نتيجة. اضغط على النتيجة لعرض محافظتها.`;
+  }
+  hits.slice(0, 50).forEach((hit) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'area-search-hit';
+    const name = document.createElement('strong');
+    name.textContent = hit.account.fullName || 'غير محدد';
+    const role = document.createElement('span');
+    role.className = 'hit-role';
+    role.textContent = hit.role;
+    const place = document.createElement('span');
+    place.className = 'hit-place';
+    place.textContent = `${hit.gov} / ${hit.city}`;
+    const contact = document.createElement('span');
+    contact.className = 'hit-contact';
+    contact.dir = 'ltr';
+    contact.textContent = [
+      hit.account.publicId ? `ID ${hit.account.publicId}` : '',
+      (hit.account.phones || [])[0] || '',
+      hit.account.email || '',
+    ].filter(Boolean).join(' · ');
+    button.append(name, role, place, contact);
+    button.addEventListener('click', () => showAreaAccount(hit.gov, hit.account.id));
+    results.appendChild(button);
+  });
+}
+
+function showAreaAccount(gov, accountId) {
+  selectGovernorate(gov);
+  const detail = document.getElementById('areasDetail');
+  if (!detail) return;
+  const chip = [...detail.querySelectorAll('.account-chip')]
+    .find((element) => element.dataset.accountId === String(accountId));
+  if (!chip) return;
+  chip.classList.add('search-hit');
+  chip.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+document.getElementById('areaSearchInput')?.addEventListener('input', applyAreaSearch);
 
 function buildGovernorateDetail(gov, stats) {
   const renderAccounts = (label, accounts, roleClass) => {
@@ -2190,7 +2382,7 @@ function buildGovernorateDetail(gov, stats) {
       const publicId = account.publicId
         ? `<small>ID ${escapeHtml(String(account.publicId))}</small>`
         : '';
-      return `<span class="account-chip">${escapeHtml(account.fullName || 'غير محدد')}${publicId}</span>`;
+      return `<span class="account-chip" data-account-id="${escapeHtml(String(account.id || ''))}">${escapeHtml(account.fullName || 'غير محدد')}${publicId}</span>`;
     }).join('');
     return `<div class="account-row ${roleClass}"><span class="account-label">${escapeHtml(label)}</span>${chips}</div>`;
   };
@@ -3306,7 +3498,7 @@ async function loadDriversList() {
         : '<span class="order-status-badge cancelled">غير متاح</span>';
       return `<tr>
         <td><strong>${escapeHtml(driver.fullName || 'غير محدد')}</strong>${driver.publicId ? `<br><small>ID ${escapeHtml(driver.publicId)}</small>` : ''}</td>
-        <td>${escapeHtml(driver.phone || '')}</td>
+        <td dir="ltr">${escapeHtml(driver.phone || '')}</td>
         <td>${escapeHtml(driver.governorate || 'غير محدد')}</td>
         <td>${escapeHtml(driver.city || driver.area || 'غير محدد')}</td>
         <td>${escapeHtml(providerServiceTypesLabel(driver.serviceTypes))}</td>
@@ -3349,8 +3541,8 @@ async function loadUsersList() {
       const id = escapeHtml(String(user._id));
       return `<tr>
         <td><strong>${escapeHtml(user.fullName || 'غير محدد')}</strong>${user.publicId ? `<br><small>ID ${escapeHtml(user.publicId)}</small>` : ''}</td>
-        <td>${escapeHtml(user.email || '')}</td>
-        <td>${escapeHtml(user.phone || '')}</td>
+        <td dir="ltr">${escapeHtml(user.email || '')}</td>
+        <td dir="ltr">${escapeHtml(user.phone || '')}</td>
         <td>${escapeHtml(user.governorate || 'غير محدد')}</td>
         <td>${escapeHtml(user.city || user.area || 'غير محدد')}</td>
         <td>${adminAccountStatusBadge(user.status)}</td>
@@ -3530,7 +3722,7 @@ async function openListModal(type, filter, title) {
           (driver) => `
         <tr>
           <td><strong>${escapeHtml(driver.name || 'غير محدد')}</strong><br><small>${escapeHtml(driver.driverId || '')}</small></td>
-          <td>${escapeHtml(driver.phone || 'غير متوفر')}</td>
+          <td dir="${driver.phone ? 'ltr' : 'auto'}">${escapeHtml(driver.phone || 'غير متوفر')}</td>
           <td>${escapeHtml(String(driver.commission))} شيكل</td>
           <td><button class="action-btn pay-now" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="markPaid" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تم دفع المستحقات</button></td>
         </tr>`,
@@ -4430,6 +4622,8 @@ function connectSupportSocket() {
   });
 }
 
+document.getElementById('conversationSearchInput')?.addEventListener('input', () => renderConversations());
+
 async function loadConversations() {
   try {
     const res = await adminFetch('/api/chat/admin/conversations');
@@ -4454,15 +4648,34 @@ function updateSupportBadge() {
 
 function renderConversations() {
   const container = document.getElementById('chatConversations');
+  const status = document.getElementById('conversationSearchStatus');
+  const query = document.getElementById('conversationSearchInput')?.value || '';
 
   if (!conversations || conversations.length === 0) {
     container.innerHTML = '<p data-presentation="p006">لا توجد محادثات حالياً</p>';
+    if (status) status.textContent = '';
     return;
   }
 
-  container.innerHTML = '';
+  const shown = conversations.filter((conversation) => accountMatches({
+    name: conversation.userName,
+    publicId: conversation.userPublicId,
+    email: conversation.userEmail,
+    phones: conversation.userPhones,
+  }, query));
+  if (status) {
+    status.textContent = query.trim()
+      ? `${shown.length} من ${conversations.length} محادثة تطابق البحث.`
+      : '';
+  }
 
-  conversations.forEach((conversation) => {
+  container.innerHTML = '';
+  if (shown.length === 0) {
+    container.innerHTML = '<p data-presentation="p006">لا توجد محادثة تطابق البحث.</p>';
+    return;
+  }
+
+  shown.forEach((conversation) => {
     const userId = String(conversation.userId || '');
     const userName = conversation.userName || 'Unknown';
     const initial = (userName || 'U')[0].toUpperCase();

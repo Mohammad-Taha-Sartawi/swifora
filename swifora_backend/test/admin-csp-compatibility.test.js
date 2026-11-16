@@ -81,10 +81,11 @@ test('presentation tokens preserve all migrated inline styles externally', () =>
   // Three fake trend chips were replaced by real order counters, and the
   // commissions dash placeholder was replaced by a reset action. The guest
   // chat note became a styled reply note (guest replies are now possible).
-  // The per-page clocks were replaced by one clock in the app bar.
+  // The per-page clocks were replaced by one clock in the app bar. The
+  // support list has a "no conversation matches the search" note.
   assert.equal(
     tokenMatches.length,
-    72,
+    73,
   );
 
   const tokens = new Set(
@@ -132,10 +133,11 @@ test('delegated browser actions replace legacy inline handlers', () => {
   // has two tabs, a tracking refresh, a per-ad daily report and a
   // per-ad countdown toggle. Driver and customer cards can clear the
   // reports from the profile. Commission "paid"/"reset" and "reset all"
-  // can be undone.
+  // can be undone. A search that finds several drivers or customers
+  // lists them, each with a "view" action.
   assert.equal(
     clickActions.length,
-    82,
+    84,
   );
 
   assert.equal(
@@ -190,12 +192,12 @@ test('delegated admin actions require the admin session capability', () => {
 
   assert.equal(
     generatedActions.length,
-    51,
+    53,
   );
 
   assert.equal(
     generatedCapabilities.length,
-    51,
+    53,
   );
 
   const generatedActionLines = browserSource

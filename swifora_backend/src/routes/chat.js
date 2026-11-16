@@ -223,7 +223,7 @@ router.get('/admin/conversations', async (req, res) => {
 
     const users = await User.find(
       { _id: { $in: userIds } },
-      'fullName publicId role',
+      'fullName publicId role email phoneNumbers phone',
     ).lean();
 
     const userMap = new Map(
@@ -238,6 +238,12 @@ router.get('/admin/conversations', async (req, res) => {
         userName: user?.fullName || 'Unknown',
         userPublicId: user?.publicId || '',
         userRole: user?.role || '',
+        // For the search box above the conversations.
+        userEmail: user?.email || '',
+        userPhones: [
+          ...(user?.phoneNumbers || []).map((entry) => entry && entry.number),
+          user?.phone,
+        ].filter(Boolean),
         lastMessage: conversation.lastMessage,
         lastTime: conversation.lastTime,
         unread: conversation.unread || 0,
@@ -256,6 +262,8 @@ router.get('/admin/conversations', async (req, res) => {
         userName: contact.name || 'Guest',
         userPublicId: '',
         userRole: 'guest',
+        userEmail: contact.email || '',
+        userPhones: contact.phone ? [contact.phone] : [],
         lastMessage: last ? last.text : formatContactMessage(contact),
         lastTime: last ? last.createdAt : contact.createdAt,
         unread: contact.read ? 0 : 1,

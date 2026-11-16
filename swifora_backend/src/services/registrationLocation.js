@@ -156,6 +156,12 @@ function accountEntry(record) {
       || '',
     fullName: record?.fullName || record?.name || 'غير محدد',
     publicId: record?.publicId || '',
+    // For the search box on the areas page.
+    email: record?.email || '',
+    phones: [
+      ...(record?.phoneNumbers || []).map((entry) => entry && entry.number),
+      record?.phone,
+    ].filter(Boolean),
   };
 }
 
