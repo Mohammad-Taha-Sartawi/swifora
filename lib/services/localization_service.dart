@@ -21,20 +21,63 @@ class AppLocalization {
 
   static final Map<String, Map<String, String>> _strings = {
     // Sign in with Google
-    'continue_with_google': {'ar': 'المتابعة باستخدام Google', 'en': 'Continue with Google'},
+    'continue_with_google': {
+      'ar': 'المتابعة باستخدام Google',
+      'en': 'Continue with Google',
+    },
     'or_divider': {'ar': 'أو', 'en': 'or'},
-    'google_sign_in_failed': {'ar': 'تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.', 'en': "Couldn't sign in with Google. Please try again."},
+    'google_sign_in_failed': {
+      'ar': 'تعذّر تسجيل الدخول عبر Google. حاول مرة أخرى.',
+      'en': "Couldn't sign in with Google. Please try again.",
+    },
     'google_complete_title': {'ar': 'إكمال التسجيل', 'en': 'Complete sign-up'},
-    'google_complete_hint_customer': {'ar': 'خطوة أخيرة: أضف رقم هاتفك ومنطقتك ليصلك السائقون.', 'en': 'One last step: add your phone and area so drivers can reach you.'},
-    'google_complete_hint_driver': {'ar': 'أكمل بيانات السائق: الهاتف والمحافظة والمدينة ونوع الخدمات. يُراجع طلبك من الإدارة قبل التفعيل.', 'en': 'Complete your driver details: phone, governorate, city and services. Your request is reviewed before activation.'},
-    'google_complete_submit_customer': {'ar': 'إنشاء الحساب', 'en': 'Create account'},
-    'google_complete_submit_driver': {'ar': 'إرسال طلب التسجيل', 'en': 'Send sign-up request'},
-    'phone_invalid': {'ar': 'رقم الهاتف غير صحيح', 'en': 'Invalid phone number'},
+    'google_complete_hint_customer': {
+      'ar': 'خطوة أخيرة: أضف رقم هاتفك ومنطقتك ليصلك السائقون.',
+      'en': 'One last step: add your phone and area so drivers can reach you.',
+    },
+    'google_complete_hint_driver': {
+      'ar':
+          'أكمل بيانات السائق: الهاتف والمحافظة والمدينة ونوع الخدمات. يُراجع طلبك من الإدارة قبل التفعيل.',
+      'en':
+          'Complete your driver details: phone, governorate, city and services. Your request is reviewed before activation.',
+    },
+    'google_complete_submit_customer': {
+      'ar': 'إنشاء الحساب',
+      'en': 'Create account',
+    },
+    'google_complete_submit_driver': {
+      'ar': 'إرسال طلب التسجيل',
+      'en': 'Send sign-up request',
+    },
+    'phone_invalid': {
+      'ar': 'رقم الهاتف غير صحيح',
+      'en': 'Invalid phone number',
+    },
+    'phone_invalid_hint': {
+      'ar':
+          'رقم غير صحيح. أدخل رقم جوال من 10 أرقام يبدأ بـ 05، مثل 0599123456',
+      'en':
+          'Invalid number. Enter a 10-digit mobile number starting with 05, e.g. 0599123456',
+    },
+    'email_incomplete': {
+      'ar': 'البريد غير صحيح. اكتبه كاملاً، مثل name@gmail.com',
+      'en': 'Invalid email. Enter the full address, e.g. name@gmail.com',
+    },
+    'email_typo': {
+      'ar': 'يبدو أن في البريد خطأً إملائياً. هل تقصد %s؟',
+      'en': 'This email looks misspelled. Did you mean %s?',
+    },
     // Privacy policy and terms of use
     'privacy_policy': {'ar': 'سياسة الخصوصية', 'en': 'Privacy policy'},
     'terms_of_use': {'ar': 'شروط الاستخدام', 'en': 'Terms of use'},
-    'legal_load_failed': {'ar': 'تعذّر تحميل النص. تحقق من الاتصال وحاول مرة أخرى.', 'en': "Couldn't load the text. Check your connection and try again."},
-    'legal_not_published': {'ar': 'لم يُنشر هذا النص بعد.', 'en': "This text hasn't been published yet."},
+    'legal_load_failed': {
+      'ar': 'تعذّر تحميل النص. تحقق من الاتصال وحاول مرة أخرى.',
+      'en': "Couldn't load the text. Check your connection and try again.",
+    },
+    'legal_not_published': {
+      'ar': 'لم يُنشر هذا النص بعد.',
+      'en': "This text hasn't been published yet.",
+    },
     'legal_updated_at': {'ar': 'آخر تحديث: %s', 'en': 'Last updated: %s'},
     // Ratings: clear numbered stars; customer rating for drivers
     'rating_word_1': {'ar': 'سيء جداً', 'en': 'Very poor'},
@@ -43,10 +86,19 @@ class AppLocalization {
     'rating_word_4': {'ar': 'جيد جداً', 'en': 'Very good'},
     'rating_word_5': {'ar': 'ممتاز', 'en': 'Excellent'},
     'rating_value_of_five': {'ar': '%d من 5', 'en': '%d out of 5'},
-    'rating_pick_hint': {'ar': 'اضغط على نجمة: 1 الأقل و5 الأفضل', 'en': 'Tap a star: 1 is lowest, 5 is best'},
+    'rating_pick_hint': {
+      'ar': 'اضغط على نجمة: 1 الأقل و5 الأفضل',
+      'en': 'Tap a star: 1 is lowest, 5 is best',
+    },
     'rating_send': {'ar': 'إرسال التقييم', 'en': 'Send rating'},
-    'positive_ratings_by_drivers': {'ar': 'أعجب به %d سائق', 'en': 'Liked by %d drivers'},
-    'customer_no_ratings': {'ar': 'زبون جديد — لا توجد تقييمات بعد', 'en': 'New customer — no ratings yet'},
+    'positive_ratings_by_drivers': {
+      'ar': 'أعجب به %d سائق',
+      'en': 'Liked by %d drivers',
+    },
+    'customer_no_ratings': {
+      'ar': 'زبون جديد — لا توجد تقييمات بعد',
+      'en': 'New customer — no ratings yet',
+    },
     // Home: availability, broadcast pop-up
     'broadcast_confirm': {'ar': 'تم', 'en': 'OK'},
     'broadcast_confirm_in': {'ar': '%s (%d)', 'en': '%s (%d)'},

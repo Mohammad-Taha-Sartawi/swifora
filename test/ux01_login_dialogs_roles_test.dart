@@ -198,7 +198,7 @@ void main() {
     // Registration fields: name(0), phone(1), area dropdown, email(2),
     // password(3), confirm(4) in customer mode.
     await tester.enterText(find.byType(TextFormField).at(0), 'Test Person');
-    await tester.enterText(find.byType(TextFormField).at(1), '0501234');
+    await tester.enterText(find.byType(TextFormField).at(1), '0501234567');
 
     // Selecting a location: opening the dropdown menu route is not possible
     // in the automated widget-test environment (the pointer route it pushes is

@@ -16,6 +16,7 @@ const {
   validateLocationUpdate,
 } = require('../security/locationValidation');
 const { isReservedGuestEmail } = require('../services/contactRequest');
+const { newAccountEmailProblem } = require('../services/emailCheck');
 const {
   normalizeMobileEmail,
   isValidMobileEmail,
@@ -456,6 +457,10 @@ router.put('/email', async (req, res) => {
         code: 'EMAIL_CONFIRMATION_MISMATCH',
       });
     }
+
+    // A complete address on a domain that really receives mail.
+    const newEmailProblem = await newAccountEmailProblem(newEmail);
+    if (newEmailProblem) return res.status(400).json(newEmailProblem);
 
     const user =
       await User.findById(

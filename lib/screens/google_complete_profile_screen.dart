@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/validators.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_api.dart';
 import '../services/legal_defaults.dart';
@@ -130,7 +131,7 @@ class _GoogleCompleteProfileScreenState
       final result = await _api.complete(
         registrationToken: widget.registrationToken,
         fullName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
+        phone: Validators.normalizePhone(_phoneController.text),
         governorate: _governorate ?? '',
         area: _area ?? '',
         serviceTypes: _serviceTypes.toList(),
@@ -221,16 +222,15 @@ class _GoogleCompleteProfileScreenState
                       decoration: _decoration(
                         AppLocalization.get(context, 'phone_number'),
                         Icons.phone_outlined,
-                      ),
+                      ).copyWith(errorMaxLines: 3),
                       validator: (v) {
-                        final digits = (v ?? '').replaceAll(
-                          RegExp(r'[\s-]'),
-                          '',
-                        );
-                        if (digits.isEmpty) return required;
-                        return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(digits)
+                        if ((v ?? '').trim().isEmpty) return required;
+                        return Validators.isValidPhone(v!)
                             ? null
-                            : AppLocalization.get(context, 'phone_invalid');
+                            : AppLocalization.get(
+                                context,
+                                'phone_invalid_hint',
+                              );
                       },
                     ),
                     const SizedBox(height: AppSpacing.md),

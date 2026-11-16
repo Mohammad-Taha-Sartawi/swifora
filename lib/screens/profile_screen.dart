@@ -202,8 +202,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _addPhone() async {
-    final phone = _phoneCtrl.text.trim();
+    final phone = Validators.normalizePhone(_phoneCtrl.text);
     if (phone.isEmpty) return;
+    if (!Validators.isValidPhone(phone)) {
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'phone_invalid_hint'),
+      );
+      return;
+    }
     try {
       await _client().post('/users/phones', data: {'number': phone});
       _phoneCtrl.clear();
@@ -229,6 +236,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => _PhoneEditDialog(initial: number),
     );
     if (newNumber == null || newNumber.isEmpty || newNumber == number) return;
+    if (!mounted) return;
+    if (!Validators.isValidPhone(newNumber)) {
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'phone_invalid_hint'),
+      );
+      return;
+    }
     try {
       await _client().put(
         '/users/phones',
@@ -345,6 +360,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (validationError != null) {
       AppFeedback.error(context, validationError);
+      return;
+    }
+    // A complete address, without a misspelled provider (the server also
+    // checks the domain receives mail).
+    if (!Validators.isCompleteEmail(email)) {
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'email_incomplete'),
+      );
+      return;
+    }
+    final suggestion = Validators.suggestedEmail(email);
+    if (suggestion != null) {
+      AppFeedback.error(
+        context,
+        AppLocalization.get(
+          context,
+          'email_typo',
+        ).replaceFirst('%s', suggestion),
+      );
       return;
     }
 
@@ -968,7 +1003,8 @@ class _PhoneEditDialogState extends State<_PhoneEditDialog> {
     super.dispose();
   }
 
-  void _save() => Navigator.pop(context, _controller.text.trim());
+  void _save() =>
+      Navigator.pop(context, Validators.normalizePhone(_controller.text));
 
   @override
   Widget build(BuildContext context) {

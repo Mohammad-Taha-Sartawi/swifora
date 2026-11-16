@@ -406,6 +406,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
+                  key: const Key('registerPhoneField'),
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   textDirection: TextDirection.ltr,
@@ -414,10 +415,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: _inputDecoration(
                     AppLocalization.get(context, 'phone_number'),
                     Icons.phone_outlined,
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? AppLocalization.get(context, 'required')
-                      : null,
+                  ).copyWith(hintText: '05XXXXXXXX', errorMaxLines: 3),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return AppLocalization.get(context, 'required');
+                    }
+                    return Validators.isValidPhone(v)
+                        ? null
+                        : AppLocalization.get(context, 'phone_invalid_hint');
+                  },
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
@@ -526,6 +532,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ],
               TextFormField(
+                key: const Key('emailField'),
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 textDirection: TextDirection.ltr,
@@ -534,10 +541,31 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: _inputDecoration(
                   AppLocalization.get(context, 'email'),
                   Icons.email_outlined,
-                ),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? AppLocalization.get(context, 'required')
-                    : null,
+                ).copyWith(errorMaxLines: 3),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return AppLocalization.get(context, 'required');
+                  }
+                  // Sign-in only needs a well-formed address (existing
+                  // accounts are never locked out); sign-up needs a
+                  // complete one, without a misspelled provider.
+                  if (_isLogin) {
+                    return Validators.email(v) == null
+                        ? null
+                        : AppLocalization.get(context, 'invalid_email');
+                  }
+                  if (!Validators.isCompleteEmail(v)) {
+                    return AppLocalization.get(context, 'email_incomplete');
+                  }
+                  final suggestion = Validators.suggestedEmail(v);
+                  if (suggestion != null) {
+                    return AppLocalization.get(
+                      context,
+                      'email_typo',
+                    ).replaceFirst('%s', suggestion);
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
@@ -1238,7 +1266,7 @@ class _LoginScreenState extends State<LoginScreen> {
       RegisterEvent(
         fullName: _nameController.text.trim(),
         email: email,
-        phone: _phoneController.text.trim(),
+        phone: Validators.normalizePhone(_phoneController.text),
         password: password,
         role: _selectedRole,
         area: _selectedArea ?? '',

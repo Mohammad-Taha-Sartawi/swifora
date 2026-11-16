@@ -1,5 +1,7 @@
 // A deleted account must not block the same email from registering again.
 // Real HTTP (production auth router) + real MongoDB (in-memory).
+// Sign-up checks email domains in DNS; these tests use example.* addresses.
+process.env.EMAIL_DOMAIN_CHECK = 'off';
 const { after, afterEach, before, test } = require('node:test');
 const assert = require('node:assert/strict');
 const os = require('node:os');
