@@ -19,8 +19,9 @@ class Validators {
     final emailRegex = RegExp(
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     );
-    if (!emailRegex.hasMatch(value.trim()))
+    if (!emailRegex.hasMatch(value.trim())) {
       return 'بريد إلكتروني غير صالح / Invalid email';
+    }
     return null;
   }
 
@@ -158,8 +159,9 @@ class Validators {
   static String? price(String? value) {
     if (value == null || value.trim().isEmpty) return 'مطلوب / Required';
     final price = double.tryParse(value.trim());
-    if (price == null || price <= 0)
+    if (price == null || price <= 0) {
       return 'يجب أن يكون السعر أكبر من 0 / Price must be > 0';
+    }
     return null;
   }
 }
