@@ -91,7 +91,7 @@ function adminDialog({ message, kind, danger = false, password = false }) {
 }
 
 function adminConfirm(message) {
-  const danger = /حذف|رفض|إلغاء|تصفير/.test(String(message));
+  const danger = /حذف|رفض|إلغاء|تصفير|مسح/.test(String(message));
   return adminDialog({ message, kind: 'confirm', danger });
 }
 
@@ -541,6 +541,7 @@ const adminActionHandlers = Object.freeze({
   openEditDriver,
   openInlineDriverEdit,
   closeDriverEdit,
+  clearProfileReports,
   openEditUser,
   closeUserEdit,
   openListModal,
@@ -1308,6 +1309,65 @@ if (driverResultElement) {
   });
 }
 
+// ---- Profile status: reports filed against a driver or a customer ----
+// role: 'driver' | 'user'. Cleared reports stay in the reports pages; they
+// only stop counting against the profile.
+function profileStatusSection(status, role, id) {
+  const s = status || {};
+  const total = Number(s.total) || 0;
+  const badge = total > 0
+    ? `<span class="profile-reports-count has-reports">${escapeHtml(total)} بلاغ</span>`
+    : '<span class="profile-reports-count">لا توجد بلاغات</span>';
+  const breakdown = total > 0
+    ? `<div class="row"><span class="label">تفاصيل البلاغات</span><span class="value">قيد المراجعة ${escapeHtml(Number(s.open) || 0)} · تم الحل ${escapeHtml(Number(s.resolved) || 0)} · مرفوضة ${escapeHtml(Number(s.rejected) || 0)}</span></div>
+       <div class="row"><span class="label">آخر بلاغ</span><span class="value">${escapeHtml(formatDisplayDate(s.lastReportedAt))}</span></div>`
+    : '';
+  const cleared = Number(s.cleared) > 0
+    ? `<div class="row"><span class="label">بلاغات مُسحت من الملف سابقاً</span><span class="value">${escapeHtml(Number(s.cleared))}</span></div>`
+    : '';
+  const button = total > 0
+    ? `<button class="action-btn clear-reports" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="clearProfileReports" data-admin-arg-count="2" data-admin-arg-1="${escapeHtml(role)}" data-admin-arg-2="${escapeHtml(String(id))}"><i class="fas fa-broom"></i> مسح البلاغات من الملف</button>`
+    : '<button class="action-btn clear-reports" disabled><i class="fas fa-broom"></i> مسح البلاغات من الملف</button>';
+  return `
+    <div class="profile-status" role="group" aria-label="حالة الملف الشخصي">
+      <h5>حالة الملف الشخصي</h5>
+      <div class="row"><span class="label">عدد البلاغات ضده</span><span class="value">${badge}</span></div>
+      ${breakdown}
+      ${cleared}
+      <div class="profile-status-actions">${button}</div>
+    </div>`;
+}
+
+async function clearProfileReports(role, id) {
+  const isDriver = role === 'driver';
+  const confirmed = await adminConfirm(
+    `مسح البلاغات من ملف ${isDriver ? 'السائق' : 'المستخدم'}؟ سيصبح عدد البلاغات ضده صفراً. `
+    + 'البلاغات نفسها تبقى في صفحة البلاغات ولا تُحذف.',
+  );
+  if (!confirmed) return;
+  try {
+    const base = isDriver ? '/admin/drivers' : '/admin/users';
+    const res = await adminFetch(`${base}/${encodeURIComponent(id)}/profile-reports/clear`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      await adminAlert(data.message || 'تعذر مسح البلاغات.');
+      return;
+    }
+    // Redraw the card with the fresh figures.
+    const again = await adminFetch(`${base}/search?id=${encodeURIComponent(id)}`);
+    const fresh = await again.json();
+    if (!fresh.error) {
+      if (isDriver) renderDriverResultFromDB(fresh);
+      else renderUserResultFromDB(fresh.user);
+    }
+    await adminAlert(data.cleared > 0
+      ? `تم مسح ${data.cleared} بلاغ من الملف.`
+      : 'لا توجد بلاغات لمسحها.');
+  } catch (err) {
+    await adminAlert('تعذر مسح البلاغات. حاول مرة أخرى.');
+  }
+}
+
 function renderDriverResultFromDB(data) {
   const {
     driver,
@@ -1349,6 +1409,7 @@ function renderDriverResultFromDB(data) {
     <div class="row"><span class="label">إجمالي الأرباح (صافي)</span><span class="value" data-presentation="p002">${escapeHtml(netProfit)} </div>
     <div class="row"><span class="label">أرباح آخر 30 يوم (صافي)</span><span class="value" data-presentation="p018">${escapeHtml(last30Profit)} </div>
     <div class="row"><span class="label">عمولة المنصة المستحقة</span><span class="value" data-presentation="p019">${escapeHtml(commission)} </div>
+    ${profileStatusSection(driver.profileStatus, 'driver', driver._id)}
     <div class="action-buttons">
       <button class="action-btn change-password" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openInlineDriverEdit" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تعديل بيانات السائق</button>
       <button class="action-btn chat" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openChat" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(driver._id))}">مراسلة</button>
@@ -1412,6 +1473,7 @@ function renderUserResultFromDB(user) {
     <div class="row"><span class="label">الحالة</span><span class="value">${getStatusBadge(user.status)}</span></div>
     <div class="row"><span class="label">عدد الطلبات</span><span class="value">${escapeHtml(orderCount)}</span></div>
     <div class="row"><span class="label">تقييم السائقين له</span><span class="value">${user.rating && user.rating.count > 0 ? `⭐ ${escapeHtml(user.rating.average)} من 5 (${escapeHtml(user.rating.count)} تقييم)` : 'لا توجد تقييمات بعد'}</span></div>
+    ${profileStatusSection(user.profileStatus, 'user', user._id)}
     <div class="action-buttons">
       <button class="action-btn chat" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openChat" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(user._id))}">مراسلة</button>
       <button class="action-btn edit" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openEditUser" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(user._id))}">تعديل البيانات</button>

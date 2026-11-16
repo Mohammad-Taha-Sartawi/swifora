@@ -282,7 +282,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     ],
     [
       'src/routes/adminDrivers.js',
-      { error: 7, failure: 9 },
+      // +1: clear reports from the driver's profile.
+      { error: 8, failure: 9 },
     ],
     [
       'src/routes/adminOrders.js',
@@ -294,7 +295,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     ],
     [
       'src/routes/adminUsers.js',
-      { error: 2, failure: 4 },
+      // +1: clear reports from the customer's profile.
+      { error: 3, failure: 4 },
     ],
   ]);
 
@@ -339,11 +341,11 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     failureTotal += failureCalls.length;
   }
 
-  assert.equal(errorTotal, 26);
+  assert.equal(errorTotal, 28);
   assert.equal(failureTotal, 25);
   assert.equal(
     errorTotal + failureTotal,
-    51,
+    53,
   );
 });
 

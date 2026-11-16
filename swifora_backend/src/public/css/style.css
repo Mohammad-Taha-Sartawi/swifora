@@ -839,3 +839,13 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
   .legal-card-head { flex-direction: column; gap: 8px; }
   .legal-actions .btn-action { flex: 1 1 auto; }
 }
+
+/* Profile status on the driver/customer card: reports filed against them. */
+.profile-status { margin-top: 16px; padding: 14px 16px; border: 1px solid #2a3546; border-radius: 12px; background: #0f141c; }
+.profile-status h5 { margin: 0 0 8px; font-size: 15px; color: #fff; }
+.profile-reports-count { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #1e2733; color: #8892a8; font-weight: 700; }
+.profile-reports-count.has-reports { background: #e74c3c22; color: #ff7b6e; border: 1px solid #e74c3c66; }
+.profile-status-actions { margin-top: 10px; display: flex; justify-content: flex-start; }
+.action-btn.clear-reports { background: transparent; border: 1px solid #e74c3c88; color: #ff7b6e; }
+.action-btn.clear-reports:hover:not([disabled]) { background: #e74c3c22; }
+.action-btn.clear-reports[disabled] { opacity: .5; cursor: not-allowed; }

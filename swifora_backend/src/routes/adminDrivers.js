@@ -44,6 +44,7 @@ const {
   INVALID_PHONE_MESSAGE,
 } = require('../services/phoneNumbers');
 const { generatePublicId, isValidAdminPublicId } = require('../utils/publicId');
+const { profileReportStatus, clearProfileReports } = require('../services/profileReports');
 const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
@@ -309,6 +310,8 @@ router.get('/search', async (req, res) => {
       commissionDue: unpaidCommission,
       commissionAdjustment: match.commissionAdjustment || 0,
       status: match.status || '',
+      // Reports filed against the driver (profile status).
+      profileStatus: await profileReportStatus(match),
       financial: {
         paymentStatus,
         payments: commissionPayments.map((payment) => ({
@@ -339,6 +342,36 @@ router.get('/search', async (req, res) => {
     });
   } catch (err) {
     sendInternalServerError(res);
+  }
+});
+
+// Profile status: clear the reports filed against this driver from the
+// profile (the reports themselves stay in the reports pages).
+router.post('/:id/profile-reports/clear', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'السائق غير موجود' });
+    }
+    const person = await User.findOne({
+      _id: req.params.id,
+      role: 'provider',
+      deleted: { $ne: true },
+    }).select('_id role publicId').lean();
+    if (!person) {
+      return res.status(404).json({ success: false, message: 'السائق غير موجود' });
+    }
+    const adminId = req.session?.admin?.id;
+    const cleared = await clearProfileReports(
+      person,
+      mongoose.isValidObjectId(adminId) ? adminId : null,
+    );
+    return res.json({
+      success: true,
+      cleared,
+      profileStatus: await profileReportStatus(person),
+    });
+  } catch (err) {
+    return sendInternalServerError(res);
   }
 });
 
