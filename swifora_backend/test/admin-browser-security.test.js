@@ -779,9 +779,20 @@ test('admin HTML and browser JS propagate CSRF token without raw fetch mutation 
     /meta name="csrf-token"\s+content="<%= csrfToken %>"/,
   );
 
+  // Logout lives in the sidebar (included by index.ejs) and posts with the
+  // CSRF token.
+  const sidebar = read(
+    'src/views/admin/partials/sidebar.ejs',
+  );
+
   assert.match(
     adminIndex,
-    /form method="POST" action="\/admin\/logout"/,
+    /include\('partials\/sidebar'\)/,
+  );
+
+  assert.match(
+    sidebar,
+    /form method="POST" action="\/admin\/logout"[\s\S]*?name="_csrf" value="<%= csrfToken %>"/,
   );
 
   assert.doesNotMatch(

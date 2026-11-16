@@ -707,3 +707,115 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
 .admin-dialog-ok.danger { background: #e74c3c; color: #fff; }
 .admin-dialog-cancel { background: #1e2733; color: #e8edf5; }
 .admin-dialog-actions button:focus-visible, .admin-dialog-input:focus-visible { outline: 2px solid #00d4ff; outline-offset: 2px; }
+
+/* ==========================================================================
+   App shell (v2): app bar, grouped menu, phone bottom bar, layout fixes,
+   focus and motion. Later rules here deliberately override older ones.
+   ========================================================================== */
+.main-content { --pad-x: 32px; padding: 0 var(--pad-x) 32px; scroll-padding-top: 90px; }
+.main-content:focus { outline: none; }
+
+/* Skip link for keyboard users */
+.skip-link { position: absolute; top: -80px; right: 12px; z-index: 3000; padding: 10px 18px; border-radius: 12px; background: #00d4ff; color: #0b0e14; font-weight: 800; text-decoration: none; }
+.skip-link:focus { top: 12px; }
+
+/* App bar: one title area for every page (replaces the per-page headers) */
+.page-section > .top-header { display: none; }
+.app-topbar {
+  position: sticky; top: 0; z-index: 800;
+  display: flex; align-items: center; gap: 14px;
+  margin: 0 calc(-1 * var(--pad-x)) 22px;
+  padding: 14px var(--pad-x);
+  background: rgba(15, 20, 28, 0.94); border-bottom: 1px solid #1e2733;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.app-topbar-titles { flex: 1; min-width: 0; }
+.app-topbar h1 { margin: 0; font-size: 22px; font-weight: 800; color: #fff; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-topbar p { margin: 2px 0 0; font-size: 13px; color: #8892a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-topbar .live-clock { padding: 8px 16px; font-size: 14px; white-space: nowrap; }
+.app-topbar .nav-toggle { display: none; flex-shrink: 0; }
+
+/* Grouped menu */
+.sidebar { padding: 20px 12px; }
+.sidebar .logo { display: flex; align-items: center; gap: 12px; margin: 0 6px 18px; text-align: start; }
+.logo-mark { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background: #0f1a26; border: 1px solid #2a3546; color: #00d4ff; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+.logo-text { display: flex; flex-direction: column; color: #fff; font-size: 18px; font-weight: 800; line-height: 1.25; }
+.logo-text small { color: #8892a8; font-size: 12px; font-weight: 600; }
+.sidebar ul { flex: none; }
+.nav-group { margin-bottom: 6px; }
+.nav-group-title { margin: 0; padding: 12px 14px 4px; font-size: 12px; font-weight: 700; color: #6f7d92; }
+.sidebar ul li { padding: 10px 14px; margin: 2px 0; min-height: 44px; }
+.sidebar ul li > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-footer { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+.sidebar-footer .status-badge { margin-top: 0; }
+.sidebar-logout button { width: 100%; min-height: 44px; border-radius: 12px; border: 1px solid #4a2a2e; background: transparent; color: #ff8a80; font: inherit; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.sidebar-logout button:hover { background: #e74c3c22; }
+
+/* Dashboard: six figures as 3 + 3 */
+.stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats-row .stat-card:hover { transform: translateY(-2px); }
+
+/* Forms: "full width" means the whole row in any column count. (span 2
+   created a hidden second column on one-column phone layouts.) */
+.add-driver-form .form-grid > .full-width,
+.add-driver-form .settings-message,
+.add-driver-form .btn-cancel-ad,
+.add-driver-form .btn-submit-driver,
+.add-driver-form .doc-section,
+.add-driver-form .success-msg,
+.add-driver-form .error-msg-form,
+.driver-edit-modal .form-group.full-width,
+.driver-inline-editor .form-group.full-width { grid-column: 1 / -1; }
+.form-grid > *, .search-box > * { min-width: 0; }
+.add-driver-form input[type="file"] { max-width: 100%; }
+
+/* Phone bottom bar (hidden on larger screens) */
+.bottom-nav { display: none; }
+.bottom-nav-badge { position: absolute; top: 4px; left: calc(50% - 22px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e74c3c; color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+.bottom-nav-dot { position: absolute; top: 8px; left: calc(50% - 14px); width: 9px; height: 9px; border-radius: 50%; background: #e74c3c; }
+.bottom-nav-badge[hidden], .bottom-nav-dot[hidden] { display: none; }
+
+/* Keyboard focus is always visible */
+:where(button, a, input, select, textarea, summary, [tabindex], [data-admin-action]):focus-visible { outline: 2px solid #00d4ff; outline-offset: 2px; }
+
+@media (max-width: 1200px) {
+  .main-content { --pad-x: 22px; padding: 0 var(--pad-x) 28px; }
+}
+
+@media (max-width: 900px) {
+  .main-content { --pad-x: 16px; padding: 0 var(--pad-x) 24px; }
+  .app-topbar { padding-top: 10px; padding-bottom: 10px; }
+  .app-topbar .nav-toggle { display: inline-flex; }
+  .app-topbar h1 { font-size: 19px; }
+  .app-topbar p { font-size: 12px; }
+  .main-content button, .main-content select, .main-content input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+  .areas-container { flex-direction: column; height: auto; }
+  .areas-list { width: 100%; max-height: 45vh; }
+}
+
+@media (max-width: 760px) {
+  .main-content { --pad-x: 12px; }
+  .app-topbar .live-clock { display: none; }
+  body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .bottom-nav {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
+    position: fixed; right: 0; bottom: 0; left: 0; z-index: 950;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    background: rgba(20, 26, 36, 0.97); border-top: 1px solid #2a3546;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .bottom-nav-item { position: relative; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; border-radius: 14px; background: none; color: #8892a8; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .bottom-nav-item i { font-size: 18px; }
+  .bottom-nav-item.active { color: #00d4ff; background: #00d4ff14; }
+  .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats-row .stat-card { padding: 14px 10px; }
+  /* Compact filters: the two dropdowns side by side. */
+  .search-box select { flex: 1 1 calc(50% - 6px); }
+  .commissions-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .commissions-summary > * { padding: 14px 10px; }
+  .modal-box { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

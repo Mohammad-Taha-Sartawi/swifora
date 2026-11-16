@@ -8,6 +8,8 @@ const { adminCsrfProtection } = require('./security/adminCsrf');
 const adminAuditLogger = require('./middleware/adminAuditLog');
 require('dotenv').config();
 const express = require('express');
+const compression = require('compression');
+const { computeAssetVersion, staticCacheHeaders } = require('./services/staticAssets');
 const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -59,6 +61,9 @@ const adminApiRoutes = require('./routes/adminApi');
 const adminAdRoutes = require('./routes/adminAds');
 
 const app = express();
+// Gzip/deflate responses (dashboard JS/CSS/HTML and JSON): several times
+// smaller downloads, much faster on phones.
+app.use(compression());
 const appConfig = loadAppConfig();
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 const isProduction = process.env.NODE_ENV === 'production';
@@ -128,8 +133,11 @@ app.use('/uploads', (req, res, next) => {
   index: false,
 }));
 
-app.use('/data', express.static(path.join(__dirname, 'public', 'data')));
-app.use(express.static(path.join(__dirname, 'public')));
+const publicRoot = path.join(__dirname, 'public');
+// Pages link CSS/JS with ?v=<assetVersion> so browsers cache them long-term.
+app.locals.assetVersion = computeAssetVersion(publicRoot);
+app.use('/data', express.static(path.join(publicRoot, 'data'), { setHeaders: staticCacheHeaders }));
+app.use(express.static(publicRoot, { setHeaders: staticCacheHeaders }));
 
 app.use('/api', (req, res, next) => {
   if (req.path === '/health' || req.path === '/config') {

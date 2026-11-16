@@ -193,14 +193,11 @@ function adminFetch(input, init = {}) {
 // 1. الساعة الحية
 // ================================================
 function updateClocks() {
-  const now = new Date();
-  const str = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  ['clockDisplay', 'clockDisplay2', 'clockDisplay3', 'clockDisplay4', 'clockDisplay5', 'clockDisplay6', 'clockDisplay7', 'clockDisplay8', 'clockDisplay9', 'clockDisplay10', 'clockDisplay11', 'clockDisplay12', 'clockDisplay13', 'clockDisplay14', 'clockDisplay15'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = str;
-  });
+  const el = document.getElementById('clockDisplay');
+  if (!el) return;
+  el.textContent = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 }
-setInterval(updateClocks, 1000);
+setInterval(updateClocks, 15000);
 updateClocks();
 
 // Fallback while the live connection is down: keep the dashboard counters
@@ -241,12 +238,74 @@ function switchPage(pageId) {
   else pages.dashboard.classList.add('active-page');
 }
 
+/** The app bar shows the title and subtitle of the page on screen. */
+function updatePageTitle(pageId) {
+  const section = pages[pageId] || pages.dashboard;
+  const heading = section ? section.querySelector('.top-header h1') : null;
+  const titleEl = document.getElementById('pageTitle');
+  const subtitleEl = document.getElementById('pageSubtitle');
+  if (!heading || !titleEl || !subtitleEl) return;
+  const subtitle = heading.querySelector('small');
+  const title = [...heading.childNodes]
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent)
+    .join(' ')
+    .trim();
+  titleEl.textContent = title;
+  subtitleEl.textContent = subtitle ? subtitle.textContent.trim() : '';
+  document.title = `${title} — سويفورا`;
+}
+
+function markActiveNavigation(pageId) {
+  document.querySelectorAll('.sidebar ul li[data-page]').forEach((li) => {
+    const active = li.dataset.page === pageId;
+    li.classList.toggle('active', active);
+    if (active) li.setAttribute('aria-current', 'page');
+    else li.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('.bottom-nav-item[data-nav-page]').forEach((button) => {
+    const active = button.dataset.navPage === pageId;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+}
+
+/**
+ * Opens a page: shows it, updates the title and the menus, loads its data
+ * and records it in the address (#orders) so the back button and reloads
+ * return to it.
+ */
+function navigateTo(pageId, { push = true } = {}) {
+  const page = pages[pageId] ? pageId : 'dashboard';
+  switchPage(page);
+  markActiveNavigation(page);
+  updatePageTitle(page);
+  const main = document.getElementById('mainContent');
+  if (main) main.scrollTop = 0;
+  window.scrollTo(0, 0);
+  if (push && location.hash !== `#${page}`) {
+    history.pushState({ page }, '', `#${page}`);
+  }
+  loadPageData(page);
+}
+
+window.addEventListener('popstate', () => {
+  navigateTo((location.hash || '#dashboard').slice(1), { push: false });
+});
+
 document.querySelectorAll('.sidebar ul li[data-page]').forEach(item => {
   item.addEventListener('click', function () {
-    const page = this.dataset.page;
-    switchPage(page);
-    document.querySelectorAll('.sidebar ul li').forEach(li => li.classList.remove('active'));
-    this.classList.add('active');
+    navigateTo(this.dataset.page);
+  });
+});
+
+document.querySelectorAll('.bottom-nav-item[data-nav-page]').forEach((button) => {
+  button.addEventListener('click', () => navigateTo(button.dataset.navPage));
+});
+
+function loadPageData(page) {
+    if (page === 'dashboard') loadDashboardStats();
     if (page === 'orders') loadOrders();
     if (page === 'drivers') loadDriversList();
     if (page === 'users') loadUsersList();
@@ -271,7 +330,19 @@ document.querySelectorAll('.sidebar ul li[data-page]').forEach(item => {
       el.textContent = '';
       loadBroadcastArchive(page === 'broadcast-drivers' ? 'drivers' : 'users');
     }
-  });
+}
+
+// Open the page named in the address on first load (e.g. /admin#ads), once
+// the whole script has run (the loaders use state declared further down).
+document.addEventListener('DOMContentLoaded', function openInitialPage() {
+  const initial = (location.hash || '').slice(1);
+  if (initial && initial !== 'dashboard' && pages[initial]) {
+    history.replaceState({ page: initial }, '', `#${initial}`);
+    navigateTo(initial, { push: false });
+  } else {
+    markActiveNavigation('dashboard');
+    updatePageTitle('dashboard');
+  }
 });
 
 // Responsive navigation: on phones and tablets (<= 900px, see style.css)
@@ -325,13 +396,49 @@ document.querySelectorAll('.sidebar ul li[data-page]').forEach(item => {
   });
 })();
 
-document.querySelectorAll('.back-home').forEach(btn => {
-  btn.addEventListener('click', function () {
-    switchPage('dashboard');
-    document.querySelectorAll('.sidebar ul li').forEach(li => li.classList.remove('active'));
-    document.querySelector('.sidebar ul li[data-page="dashboard"]').classList.add('active');
-  });
+// Clickable cards (stat cards, report links) work from the keyboard too.
+const ACTION_WITHOUT_NATIVE_KEYS = '[data-admin-action]:not(button):not(a):not(input):not(select):not(textarea)';
+document.querySelectorAll(ACTION_WITHOUT_NATIVE_KEYS).forEach((element) => {
+  if (!element.hasAttribute('tabindex')) element.setAttribute('tabindex', '0');
+  if (!element.hasAttribute('role')) element.setAttribute('role', 'button');
 });
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target || !target.matches(ACTION_WITHOUT_NATIVE_KEYS)) return;
+  event.preventDefault();
+  target.click();
+});
+
+// Phone bottom bar: "More" opens the full menu; badges mirror the sidebar.
+(function setUpBottomNav() {
+  const more = document.querySelector('.bottom-nav-item[data-nav-menu]');
+  const toggle = document.getElementById('navToggle');
+  if (more && toggle) more.addEventListener('click', () => toggle.click());
+
+  const chatBadge = document.getElementById('chatBadge');
+  const bottomChatBadge = document.getElementById('bottomChatBadge');
+  const moreDot = document.getElementById('bottomMoreDot');
+  const otherBadges = ['pendingBadge', 'driverReportsBadge', 'userReportsBadge']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const visible = (badge) => badge && !badge.classList.contains('csp-hidden')
+    && getComputedStyle(badge).display !== 'none'
+    && Number(badge.textContent || 0) > 0;
+
+  function sync() {
+    if (bottomChatBadge && chatBadge) {
+      bottomChatBadge.hidden = !visible(chatBadge);
+      bottomChatBadge.textContent = chatBadge.textContent;
+    }
+    if (moreDot) moreDot.hidden = !otherBadges.some(visible);
+  }
+  const observer = new MutationObserver(sync);
+  [chatBadge, ...otherBadges].filter(Boolean).forEach((badge) => {
+    observer.observe(badge, { attributes: true, childList: true, characterData: true, subtree: true });
+  });
+  sync();
+})();
 
 // ================================================
 // 3. بيانات فلسطين (المحافظات والمدن)
@@ -3998,6 +4105,7 @@ const LIVE_PAGE_LOADERS = {
 const LIVE_BADGE_TOPICS = ['dashboard', 'pending-providers', 'driver-reports', 'user-reports'];
 
 let liveTopics = new Set();
+let liveConnectedBefore = false;
 let liveRefreshTimer = null;
 
 function setLiveStatus(connected) {
@@ -4044,8 +4152,10 @@ function connectSupportSocket() {
   supportSocket = io({ transports: ['websocket'], withCredentials: true });
   supportSocket.on('connect', () => {
     setLiveStatus(true);
-    // Catch up on anything that changed while disconnected.
-    applyLiveTopics(new Set(Object.keys(LIVE_PAGE_LOADERS)));
+    // After a reconnect, catch up on anything that changed meanwhile (the
+    // first connection follows the page's own initial load).
+    if (liveConnectedBefore) applyLiveTopics(new Set(Object.keys(LIVE_PAGE_LOADERS)));
+    liveConnectedBefore = true;
   });
   supportSocket.on('disconnect', () => setLiveStatus(false));
   supportSocket.on('connect_error', () => setLiveStatus(false));

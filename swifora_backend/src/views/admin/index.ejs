@@ -2,29 +2,42 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="csrf-token" content="<%= csrfToken %>">
-  <title>Swifora - لوحة التحكم</title>
+  <title>سويفورا — لوحة التحكم</title>
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="سويفورا">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
 </head>
 <body>
-  <!-- Shown on phones and tablets (<= 900px): opens the sidebar as a drawer. -->
-  <header class="mobile-topbar">
-    <button type="button" class="nav-toggle" id="navToggle" aria-label="فتح القائمة" aria-controls="adminSidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
-    <div class="mobile-topbar-title"><span>🚀</span> Swifora</div>
-  </header>
+  <a class="skip-link" href="#mainContent">تخطي إلى المحتوى</a>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <%- include('partials/sidebar') %>
 
-  <div class="main-content">
+  <main class="main-content" id="mainContent" tabindex="-1">
+    <!-- One app bar for every page: menu (phones/tablets), page title, clock. -->
+    <header class="app-topbar">
+      <button type="button" class="nav-toggle" id="navToggle" aria-label="فتح القائمة" aria-controls="adminSidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
+      <div class="app-topbar-titles">
+        <h1 id="pageTitle">لوحة القيادة</h1>
+        <p id="pageSubtitle">التحكم بالعمولات والإحصائيات</p>
+      </div>
+      <div class="live-clock" aria-hidden="true"><i class="fas fa-clock"></i> <span id="clockDisplay">--:--</span></div>
+    </header>
 
     <!-- الرئيسية - Dashboard -->
     <div id="page-dashboard" class="page-section active-page">
       <div class="top-header">
         <h1>لوحة القيادة <small>التحكم بالعمولات والإحصائيات</small></h1>
-        <div class="live-clock"><i class="fas fa-sync-alt fa-fw" data-presentation="p001"></i> <span id="clockDisplay">جاري التحميل...</span></div>
       </div>
       <div class="stats-row">
         <div class="stat-card blue" data-admin-action="openListModal" data-admin-arg-count="3" data-admin-arg-1="drivers" data-admin-arg-2="all" data-admin-arg-3="جميع السائقين"><span class="icon"><i class="fas fa-users"></i></span><div class="number" id="totalDrivers">0</div><div class="label">إجمالي السائقين</div></div>
@@ -56,7 +69,7 @@
 
     <!-- الطلبات -->
     <div id="page-orders" class="page-section">
-      <div class="top-header"><h1>الطلبات <small>جميع طلبات التوصيل والنقل</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplayOrders">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>الطلبات <small>جميع طلبات التوصيل والنقل</small></h1></div>
       <div class="search-container">
         <div class="search-box">
           <input id="orderSearchInput" type="text" placeholder="رقم الطلب أو وصف الطلب...">
@@ -85,12 +98,11 @@
 
     <!-- السائقين -->
     <div id="page-drivers" class="page-section">
-      <div class="top-header"><h1>إدارة السائقين <small>بحث برقم السائق (أرقام فقط)</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay2">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إدارة السائقين <small>بحث برقم السائق (أرقام فقط)</small></h1></div>
       <div class="search-container">
         <div class="search-box">
           <input type="text" id="driverSearchInput" placeholder="أدخل ID السائق أو الاسم">
           <button id="driverSearchBtn"><i class="fas fa-search"></i> بحث</button>
-          <button class="back-home" data-page="dashboard"><i class="fas fa-arrow-right"></i> الرئيسية</button>
         </div>
         <div id="driverResult" class="result-card"></div>
         <div id="driversList" class="result-card"></div>
@@ -99,12 +111,11 @@
 
     <!-- المستخدمين -->
     <div id="page-users" class="page-section">
-      <div class="top-header"><h1>إدارة المستخدمين <small>بحث برقم المستخدم (أرقام فقط)</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay3">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إدارة المستخدمين <small>بحث برقم المستخدم (أرقام فقط)</small></h1></div>
       <div class="search-container">
         <div class="search-box">
           <input type="text" id="userSearchInput" placeholder="أدخل ID المستخدم أو الاسم">
           <button id="userSearchBtn"><i class="fas fa-search"></i> بحث</button>
-          <button class="back-home" data-page="dashboard"><i class="fas fa-arrow-right"></i> الرئيسية</button>
         </div>
         <div id="userResult" class="result-card"></div>
         <div id="usersList" class="result-card"></div>
@@ -113,13 +124,13 @@
 
     <!-- العمولات -->
     <div id="page-commissions" class="page-section">
-      <div class="top-header"><h1>إدارة العمولات <small>أرباح المنصة من العمولات المستحقة</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay4">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إدارة العمولات <small>أرباح المنصة من العمولات المستحقة</small></h1></div>
       <div id="commissionsContent"></div>
     </div>
 
     <!-- إضافة سائق جديد -->
     <div id="page-add-driver" class="page-section">
-      <div class="top-header"><h1>إضافة سائق جديد <small>تسجيل وتفعيل سائق على المنصة</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay10">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إضافة سائق جديد <small>تسجيل وتفعيل سائق على المنصة</small></h1></div>
       <div class="add-driver-form">
         <form id="addDriverForm">
           <div class="form-grid">
@@ -167,25 +178,25 @@
 
     <!-- طلبات التسجيل -->
     <div id="page-pending-providers" class="page-section">
-      <div class="top-header"><h1>طلبات تسجيل السائقين <small>طلبات التسجيل الجديدة للمراجعة والقبول</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay14">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>طلبات تسجيل السائقين <small>طلبات التسجيل الجديدة للمراجعة والقبول</small></h1></div>
       <div id="pendingProvidersContent"></div>
     </div>
 
     <!-- إبلاغات السائقين -->
     <div id="page-driver-reports" class="page-section">
-      <div class="top-header"><h1>إبلاغات السائقين <small>الشكاوى والملاحظات المقدمة من السائقين</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay5">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إبلاغات السائقين <small>الشكاوى والملاحظات المقدمة من السائقين</small></h1></div>
       <div id="driverReportsContent"></div>
     </div>
 
     <!-- إبلاغات المستخدمين -->
     <div id="page-user-reports" class="page-section">
-      <div class="top-header"><h1>إبلاغات المستخدمين <small>الشكاوى والملاحظات المقدمة من المستخدمين</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay6">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إبلاغات المستخدمين <small>الشكاوى والملاحظات المقدمة من المستخدمين</small></h1></div>
       <div id="userReportsContent"></div>
     </div>
 
     <!-- محادثات الدعم -->
     <div id="page-support-chat" class="page-section">
-      <div class="top-header"><h1>محادثات الدعم <small>الدردشة المباشرة مع المستخدمين والسائقين</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay13">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>محادثات الدعم <small>الدردشة المباشرة مع المستخدمين والسائقين</small></h1></div>
       <div class="chat-layout">
         <div class="chat-conversations" id="chatConversations">
           <p data-presentation="p006">جاري تحميل المحادثات...</p>
@@ -201,7 +212,7 @@
 
     <!-- إرسال رسالة للسائقين -->
     <div id="page-broadcast-drivers" class="page-section">
-      <div class="top-header"><h1>إرسال رسالة للسائقين <small>إرسال إشعار جماعي لجميع السائقين</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay11">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إرسال رسالة للسائقين <small>إرسال إشعار جماعي لجميع السائقين</small></h1></div>
       <div class="broadcast-form">
         <div class="form-group"><label>عنوان الرسالة</label><input type="text" id="driverBroadcastTitle" placeholder="أدخل عنوان الرسالة"></div>
         <div class="form-group"><label>نص الرسالة</label><textarea id="driverBroadcastBody" placeholder="أدخل محتوى الرسالة..."></textarea></div>
@@ -216,7 +227,7 @@
 
     <!-- إرسال رسالة للمستخدمين -->
     <div id="page-broadcast-users" class="page-section">
-      <div class="top-header"><h1>إرسال رسالة للمستخدمين <small>إرسال إشعار جماعي لجميع المستخدمين</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay12">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>إرسال رسالة للمستخدمين <small>إرسال إشعار جماعي لجميع المستخدمين</small></h1></div>
       <div class="broadcast-form">
         <div class="form-group"><label>عنوان الرسالة</label><input type="text" id="userBroadcastTitle" placeholder="أدخل عنوان الرسالة"></div>
         <div class="form-group"><label>نص الرسالة</label><textarea id="userBroadcastBody" placeholder="أدخل محتوى الرسالة..."></textarea></div>
@@ -231,7 +242,7 @@
 
     <!-- الإعلانات -->
     <div id="page-ads" class="page-section">
-      <div class="top-header"><h1>الإعلانات <small>شريط إعلاني أعلى شاشة الزبون والسائق</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay15">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>الإعلانات <small>شريط إعلاني أعلى شاشة الزبون والسائق</small></h1></div>
       <div class="ad-tabs" role="tablist" aria-label="الإعلانات">
         <button type="button" class="ad-tab active" role="tab" id="adTabManage" aria-selected="true" aria-controls="adManagePanel" data-admin-action="showAdTab" data-admin-arg-count="1" data-admin-arg-1="manage"><i class="fas fa-rectangle-ad"></i> إدارة الإعلانات</button>
         <button type="button" class="ad-tab" role="tab" id="adTabTracking" aria-selected="false" aria-controls="adTrackingPanel" data-admin-action="showAdTab" data-admin-arg-count="1" data-admin-arg-1="tracking"><i class="fas fa-chart-line"></i> تتبع الإعلانات</button>
@@ -311,16 +322,15 @@
 
     <!-- المناطق -->
     <div id="page-areas" class="page-section">
-      <div class="top-header"><h1>المناطق <small>توزيع المستخدمين والسائقين حسب المحافظات والمدن</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay8">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>المناطق <small>توزيع المستخدمين والسائقين حسب المحافظات والمدن</small></h1></div>
       <div class="areas-legend"><span class="legend-drivers"><i class="fas fa-car"></i> السائقون</span><span class="legend-users"><i class="fas fa-user"></i> المستخدمون</span><span class="sort-note">اختر محافظة لعرض قرىها وأسماء المسجلين — مرتبة حسب الإجمالي تنازلياً</span></div>
       <div id="areasContainer" class="areas-container"></div>
     </div>
 
     <!-- الإعدادات -->
     <div id="page-settings" class="page-section">
-      <div class="top-header"><h1>الإعدادات <small>إعدادات النظام العامة</small></h1><div class="live-clock"><i class="fas fa-clock"></i> <span id="clockDisplay9">جاري التحميل...</span></div></div>
+      <div class="top-header"><h1>الإعدادات <small>إعدادات النظام العامة</small></h1></div>
       <div class="settings-grid">
-        <div class="settings-card"><div class="icon"><i class="fas fa-sign-out-alt"></i></div><h3>تسجيل الخروج</h3><p>قم بتسجيل الخروج من لوحة التحكم.</p><form method="POST" action="/admin/logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn-action logout"><i class="fas fa-door-open"></i> تسجيل الخروج</button></form></div>
         <div class="settings-card"><div class="icon"><i class="fas fa-key"></i></div><h3>إعادة تعيين كلمة المرور</h3><p>تغيير كلمة المرور الخاصة بحساب المدير.</p><button class="btn-action reset" data-admin-action="openResetPassword" data-admin-arg-count="0"><i class="fas fa-undo-alt"></i> إعادة تعيين كلمة المرور</button></div>
         <div class="settings-card"><div class="icon"><i class="fas fa-shield-alt"></i></div><h3>المصادقة الثنائية</h3><p>أضف طبقة حماية ثانية بحساب مصادقة (TOTP) ورموز استرداد.</p><button class="btn-action reset" data-admin-action="manageTwoFactor" data-admin-arg-count="0"><i class="fas fa-shield-alt"></i> إدارة المصادقة الثنائية</button></div>
         <div class="settings-card">
@@ -353,11 +363,20 @@
       </div>
     </div>
 
-  </div>
+  </main>
+
+  <!-- Phones: the main destinations one tap away; "More" opens the full menu. -->
+  <nav class="bottom-nav" id="bottomNav" aria-label="تنقل سريع">
+    <button type="button" class="bottom-nav-item active" data-nav-page="dashboard"><i class="fas fa-chart-pie"></i><span>الرئيسية</span></button>
+    <button type="button" class="bottom-nav-item" data-nav-page="orders"><i class="fas fa-shopping-cart"></i><span>الطلبات</span></button>
+    <button type="button" class="bottom-nav-item" data-nav-page="drivers"><i class="fas fa-users"></i><span>السائقون</span></button>
+    <button type="button" class="bottom-nav-item" data-nav-page="support-chat"><i class="fas fa-headset"></i><span>الدعم</span><span class="bottom-nav-badge" id="bottomChatBadge" hidden></span></button>
+    <button type="button" class="bottom-nav-item" data-nav-menu aria-controls="adminSidebar"><i class="fas fa-bars"></i><span>المزيد</span><span class="bottom-nav-dot" id="bottomMoreDot" hidden></span></button>
+  </nav>
 
   <%- include('partials/modals') %>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/main.js"></script>
+  <script src="/js/main.js?v=<%= assetVersion %>"></script>
 </body>
 </html>

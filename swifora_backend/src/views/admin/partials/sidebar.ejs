@@ -1,23 +1,66 @@
 <nav class="sidebar" id="adminSidebar" aria-label="القائمة الرئيسية">
-  <div class="logo"><span>🚀</span> Swifora</div>
-  <ul>
-    <li class="active" data-page="dashboard"><i class="fas fa-chart-pie"></i> الرئيسية</li>
-    <li data-page="orders"><i class="fas fa-shopping-cart"></i> الطلبات</li>
-    <li data-page="drivers"><i class="fas fa-users"></i> السائقين</li>
-    <li data-page="users"><i class="fas fa-user-friends"></i> المستخدمين</li>
-    <li data-page="commissions"><i class="fas fa-coins"></i> العمولات</li>
-    <li data-page="add-driver"><i class="fas fa-user-plus"></i> إضافة سائق جديد</li>
-    <li data-page="pending-providers"><span><i class="fas fa-clock"></i> طلبات التسجيل</span><span class="badge-counter" id="pendingBadge" data-presentation="p015">0</span></li>
-    <li data-page="driver-reports"><span><i class="fas fa-flag"></i> إبلاغات السائقين</span><span class="badge-counter" id="driverReportsBadge" data-presentation="p015">0</span></li>
-    <li data-page="user-reports"><span><i class="fas fa-flag"></i> إبلاغات المستخدمين</span><span class="badge-counter" id="userReportsBadge" data-presentation="p015">0</span></li>
-    <li data-page="support-chat"><span><i class="fas fa-headset"></i> محادثات الدعم</span><span class="badge-counter" id="chatBadge" data-presentation="p015">0</span></li>
-    <li data-page="broadcast-drivers"><i class="fas fa-bullhorn"></i> إرسال رسالة للسائقين</li>
-    <li data-page="broadcast-users"><i class="fas fa-bullhorn"></i> إرسال رسالة للمستخدمين</li>
-    <li data-page="ads"><i class="fas fa-rectangle-ad"></i> الإعلانات</li>
-    <li data-page="areas"><i class="fas fa-map-marked-alt"></i> المناطق</li>
-    <li data-page="settings"><i class="fas fa-cog"></i> الإعدادات</li>
-  </ul>
-  <div class="status-badge" id="liveStatus" role="status" aria-live="polite">
-    <i class="fas fa-circle" data-presentation="p016"></i> <span id="liveStatusText">جاري الاتصال…</span>
+  <div class="logo">
+    <span class="logo-mark" aria-hidden="true">S</span>
+    <span class="logo-text">سويفورا <small>لوحة التحكم</small></span>
+  </div>
+
+  <div class="nav-group">
+    <ul>
+      <li class="active" data-page="dashboard"><span><i class="fas fa-chart-pie"></i> الرئيسية</span></li>
+    </ul>
+  </div>
+
+  <div class="nav-group">
+    <p class="nav-group-title">العمليات</p>
+    <ul>
+      <li data-page="orders"><span><i class="fas fa-shopping-cart"></i> الطلبات</span></li>
+      <li data-page="pending-providers"><span><i class="fas fa-clock"></i> طلبات التسجيل</span><span class="badge-counter" id="pendingBadge" data-presentation="p015">0</span></li>
+      <li data-page="driver-reports"><span><i class="fas fa-flag"></i> إبلاغات السائقين</span><span class="badge-counter" id="driverReportsBadge" data-presentation="p015">0</span></li>
+      <li data-page="user-reports"><span><i class="fas fa-flag"></i> إبلاغات المستخدمين</span><span class="badge-counter" id="userReportsBadge" data-presentation="p015">0</span></li>
+    </ul>
+  </div>
+
+  <div class="nav-group">
+    <p class="nav-group-title">الحسابات</p>
+    <ul>
+      <li data-page="drivers"><span><i class="fas fa-users"></i> السائقون</span></li>
+      <li data-page="add-driver"><span><i class="fas fa-user-plus"></i> إضافة سائق</span></li>
+      <li data-page="users"><span><i class="fas fa-user-friends"></i> المستخدمون</span></li>
+    </ul>
+  </div>
+
+  <div class="nav-group">
+    <p class="nav-group-title">المالية</p>
+    <ul>
+      <li data-page="commissions"><span><i class="fas fa-coins"></i> العمولات</span></li>
+    </ul>
+  </div>
+
+  <div class="nav-group">
+    <p class="nav-group-title">التواصل</p>
+    <ul>
+      <li data-page="support-chat"><span><i class="fas fa-headset"></i> محادثات الدعم</span><span class="badge-counter" id="chatBadge" data-presentation="p015">0</span></li>
+      <li data-page="broadcast-drivers"><span><i class="fas fa-bullhorn"></i> رسالة للسائقين</span></li>
+      <li data-page="broadcast-users"><span><i class="fas fa-bullhorn"></i> رسالة للمستخدمين</span></li>
+    </ul>
+  </div>
+
+  <div class="nav-group">
+    <p class="nav-group-title">المحتوى والنظام</p>
+    <ul>
+      <li data-page="ads"><span><i class="fas fa-rectangle-ad"></i> الإعلانات</span></li>
+      <li data-page="areas"><span><i class="fas fa-map-marked-alt"></i> المناطق</span></li>
+      <li data-page="settings"><span><i class="fas fa-cog"></i> الإعدادات</span></li>
+    </ul>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="status-badge" id="liveStatus" role="status" aria-live="polite">
+      <i class="fas fa-circle" data-presentation="p016"></i> <span id="liveStatusText">جاري الاتصال…</span>
+    </div>
+    <form method="POST" action="/admin/logout" class="sidebar-logout">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit"><i class="fas fa-door-open"></i> تسجيل الخروج</button>
+    </form>
   </div>
 </nav>
