@@ -278,7 +278,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     ],
     [
       'src/routes/adminCommissions.js',
-      { error: 1, failure: 3 },
+      // +2: undo a "paid"/"reset", undo a "reset all".
+      { error: 1, failure: 5 },
     ],
     [
       'src/routes/adminDrivers.js',
@@ -342,10 +343,10 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
   }
 
   assert.equal(errorTotal, 28);
-  assert.equal(failureTotal, 25);
+  assert.equal(failureTotal, 27);
   assert.equal(
     errorTotal + failureTotal,
-    53,
+    55,
   );
 });
 

@@ -542,6 +542,8 @@ const adminActionHandlers = Object.freeze({
   openInlineDriverEdit,
   closeDriverEdit,
   clearProfileReports,
+  undoCommissionAction,
+  undoResetAll,
   openEditUser,
   closeUserEdit,
   openListModal,
@@ -1409,6 +1411,7 @@ function renderDriverResultFromDB(data) {
     <div class="row"><span class="label">إجمالي الأرباح (صافي)</span><span class="value" data-presentation="p002">${escapeHtml(netProfit)} </div>
     <div class="row"><span class="label">أرباح آخر 30 يوم (صافي)</span><span class="value" data-presentation="p018">${escapeHtml(last30Profit)} </div>
     <div class="row"><span class="label">عمولة المنصة المستحقة</span><span class="value" data-presentation="p019">${escapeHtml(commission)} </div>
+    ${driver.lastCommissionAction ? `<div class="row commission-last-action"><span class="label">آخر عملية على العمولة</span><span class="value">${commissionActionLabel(driver.lastCommissionAction)} ${commissionUndoButton(driver.lastCommissionAction, driver._id)}</span></div>` : ''}
     ${profileStatusSection(driver.profileStatus, 'driver', driver._id)}
     <div class="action-buttons">
       <button class="action-btn change-password" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openInlineDriverEdit" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تعديل بيانات السائق</button>
@@ -1938,11 +1941,17 @@ async function loadCommissions() {
         ? `<button class="action-btn pay-now" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="markPaid" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}" data-presentation="p020">تحديد كمدفوع</button>`
         : '';
       const resetAction = `<button class="action-btn reset-commissions" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resetDriverCommission" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(driver._id))}">تصفير العداد</button>`;
-      const actionHtml = `<div class="table-actions">${payAction}${resetAction}</div>`;
+      const undoAction = commissionUndoButton(driver.lastAction, driver._id);
+      const actionHtml = `<div class="table-actions">${payAction}${resetAction}${undoAction}</div>`;
       rows += `<tr><td><strong>${escapeHtml(driver.name)}</strong><br><small data-presentation="p008">${escapeHtml(driver.driverId)}</small></td><td>${escapeHtml(driver.phone || 'غير متوفر')}</td><td>${escapeHtml(driver.serviceType)}</td><td>${escapeHtml(driver.commission)}</td><td>${statusText}</td><td>${actionHtml}</td></tr>`;
     });
 
+    const resetAll = data.lastResetAll;
+    const resetAllBar = resetAll
+      ? `<div class="undo-reset-all" role="status"><span>آخر «تصفير الكل»: ${escapeHtml(resetAll.drivers)} سائق، ${escapeHtml(resetAll.amount)} شيكل — ${escapeHtml(formatDisplayDateTime(resetAll.at))}</span><button class="action-btn undo-commission" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="undoResetAll" data-admin-arg-count="3" data-admin-arg-1="${escapeHtml(resetAll.batchId)}" data-admin-arg-2="${escapeHtml(resetAll.drivers)}" data-admin-arg-3="${escapeHtml(resetAll.amount)}"><i class="fas fa-rotate-left"></i> تراجع عن تصفير الكل</button></div>`
+      : '';
     document.getElementById('commissionsContent').innerHTML = `
+      ${resetAllBar}
       <div class="commissions-summary">
         <div class="summary-card"><div class="label">إجمالي العمولات المستحقة</div><div class="number red">${escapeHtml(data.totalUnpaid)} </div></div>
         <div class="summary-card"><div class="label">عدد السائقين المستحقين</div><div class="number orange">${escapeHtml(data.unpaidDrivers)}</div></div>
@@ -1962,13 +1971,82 @@ async function loadCommissions() {
   }
 }
 
+// ---- Undo a commission "paid" / "reset" (newest first) ----
+function commissionActionLabel(action) {
+  if (!action) return '';
+  const amount = `${escapeHtml(action.amount)} شيكل`;
+  const when = escapeHtml(formatDisplayDateTime(action.at));
+  return action.type === 'payment'
+    ? `تسجيل دفع ${amount} — ${when}`
+    : `تصفير العداد (${amount}) — ${when}`;
+}
+
+function commissionUndoButton(action, driverId) {
+  if (!action) return '';
+  const label = action.type === 'payment' ? 'تراجع عن الدفع' : 'تراجع عن التصفير';
+  return `<button class="action-btn undo-commission" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="undoCommissionAction" data-admin-arg-count="4" data-admin-arg-1="${escapeHtml(action.id)}" data-admin-arg-2="${escapeHtml(String(driverId))}" data-admin-arg-3="${escapeHtml(action.type)}" data-admin-arg-4="${escapeHtml(action.amount)}"><i class="fas fa-rotate-left"></i> ${label}</button>`;
+}
+
+function refreshAfterCommissionChange(driverId) {
+  loadCommissions();
+  loadDashboardStats();
+  const driversPage = document.getElementById('page-drivers');
+  if (driverId && driversPage && driversPage.classList.contains('active-page')) {
+    searchDriverById(driverId);
+  }
+  refreshPayoutsModal();
+}
+
+async function undoCommissionAction(actionId, driverId, type, amount) {
+  const message = type === 'payment'
+    ? `التراجع عن تسجيل دفع ${amount} شيكل؟ سيعود المبلغ مستحقاً على السائق كما كان قبل الدفع.`
+    : `التراجع عن تصفير العداد؟ ستعود عمولة المنصة (${amount} شيكل) مستحقة على السائق كما كانت قبل التصفير.`;
+  if (!await adminConfirm(message)) return;
+  try {
+    const res = await adminFetch(`/admin/commissions/undo/${encodeURIComponent(actionId)}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      adminAlert(data.message || 'تعذر التراجع عن العملية.');
+      refreshAfterCommissionChange(driverId);
+      return;
+    }
+    adminAlert(data.type === 'payment'
+      ? `تم التراجع عن الدفع. عاد ${data.amount} شيكل مستحقاً على السائق.`
+      : `تم التراجع عن التصفير. عادت عمولة ${data.amount} شيكل مستحقة على السائق.`);
+    refreshAfterCommissionChange(driverId);
+  } catch (err) {
+    adminAlert('حدث خطأ أثناء التراجع. لم يتغير شيء.');
+  }
+}
+
+async function undoResetAll(batchId, drivers, amount) {
+  if (!await adminConfirm(`التراجع عن «تصفير الكل»؟ ستعود عمولة ${drivers} سائق (${amount} شيكل) مستحقة كما كانت.`)) return;
+  try {
+    const res = await adminFetch(`/admin/commissions/undo-batch/${encodeURIComponent(batchId)}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      adminAlert(data.message || 'تعذر التراجع عن تصفير الكل.');
+      return;
+    }
+    adminAlert(
+      `تم التراجع عن التصفير لـ ${data.undone} سائق (${data.amount} شيكل).`
+      + (data.skipped > 0 ? ` لم يُتراجع عن ${data.skipped} سائق لأن لديهم عمليات أحدث.` : ''),
+    );
+    refreshAfterCommissionChange(null);
+  } catch (err) {
+    adminAlert('حدث خطأ أثناء التراجع. لم يتغير شيء.');
+  }
+}
+
 async function markPaid(driverId) {
   if (!await adminConfirm('هل أنت متأكد من تحديد السائق كمدفوع؟')) return;
   try {
     const res = await adminFetch(`/admin/commissions/pay/${driverId}`, { method: 'PUT' });
     const data = await res.json();
     if (data.success) {
-      adminAlert(data.message);
+      adminAlert(data.action
+        ? `${data.message}. يمكنك التراجع من بطاقة السائق أو صفحة العمولات.`
+        : data.message);
       loadCommissions();
       loadDashboardStats();
 
@@ -2017,7 +2095,8 @@ async function resetDriverCommission(driverId) {
       'تم تصفير عداد العمولة' +
         (Number(data.amount) > 0
           ? ` وإرجاع ${data.amount} شيكل للسائق.`
-          : '.'),
+          : '.') +
+        (data.action ? ' يمكنك التراجع من بطاقة السائق أو صفحة العمولات.' : ''),
     );
     loadCommissions();
     loadDashboardStats();
@@ -2053,7 +2132,7 @@ async function resetAllCommissions() {
     }
 
     adminAlert(
-      `تم تصفير ${data.drivers} سائق وإرجاع ${data.amount} شيكل لهم.`,
+      `تم تصفير ${data.drivers} سائق وإرجاع ${data.amount} شيكل لهم. يمكنك التراجع من صفحة العمولات.`,
     );
     loadCommissions();
     loadDashboardStats();

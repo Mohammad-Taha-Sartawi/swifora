@@ -849,3 +849,9 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
 .action-btn.clear-reports { background: transparent; border: 1px solid #e74c3c88; color: #ff7b6e; }
 .action-btn.clear-reports:hover:not([disabled]) { background: #e74c3c22; }
 .action-btn.clear-reports[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* Undo for commission "paid" / "reset". */
+.action-btn.undo-commission { background: transparent; border: 1px solid #f39c1288; color: #f5b041; }
+.action-btn.undo-commission:hover { background: #f39c1222; }
+.commission-last-action .value { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.undo-reset-all { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 16px; border: 1px solid #f39c1266; border-radius: 12px; background: #f39c1211; color: #f5b041; }

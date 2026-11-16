@@ -45,6 +45,7 @@ const {
 } = require('../services/phoneNumbers');
 const { generatePublicId, isValidAdminPublicId } = require('../utils/publicId');
 const { profileReportStatus, clearProfileReports } = require('../services/profileReports');
+const { latestUndoableAction, actionSummary } = require('../services/commissionActions');
 const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
@@ -312,6 +313,8 @@ router.get('/search', async (req, res) => {
       status: match.status || '',
       // Reports filed against the driver (profile status).
       profileStatus: await profileReportStatus(match),
+      // The latest "paid"/"reset" that can be undone.
+      lastCommissionAction: actionSummary(await latestUndoableAction(match._id)),
       financial: {
         paymentStatus,
         payments: commissionPayments.map((payment) => ({
