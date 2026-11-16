@@ -21,6 +21,15 @@ class MockApi {
 
   List<Map<String, dynamic>> offeredOrders = [];
 
+  /// The driver's own orders (accepted / fulfilling), `/api/provider/orders`.
+  List<Map<String, dynamic>> activeOrders = [];
+
+  /// Trip updates sent by the driver: `/api/orders/<id>/fulfilling|complete`.
+  final List<String> tripUpdates = [];
+
+  /// Broadcast pop-ups confirmed by the user (`/api/notifications/<id>/ack`).
+  final List<String> acknowledgedNotifications = [];
+
   int supportUnreadCount = 0;
 
   int statsRequests = 0;
@@ -52,6 +61,9 @@ class MockApi {
     responseDelay = Duration.zero;
     notifications = [];
     availabilityCalls.clear();
+    activeOrders = [];
+    tripUpdates.clear();
+    acknowledgedNotifications.clear();
     contactCalls.clear();
     contactDelay = Duration.zero;
   }
@@ -119,6 +131,17 @@ class _MockApiAdapter implements HttpClientAdapter {
         data = _api.pendingOrders;
       case '/api/provider/offered-orders':
         data = _api.offeredOrders;
+      case '/api/provider/orders':
+        data = _api.activeOrders;
+      case final p
+          when p.startsWith('/api/notifications/') && p.endsWith('/ack'):
+        _api.acknowledgedNotifications.add(p.split('/')[3]);
+        data = {'acknowledgedAt': DateTime.now().toIso8601String()};
+      case final p
+          when p.startsWith('/api/orders/') &&
+              (p.endsWith('/fulfilling') || p.endsWith('/complete')):
+        _api.tripUpdates.add(p);
+        data = const <String, dynamic>{};
       case '/api/notifications':
         data = _api.notifications;
       case '/api/notifications/unread-count':

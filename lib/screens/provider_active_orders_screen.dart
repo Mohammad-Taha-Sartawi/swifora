@@ -11,7 +11,11 @@ import '../services/localization_service.dart';
 import '../services/location_service.dart';
 import '../services/socket_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/ui/app_busy_actions.dart';
+import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_phone_link.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 import '../services/list_screen_navigation.dart';
@@ -25,7 +29,7 @@ class ProviderActiveOrdersScreen extends StatefulWidget {
 }
 
 class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
-    with ListScreenNavigation {
+    with ListScreenNavigation, AppBusyActions {
   final ProviderService _service = ProviderService();
   List<Map<String, dynamic>>? _orders;
   bool _loading = true;
@@ -175,6 +179,17 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
   }
 
   Future<void> _markFulfilling(String orderId) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'start_delivery_confirm_title'),
+      message: AppLocalization.get(context, 'start_delivery_confirm_message'),
+      confirmLabel: AppLocalization.get(context, 'start_delivery'),
+    );
+    if (!confirmed || !mounted) return;
+    await runBusyAction('trip:$orderId', () => _sendFulfilling(orderId));
+  }
+
+  Future<void> _sendFulfilling(String orderId) async {
     try {
       await _service.markFulfilling(widget.token, orderId);
       _loadOrders();
@@ -197,6 +212,20 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
   }
 
   Future<void> _markComplete(String orderId) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'complete_delivery_confirm_title'),
+      message: AppLocalization.get(
+        context,
+        'complete_delivery_confirm_message',
+      ),
+      confirmLabel: AppLocalization.get(context, 'confirm_delivery'),
+    );
+    if (!confirmed || !mounted) return;
+    await runBusyAction('trip:$orderId', () => _sendComplete(orderId));
+  }
+
+  Future<void> _sendComplete(String orderId) async {
     try {
       await _service.markComplete(widget.token, orderId);
       _loadOrders();
@@ -225,7 +254,6 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
   Widget build(BuildContext context) {
     trackListItems(_loading || _error != null ? null : (_orders?.length ?? 0));
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
-    final scheme = Theme.of(context).colorScheme;
     return Directionality(
       textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
@@ -241,20 +269,17 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                  ? Center(
-                      child: Text(
-                        _error!,
-                        style: TextStyle(color: scheme.error),
-                      ),
-                    )
+                  ? AppErrorState(message: _error!, onRetry: _loadOrders)
                   : _orders == null || _orders!.isEmpty
-                  ? Center(
-                      child: Text(
-                        AppLocalization.get(context, 'no_orders'),
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 16,
-                        ),
+                  ? AppEmptyState(
+                      icon: Icons.local_shipping_outlined,
+                      title: AppLocalization.get(
+                        context,
+                        'no_active_orders_title',
+                      ),
+                      message: AppLocalization.get(
+                        context,
+                        'no_active_orders_driver_hint',
                       ),
                     )
                   : RefreshIndicator(
@@ -322,28 +347,8 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
                                   if (o['status'] == 'fulfilling' ||
                                       o['status'] == 'completed') ...[
                                     if (o['phone'] != null) ...[
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.phone,
-                                            size: 14,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            o['phone'].toString(),
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onSurfaceVariant,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
+                                      AppPhoneLink(
+                                        phone: o['phone'].toString(),
                                       ),
                                     ],
                                     if (o['area'] != null) ...[
@@ -392,9 +397,12 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
                                     SizedBox(
                                       width: double.infinity,
                                       child: ElevatedButton(
-                                        onPressed: () => _markFulfilling(
-                                          o['_id']?.toString() ?? '',
-                                        ),
+                                        onPressed:
+                                            isActionBusy('trip:${o['_id']}')
+                                            ? null
+                                            : () => _markFulfilling(
+                                                o['_id']?.toString() ?? '',
+                                              ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: appToneStyle(
                                             context,
@@ -464,9 +472,12 @@ class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton(
-                                          onPressed: () => _markComplete(
-                                            o['_id']?.toString() ?? '',
-                                          ),
+                                          onPressed:
+                                              isActionBusy('trip:${o['_id']}')
+                                              ? null
+                                              : () => _markComplete(
+                                                  o['_id']?.toString() ?? '',
+                                                ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: appToneStyle(
                                               context,

@@ -24,13 +24,14 @@ import '../services/socket_service.dart';
 import '../services/mobile_session_failure.dart';
 import '../services/notification_router.dart';
 import '../services/push_notification_service.dart';
-import '../widgets/ui/app_action_tile.dart';
 import '../widgets/ui/ad_banner_carousel.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/brand/swifora_brand.dart';
+import '../widgets/ui/broadcast_popup.dart';
+import '../widgets/ui/star_rating_dialog.dart';
 import '../widgets/brand/swifora_home_chrome.dart';
 import '../services/ad_repository.dart';
 import '../widgets/governorate_scope_card.dart';
@@ -59,7 +60,7 @@ class ProviderHomeScreen extends StatefulWidget {
 }
 
 class _ProviderHomeScreenState extends State<ProviderHomeScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, BroadcastPopupHost {
   final ProviderService _providerService = ProviderService();
   Timer? _notifTimer;
   Timer? _dashboardRefreshTimer;
@@ -190,6 +191,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   @override
   void initState() {
     super.initState();
+    // Messages sent from the dashboard while the app was closed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(showPendingBroadcasts(widget.token));
+    });
     // Ad banner: views/taps go to the dashboard's tracking tab. "Create
     // order" ads are for customers and stay plain banners here.
     _adEvents = ApiAdEvents(
@@ -380,6 +385,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
               context,
               AppLocalization.get(context, 'delivery_confirmed_provider'),
             );
+            // Rate the customer right away, as the customer rates the
+            // driver right after confirming.
+            final orderId = data['orderId']?.toString() ?? '';
+            if (orderId.isNotEmpty) unawaited(_promptCustomerRating(orderId));
           } else {
             AppFeedback.warning(
               context,
@@ -410,11 +419,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
     _broadcastSub = SocketService.instance.onBroadcast.listen((_) {
       if (!mounted) return;
-      // Admin broadcasts are notification-only; do not show a home snackbar
-      // and do not touch the support-chat unread counter.
+      // A message from the dashboard: refresh the list and show it as a
+      // pop-up (it stays pinned in the notifications for 72 hours). It does
+      // not touch the support-chat unread counter.
       context.read<NotificationBloc>().add(
         LoadNotifications(token: widget.token),
       );
+      unawaited(showPendingBroadcasts(widget.token));
     });
 
     _accountDeletedSub = SocketService.instance.onAccountDeleted.listen((_) {
@@ -478,6 +489,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
         );
       }
       _refreshCurrentUser();
+      unawaited(showPendingBroadcasts(widget.token));
       LocationService.syncToBackend(widget.token);
       context.read<ProviderBloc>().add(LoadPendingOrders(token: widget.token));
       context.read<ProviderBloc>().add(LoadProviderStats(token: widget.token));
@@ -603,9 +615,18 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                 child: SwiforaHeader(
                   actions: [
                     SwiforaNotificationButton(token: widget.token),
-                    SwiforaAccountButton(
-                      fullName: _user.fullName,
-                      onPressed: _openAccountMenu,
+                    SwiforaHeaderAction(
+                      key: const Key('headerSupportButton'),
+                      icon: Icons.headset_mic_outlined,
+                      tooltip: AppLocalization.get(context, 'contact_support'),
+                      badgeCount: _supportUnreadCount,
+                      onPressed: _openSupport,
+                    ),
+                    SwiforaHeaderAction(
+                      key: const Key('headerReportButton'),
+                      icon: Icons.report_outlined,
+                      tooltip: AppLocalization.get(context, 'report_customer'),
+                      onPressed: _openReportCustomer,
                     ),
                   ],
                 ),
@@ -655,6 +676,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                             state.pendingOrders!.isNotEmpty) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             if (!mounted) return;
+                            // Do not cover the customer-rating question; the
+                            // pending banner on the home still leads there.
+                            if (_customerRatingOpen) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -720,6 +744,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
         builder: (_) => ProfileScreen(
           user: _user,
           token: widget.token,
+          driverStats: () {
+            final state = context.read<ProviderBloc>().state;
+            return state is ProviderStatsLoaded ? state.stats : null;
+          }(),
           onUserUpdated: (updated) {
             setState(() {
               _user = updated;
@@ -743,6 +771,50 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
           },
         ),
       ),
+    );
+  }
+
+  /// Orders whose customer this driver was already asked to rate (once per
+  /// order, even if the confirmation event arrives twice).
+  final Set<String> _customerRatingAsked = <String>{};
+
+  /// While the rating question is open, new orders do not open on top of it.
+  bool _customerRatingOpen = false;
+
+  Future<void> _promptCustomerRating(String orderId) async {
+    if (!_customerRatingAsked.add(orderId)) return;
+    _customerRatingOpen = true;
+    final int? rating;
+    try {
+      rating = await showStarRatingDialog(
+        context,
+        title: AppLocalization.get(context, 'rate_customer_title'),
+        body: AppLocalization.get(context, 'rate_customer_body'),
+      );
+    } finally {
+      _customerRatingOpen = false;
+    }
+    if (rating == null || !mounted) return;
+    try {
+      await _providerService.rateCustomer(widget.token, orderId, rating);
+      if (!mounted) return;
+      AppFeedback.success(
+        context,
+        AppLocalization.get(context, 'rating_thanks'),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      AppFeedback.error(
+        context,
+        error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  @override
+  void onBroadcastsConfirmed() {
+    context.read<NotificationBloc>().add(
+      LoadNotifications(token: widget.token),
     );
   }
 
@@ -947,10 +1019,15 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                   if (!s.isAvailable) ...[
                     const SizedBox(height: AppSpacing.md),
                     _buildOrdersPausedCard(context, s),
-                    const SizedBox(height: AppSpacing.md),
-                    AppActionWrap(children: [_buildSupportTile(context)]),
                   ],
-                  const SizedBox(height: AppSpacing.md),
+                  // Advertisements: right after the main card and before
+                  // the orders (same place on the customer's home).
+                  AdBannerCarousel(
+                    token: widget.token,
+                    refreshTick: _adRefreshTick,
+                    events: _adEvents,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
                   IgnorePointer(
                     key: const Key('providerUnavailableDisabledArea'),
                     ignoring: !s.isAvailable,
@@ -1076,8 +1153,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                             _buildCommissionCard(context, s),
                             const SizedBox(height: AppSpacing.md),
                           ],
-                          _buildRatingCard(context, s),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.sm),
                           SwiforaSectionTitle(
                             title: AppLocalization.get(
                               context,
@@ -1110,50 +1186,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                               );
                             },
                           ),
-                          const SizedBox(height: AppSpacing.lg),
-                          SwiforaSectionTitle(
-                            title: AppLocalization.get(
-                              context,
-                              'help_and_report_section',
-                            ),
-                          ),
-                          AppActionWrap(
-                            children: [
-                              AppActionTile(
-                                icon: Icons.report_outlined,
-                                title: AppLocalization.get(
-                                  context,
-                                  'report_customer',
-                                ),
-                                tone: AppTone.danger,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ReportScreen(
-                                        token: widget.token,
-                                        reportType: 'user',
-                                        title: AppLocalization.get(
-                                          context,
-                                          'report_customer',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              if (s.isAvailable) _buildSupportTile(context),
-                            ],
-                          ),
                         ],
                       ),
                     ),
-                  ),
-                  // Advertisements below the driver's work, never above it.
-                  AdBannerCarousel(
-                    token: widget.token,
-                    refreshTick: _adRefreshTick,
-                    events: _adEvents,
                   ),
                   const SizedBox(height: AppSpacing.xl),
                 ],
@@ -1344,13 +1379,16 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     );
   }
 
-  Widget _buildSupportTile(BuildContext context) {
-    return AppActionTile(
-      icon: Icons.headset_mic_outlined,
-      title: AppLocalization.get(context, 'contact_support'),
-      tone: AppTone.accent,
-      badgeCount: _supportUnreadCount,
-      onTap: _openSupport,
+  void _openReportCustomer() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReportScreen(
+          token: widget.token,
+          reportType: 'user',
+          title: AppLocalization.get(context, 'report_customer'),
+        ),
+      ),
     );
   }
 
@@ -1371,90 +1409,82 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
       context,
       s.isAvailable ? AppTone.success : AppTone.danger,
     );
-    final title = AppLocalization.get(
+    final title = AppLocalization.get(context, 'availability_title');
+    final status = AppLocalization.get(
       context,
-      s.isAvailable ? 'driver_availability' : 'driver_availability_off',
-    );
-    final subtitle = AppLocalization.get(
-      context,
-      s.isAvailable ? 'driver_available' : 'driver_unavailable',
+      s.isAvailable ? 'availability_on_short' : 'availability_off_short',
     );
 
     return Semantics(
       button: true,
       toggled: s.isAvailable,
       enabled: !_updatingAvailability,
-      label: title,
-      hint: AppLocalization.get(context, 'availability_tap_hint'),
+      label: '$title. $status',
       excludeSemantics: true,
       child: Material(
         color: tone.background,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadiusDirectional.circular(AppRadius.xxl),
+          borderRadius: BorderRadiusDirectional.circular(AppRadius.xl),
           side: BorderSide(color: tone.border),
         ),
         clipBehavior: Clip.antiAlias,
-        child: ListTile(
+        child: InkWell(
           key: const Key('providerAvailabilityToggle'),
-          minVerticalPadding: AppSpacing.md,
-          contentPadding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
-          ),
-          leading: Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: tone.solid.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-            ),
-            child: Icon(
-              s.isAvailable ? Icons.check_rounded : Icons.pause_rounded,
-              color: tone.solid,
-              size: AppSizes.iconLg,
-            ),
-          ),
-          title: Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: tone.foreground,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: tone.foreground,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                AppLocalization.get(context, 'availability_tap_hint'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: tone.foreground.withValues(alpha: 0.82),
-                  fontSize: 11.5,
-                ),
-              ),
-            ],
-          ),
-          // Visual state only; the whole card is the (large) tap target.
-          trailing: ExcludeSemantics(
-            child: IgnorePointer(
-              child: Switch(
-                activeTrackColor: tone.solid,
-                activeThumbColor: tone.onSolid,
-                value: s.isAvailable,
-                onChanged: _updatingAvailability ? null : (_) {},
-              ),
-            ),
-          ),
           onTap: _updatingAvailability
               ? null
               : () => _setAvailability(!s.isAvailable),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(
+              start: AppSpacing.md,
+              end: AppSpacing.sm,
+              top: AppSpacing.sm,
+              bottom: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  s.isAvailable
+                      ? Icons.check_circle_rounded
+                      : Icons.pause_circle_rounded,
+                  color: tone.solid,
+                  size: AppSizes.iconMd,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: tone.foreground,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        status,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: tone.foreground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Visual state only; the whole row is the tap target.
+                ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: Switch(
+                      activeTrackColor: tone.solid,
+                      activeThumbColor: tone.onSolid,
+                      value: s.isAvailable,
+                      onChanged: _updatingAvailability ? null : (_) {},
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1652,72 +1682,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
               const SizedBox(height: AppSpacing.xs),
               footer,
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRatingCard(BuildContext context, ProviderStats s) {
-    final theme = Theme.of(context);
-    final tone = appToneStyle(context, AppTone.info);
-
-    return Material(
-      color: tone.background,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadiusDirectional.circular(AppRadius.lg),
-        side: BorderSide(color: tone.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Icon(Icons.star_rounded, size: 36, color: tone.foreground),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLocalization.get(context, 'driver_rating'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: tone.foreground,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  if (s.ratingCount == 0)
-                    Text(
-                      AppLocalization.get(context, 'no_ratings_yet'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: tone.foreground,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  else ...[
-                    Text(
-                      AppLocalization.get(
-                        context,
-                        'rating_stars_total',
-                      ).replaceAll('%d', '${s.ratingStars}'),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: tone.foreground,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      AppLocalization.get(
-                        context,
-                        'rating_count',
-                      ).replaceAll('%d', '${s.ratingCount}'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: tone.foreground.withValues(alpha: 0.86),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
           ],
         ),
       ),

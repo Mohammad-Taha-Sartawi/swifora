@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,12 +12,17 @@ import '../services/api_config.dart';
 import '../services/auth_service.dart';
 import '../services/localization_service.dart';
 import '../services/mobile_api_client.dart';
+import '../services/push_notification_service.dart';
 import '../services/responsive.dart';
+import '../services/socket_service.dart';
 import '../services/theme_service.dart';
 import '../services/validators.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
+import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_password_toggle.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
 import 'provider_home_screen.dart';
 
 class ForceChangePasswordScreen extends StatefulWidget {
@@ -39,6 +46,9 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
   final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _submitting = false;
+  bool _hideCurrent = true;
+  bool _hideNew = true;
+  bool _hideConfirm = true;
 
   @override
   void dispose() {
@@ -163,6 +173,24 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
     );
   }
 
+  Future<void> _signOut() async {
+    final confirmed = await showLogoutConfirmation(context);
+    if (!confirmed || !mounted) return;
+    await PushNotificationService.instance.stop().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {},
+    );
+    if (!mounted) return;
+    unawaited(AuthService().revokeSession(widget.token));
+    SocketService.instance.disconnect();
+    context.read<AuthBloc>().add(LogoutEvent());
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
@@ -237,7 +265,8 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                         const SizedBox(height: AppSpacing.xl),
                         TextFormField(
                           controller: _currentPasswordController,
-                          obscureText: true,
+                          obscureText: _hideCurrent,
+                          autofillHints: const [AutofillHints.password],
                           autocorrect: false,
                           enableSuggestions: false,
                           textInputAction: TextInputAction.next,
@@ -247,6 +276,11 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                               'current_password',
                             ),
                             border: const OutlineInputBorder(),
+                            suffixIcon: AppPasswordToggle(
+                              obscured: _hideCurrent,
+                              onPressed: () =>
+                                  setState(() => _hideCurrent = !_hideCurrent),
+                            ),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -258,7 +292,8 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                         const SizedBox(height: AppSpacing.md),
                         TextFormField(
                           controller: _newPasswordController,
-                          obscureText: true,
+                          obscureText: _hideNew,
+                          autofillHints: const [AutofillHints.newPassword],
                           autocorrect: false,
                           enableSuggestions: false,
                           textInputAction: TextInputAction.next,
@@ -268,6 +303,11 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                               'new_password',
                             ),
                             border: const OutlineInputBorder(),
+                            suffixIcon: AppPasswordToggle(
+                              obscured: _hideNew,
+                              onPressed: () =>
+                                  setState(() => _hideNew = !_hideNew),
+                            ),
                           ),
                           validator: (value) {
                             return Validators.password(value ?? '');
@@ -276,7 +316,8 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                         const SizedBox(height: AppSpacing.md),
                         TextFormField(
                           controller: _confirmPasswordController,
-                          obscureText: true,
+                          obscureText: _hideConfirm,
+                          autofillHints: const [AutofillHints.newPassword],
                           autocorrect: false,
                           enableSuggestions: false,
                           textInputAction: TextInputAction.done,
@@ -287,6 +328,11 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                               'confirm_password',
                             ),
                             border: const OutlineInputBorder(),
+                            suffixIcon: AppPasswordToggle(
+                              obscured: _hideConfirm,
+                              onPressed: () =>
+                                  setState(() => _hideConfirm = !_hideConfirm),
+                            ),
                           ),
                           validator: (value) {
                             if ((value ?? '') != _newPasswordController.text) {
@@ -318,6 +364,13 @@ class _ForceChangePasswordScreenState extends State<ForceChangePasswordScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextButton.icon(
+                          key: const Key('forcedPasswordSignOut'),
+                          onPressed: _submitting ? null : _signOut,
+                          icon: const Icon(Icons.logout),
+                          label: Text(AppLocalization.get(context, 'logout')),
                         ),
                       ],
                     ),

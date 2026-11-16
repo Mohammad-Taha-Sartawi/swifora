@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 const CustomerRating = require('../models/CustomerRating');
 
 /**
- * Returns Map<customerId string, { average, count }> for [customerIds].
+ * Returns Map<customerId string, { average, count, positiveCount }> for
+ * [customerIds] (positiveCount: ratings of 4 or 5 stars).
  * Customers without ratings are absent from the map.
  */
 async function customerRatingSummaries(customerIds) {
@@ -17,11 +18,22 @@ async function customerRatingSummaries(customerIds) {
 
   const rows = await CustomerRating.aggregate([
     { $match: { customerId: { $in: ids } } },
-    { $group: { _id: '$customerId', count: { $sum: 1 }, stars: { $sum: '$rating' } } },
+    {
+      $group: {
+        _id: '$customerId',
+        count: { $sum: 1 },
+        stars: { $sum: '$rating' },
+        positiveCount: { $sum: { $cond: [{ $gte: ['$rating', 4] }, 1, 0] } },
+      },
+    },
   ]);
   return new Map(rows.map((row) => [
     row._id.toString(),
-    { average: Math.round((row.stars / row.count) * 10) / 10, count: row.count },
+    {
+      average: Math.round((row.stars / row.count) * 10) / 10,
+      count: row.count,
+      positiveCount: row.positiveCount || 0,
+    },
   ]));
 }
 
@@ -32,14 +44,18 @@ function orderCustomerId(order) {
   return (customer._id || customer).toString();
 }
 
+/** A customer nobody has rated yet. */
+const NO_RATINGS = Object.freeze({ average: 0, count: 0, positiveCount: 0 });
+
 /**
- * Adds `customerRating: { average, count }` (or null) to each order's
- * populated customer, in place. Returns the orders.
+ * Adds `customerRating: { average, count, positiveCount }` to each order's
+ * populated customer (count 0 for a customer nobody has rated yet), in
+ * place. Returns the orders.
  */
 async function attachCustomerRatings(orders) {
   const summaries = await customerRatingSummaries(orders.map(orderCustomerId));
   for (const order of orders) {
-    const summary = summaries.get(orderCustomerId(order)) || null;
+    const summary = summaries.get(orderCustomerId(order)) || { ...NO_RATINGS };
     if (order.customerId && typeof order.customerId === 'object' && order.customerId._id) {
       order.customerId.rating = summary;
     }

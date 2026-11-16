@@ -292,10 +292,17 @@ void main() {
       expect(find.text('أرفض'), findsOneWidget);
       expect(find.text('أوافق'), findsOneWidget);
 
-      // Agreeing continues to the privacy dialog (localized title).
+      // Agreeing continues to the privacy dialog (localized title). The
+      // login screen also links to the policy, so look inside the dialog.
       await tester.tap(find.text('أوافق'));
       await tester.pumpAndSettle(const Duration(milliseconds: 150));
-      expect(find.text('سياسة الخصوصية'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('سياسة الخصوصية'),
+        ),
+        findsOneWidget,
+      );
 
       // Declining the privacy policy opens the Arabic reject dialog.
       await tester.tap(find.text('أرفض'));

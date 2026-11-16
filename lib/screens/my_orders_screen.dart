@@ -11,11 +11,13 @@ import '../services/responsive.dart';
 import '../services/localization_service.dart';
 import '../services/socket_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/ui/app_busy_actions.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
+import '../widgets/ui/star_rating_dialog.dart';
 import '../bloc/app/app_bloc.dart';
 import '../services/list_screen_navigation.dart';
 
@@ -36,7 +38,7 @@ class MyOrdersScreen extends StatefulWidget {
 }
 
 class _MyOrdersScreenState extends State<MyOrdersScreen>
-    with ListScreenNavigation {
+    with ListScreenNavigation, AppBusyActions {
   final OrderService _orderService = OrderService();
   final OfferService _offerService = OfferService();
   List<Map<String, dynamic>>? _orders;
@@ -132,43 +134,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     );
   }
 
+  /// The same clear, numbered rating window the driver uses for customers.
   Future<int?> _showRatingPrompt() {
-    return showDialog<int>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(AppLocalization.get(dialogContext, 'rating_prompt_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              AppLocalization.get(dialogContext, 'rating_prompt_body'),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                final value = index + 1;
-                return IconButton(
-                  tooltip: '$value / 5',
-                  iconSize: 36,
-                  onPressed: () => Navigator.pop(dialogContext, value),
-                  icon: Icon(
-                    Icons.star_border_rounded,
-                    color: appToneStyle(dialogContext, AppTone.warning).solid,
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(AppLocalization.get(dialogContext, 'cancel')),
-          ),
-        ],
-      ),
+    return showStarRatingDialog(
+      context,
+      title: AppLocalization.get(context, 'rating_prompt_title'),
+      body: AppLocalization.get(context, 'rating_prompt_body'),
     );
   }
 
@@ -197,6 +168,21 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
   }
 
   Future<void> _confirmDelivery(String orderId) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'approve_delivery_confirm_title'),
+      message: AppLocalization.get(context, 'approve_delivery_confirm_message'),
+      confirmLabel: AppLocalization.get(context, 'approve_delivery'),
+      cancelLabel: AppLocalization.get(context, 'cancel'),
+    );
+    if (!confirmed || !mounted) return;
+    await runBusyAction(
+      'delivery:$orderId',
+      () => _sendDeliveryApproval(orderId),
+    );
+  }
+
+  Future<void> _sendDeliveryApproval(String orderId) async {
     try {
       await _orderService.confirmDelivery(widget.token, orderId);
       await _loadOrders();
@@ -227,7 +213,13 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     );
 
     if (!confirmed || !mounted) return;
+    await runBusyAction(
+      'delivery:$orderId',
+      () => _sendDeliveryRejection(orderId),
+    );
+  }
 
+  Future<void> _sendDeliveryRejection(String orderId) async {
     try {
       await _orderService.rejectDelivery(widget.token, orderId);
       await _loadOrders();
@@ -258,7 +250,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     if (!confirmed || !mounted) {
       return;
     }
+    await runBusyAction('cancel:$orderId', () => _sendCancel(orderId));
+  }
 
+  Future<void> _sendCancel(String orderId) async {
     try {
       await _offerService.cancelOrder(widget.token, orderId);
       await _loadOrders();
@@ -381,13 +376,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                       onRetry: _retryLoad,
                     )
                   : _orders == null || _orders!.isEmpty
-                  ? Center(
-                      child: Text(
-                        AppLocalization.get(context, 'no_orders'),
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 16,
-                        ),
+                  ? AppEmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      title: AppLocalization.get(context, 'no_orders'),
+                      message: AppLocalization.get(
+                        context,
+                        'no_orders_customer_hint',
                       ),
                     )
                   : RefreshIndicator(
@@ -831,11 +825,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                                             children: [
                                               Expanded(
                                                 child: ElevatedButton(
-                                                  onPressed: () =>
-                                                      _confirmDelivery(
-                                                        o['_id']?.toString() ??
-                                                            '',
-                                                      ),
+                                                  onPressed:
+                                                      isActionBusy(
+                                                        'delivery:${o['_id']}',
+                                                      )
+                                                      ? null
+                                                      : () => _confirmDelivery(
+                                                          o['_id']?.toString() ??
+                                                              '',
+                                                        ),
                                                   style:
                                                       ElevatedButton.styleFrom(
                                                         backgroundColor:
@@ -866,11 +864,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                                               const SizedBox(width: 8),
                                               Expanded(
                                                 child: OutlinedButton(
-                                                  onPressed: () =>
-                                                      _rejectDelivery(
-                                                        o['_id']?.toString() ??
-                                                            '',
-                                                      ),
+                                                  onPressed:
+                                                      isActionBusy(
+                                                        'delivery:${o['_id']}',
+                                                      )
+                                                      ? null
+                                                      : () => _rejectDelivery(
+                                                          o['_id']?.toString() ??
+                                                              '',
+                                                        ),
                                                   style:
                                                       OutlinedButton.styleFrom(
                                                         foregroundColor:
@@ -1003,9 +1005,14 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
                                         SizedBox(
                                           width: double.infinity,
                                           child: OutlinedButton.icon(
-                                            onPressed: () => _cancelOrder(
-                                              o['_id']?.toString() ?? '',
-                                            ),
+                                            onPressed:
+                                                isActionBusy(
+                                                  'cancel:${o['_id']}',
+                                                )
+                                                ? null
+                                                : () => _cancelOrder(
+                                                    o['_id']?.toString() ?? '',
+                                                  ),
                                             icon: const Icon(
                                               Icons.cancel_outlined,
                                               size: 18,

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../services/date_format.dart';
+import '../services/localization_service.dart';
 import '../services/report_service.dart';
 import '../services/responsive.dart';
 import '../services/theme_service.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 
@@ -31,6 +34,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   List<Map<String, dynamic>> _history = [];
   bool _loadingHistory = true;
+  bool _historyFailed = false;
   bool _sending = false;
 
   @override
@@ -40,6 +44,12 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _loadHistory() async {
+    if (!_loadingHistory || _historyFailed) {
+      setState(() {
+        _loadingHistory = true;
+        _historyFailed = false;
+      });
+    }
     try {
       final reports = await _service.getMyReports(widget.token);
       if (!mounted) return;
@@ -49,7 +59,10 @@ class _ReportScreenState extends State<ReportScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadingHistory = false);
+      setState(() {
+        _loadingHistory = false;
+        _historyFailed = true;
+      });
     }
   }
 
@@ -66,7 +79,7 @@ class _ReportScreenState extends State<ReportScreen> {
       if (!mounted) return;
       _idController.clear();
       _contentController.clear();
-      AppFeedback.success(context, 'تم إرسال البلاغ بنجاح');
+      AppFeedback.success(context, AppLocalization.get(context, 'report_sent'));
       _loadHistory();
     } catch (e) {
       if (!mounted) return;
@@ -76,16 +89,16 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  String _statusLabel(String? s) {
+  String _statusLabel(BuildContext context, String? s) {
     switch (s) {
       case 'in-review':
-        return 'قيد المراجعة';
+        return AppLocalization.get(context, 'report_status_in_review');
       case 'in-progress':
-        return 'قيد المعالجة';
+        return AppLocalization.get(context, 'report_status_in_progress');
       case 'resolved':
-        return 'تم الحل';
+        return AppLocalization.get(context, 'report_status_resolved');
       case 'rejected':
-        return 'مرفوض';
+        return AppLocalization.get(context, 'report_status_rejected');
       default:
         return s ?? '';
     }
@@ -138,28 +151,42 @@ class _ReportScreenState extends State<ReportScreen> {
                     TextFormField(
                       controller: _idController,
                       textDirection: TextDirection.ltr,
-                      decoration: const InputDecoration(
-                        labelText: 'ID',
-                        hintText: 'أدخل ID الشخص المراد الإبلاغ عنه',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person_search),
+                      decoration: InputDecoration(
+                        labelText: AppLocalization.get(
+                          context,
+                          'report_id_label',
+                        ),
+                        hintText: AppLocalization.get(
+                          context,
+                          'report_id_hint',
+                        ),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.person_search),
                       ),
                       keyboardType: TextInputType.number,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? AppLocalization.get(context, 'required')
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _contentController,
-                      decoration: const InputDecoration(
-                        labelText: 'وصف المشكلة',
-                        hintText: 'اشرح المشكلة التي تواجهها',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.description),
+                      decoration: InputDecoration(
+                        labelText: AppLocalization.get(
+                          context,
+                          'report_content_label',
+                        ),
+                        hintText: AppLocalization.get(
+                          context,
+                          'report_content_hint',
+                        ),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.description),
                       ),
                       maxLines: 4,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? AppLocalization.get(context, 'required')
+                          : null,
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
@@ -177,9 +204,9 @@ class _ReportScreenState extends State<ReportScreen> {
                         ),
                         child: _sending
                             ? const AppButtonLoadingIndicator()
-                            : const Text(
-                                'إرسال البلاغ',
-                                style: TextStyle(
+                            : Text(
+                                AppLocalization.get(context, 'report_submit'),
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
@@ -187,9 +214,9 @@ class _ReportScreenState extends State<ReportScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    const Text(
-                      'آخر البلاغات',
-                      style: TextStyle(
+                    Text(
+                      AppLocalization.get(context, 'recent_reports'),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -202,12 +229,20 @@ class _ReportScreenState extends State<ReportScreen> {
                           child: CircularProgressIndicator(),
                         ),
                       )
+                    else if (_historyFailed)
+                      AppErrorState(
+                        message: AppLocalization.get(
+                          context,
+                          'report_history_failed',
+                        ),
+                        onRetry: _loadHistory,
+                      )
                     else if (_history.isEmpty)
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            'لا توجد بلاغات سابقة',
+                            AppLocalization.get(context, 'no_previous_reports'),
                             style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
                         ),
@@ -235,7 +270,7 @@ class _ReportScreenState extends State<ReportScreen> {
                                       ),
                                     ),
                                     AppStatusChip(
-                                      label: _statusLabel(r['status']),
+                                      label: _statusLabel(context, r['status']),
                                       tone: _statusTone(r['status']),
                                     ),
                                   ],
@@ -251,7 +286,8 @@ class _ReportScreenState extends State<ReportScreen> {
                                 if (r['date'] != null) ...[
                                   const SizedBox(height: 4),
                                   Text(
-                                    r['date'].toString(),
+                                    formatServerDate(r['date']),
+                                    textDirection: TextDirection.ltr,
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: scheme.onSurfaceVariant,
@@ -296,7 +332,15 @@ class _ReportScreenState extends State<ReportScreen> {
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                isAdmin ? 'الدعم الفني' : 'أنت',
+                                                isAdmin
+                                                    ? AppLocalization.get(
+                                                        context,
+                                                        'support_team',
+                                                      )
+                                                    : AppLocalization.get(
+                                                        context,
+                                                        'you',
+                                                      ),
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.bold,

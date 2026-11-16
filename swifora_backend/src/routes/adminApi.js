@@ -5,6 +5,11 @@ const User = require('../models/User');
 const Order = require('../models/Order');
 const Report = require('../models/Report');
 const CommissionSetting = require('../models/CommissionSetting');
+const mongoose = require('mongoose');
+const LegalDocument = require('../models/LegalDocument');
+const { DEFAULT_LEGAL_TEXT } = require('../services/legalDefaults');
+
+const { LEGAL_DOCUMENT_KEYS, LEGAL_DOCUMENT_MAX_LENGTH } = LegalDocument;
 const {
   normalizeCommissionConfig,
   getCommissionConfig,
@@ -314,6 +319,72 @@ router.put('/commission-settings', async (req, res) => {
     });
   } catch (err) {
     sendInternalServerError(res);
+  }
+});
+
+// Privacy policy and terms of use, written in the settings page. The saved
+// text is returned as is, so the editor opens with it every time.
+// Until a text is saved, the editor opens with the one that shipped with
+// the app (isDefault), ready to edit.
+function legalDocumentPayload(key, doc) {
+  if (!doc) {
+    return { key, content: DEFAULT_LEGAL_TEXT[key], updatedAt: null, isDefault: true };
+  }
+  return {
+    key,
+    content: doc.content || '',
+    updatedAt: doc.updatedAt || null,
+    isDefault: false,
+  };
+}
+
+router.get('/legal/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!LEGAL_DOCUMENT_KEYS.includes(key)) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    const doc = await LegalDocument.findOne({ key }).lean();
+    return res.json(legalDocumentPayload(key, doc));
+  } catch (err) {
+    return sendInternalServerError(res);
+  }
+});
+
+router.put('/legal/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!LEGAL_DOCUMENT_KEYS.includes(key)) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    const raw = req.body?.content;
+    if (typeof raw !== 'string') {
+      return res.status(400).json({ success: false, message: 'النص غير صالح.' });
+    }
+    // Kept exactly as written (only Windows line breaks are unified); an
+    // empty text clears the document.
+    const content = raw.replace(/\r\n/g, '\n');
+    if (content.length > LEGAL_DOCUMENT_MAX_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        message: `النص طويل جداً (الحد الأقصى ${LEGAL_DOCUMENT_MAX_LENGTH} حرف).`,
+      });
+    }
+    const adminId = req.session?.admin?.id;
+    const doc = await LegalDocument.findOneAndUpdate(
+      { key },
+      {
+        $set: {
+          content,
+          updatedAt: new Date(),
+          updatedBy: mongoose.isValidObjectId(adminId) ? adminId : null,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    ).lean();
+    return res.json({ success: true, ...legalDocumentPayload(key, doc) });
+  } catch (err) {
+    return sendInternalServerError(res);
   }
 });
 

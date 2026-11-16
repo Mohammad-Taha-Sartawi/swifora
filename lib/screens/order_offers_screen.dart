@@ -14,7 +14,9 @@ import '../models/offer_model.dart';
 import '../bloc/app/app_bloc.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_tone.dart';
+import '../widgets/ui/rating_summary_bar.dart';
 import '../services/list_screen_navigation.dart';
 
 class OrderOffersScreen extends StatefulWidget {
@@ -37,6 +39,8 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
   StreamSubscription? _offerCancelledSub;
   bool _cancelRequested = false;
   bool _resendRequested = false;
+  // Set while an accept request is on its way; blocks a second tap.
+  bool _acceptInFlight = false;
   bool _orderWindowExpired = false;
   bool _driverUnavailable = false;
   bool _driverTakenDialogOpen = false;
@@ -182,6 +186,9 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
               constraints: const BoxConstraints(maxWidth: 600),
               child: BlocConsumer<OfferBloc, OfferState>(
                 listener: (context, state) {
+                  if (state is! OfferLoading && _acceptInFlight) {
+                    setState(() => _acceptInFlight = false);
+                  }
                   if (state is OfferConflict) {
                     if (state.code == 'PROVIDER_TAKEN') {
                       setState(() => _driverUnavailable = true);
@@ -729,11 +736,12 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
                     );
                   }
                   if (state is OfferError)
-                    return Center(
-                      child: Text(
-                        state.message,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                    return AppErrorState(
+                      message: state.message,
+                      onRetry: () => context.read<OfferBloc>().add(
+                        LoadOffersEvent(
+                          token: widget.token,
+                          orderId: widget.orderId,
                         ),
                       ),
                     );
@@ -749,105 +757,26 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
 
   Widget _buildProviderRating(BuildContext context, OfferModel offer) {
     final scheme = Theme.of(context).colorScheme;
-    final count = offer.providerRatingCount;
-    final average = offer.providerRatingAverage;
-    final stars = <Widget>[];
-
-    if (count > 0) {
-      for (var index = 0; index < 5; index += 1) {
-        final filled = average >= index + 1;
-        final half = !filled && average >= index + 0.5;
-
-        stars.add(
-          Icon(
-            filled
-                ? Icons.star_rounded
-                : half
-                ? Icons.star_half_rounded
-                : Icons.star_border_rounded,
-            size: 16,
-            color: filled || half
-                ? const Color(0xFFFFB300)
-                : scheme.outlineVariant,
-          ),
-        );
-      }
-    } else {
-      stars.add(
-        Icon(
-          Icons.star_border_rounded,
-          size: 16,
-          color: scheme.onSurfaceVariant,
+    // Same bar the driver sees for the customer on a new order.
+    return RatingSummaryBar(
+      average: offer.providerRatingAverage,
+      count: offer.providerRatingCount,
+      positiveCount: offer.providerPositiveRatingCount,
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
         ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Row(mainAxisSize: MainAxisSize.min, children: stars),
-          if (count > 0) ...[
-            Text(
-              AppLocalization.get(
-                context,
-                'rating_average',
-              ).replaceAll('%s', average.toStringAsFixed(1)),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: scheme.onSurface,
-              ),
-            ),
-            Text(
-              AppLocalization.get(
-                context,
-                'rating_count',
-              ).replaceAll('%d', '$count'),
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-            ),
-            if (offer.providerPositiveRatingCount > 0)
-              Text(
-                AppLocalization.get(
-                  context,
-                  'positive_ratings_count',
-                ).replaceAll('%d', '${offer.providerPositiveRatingCount}'),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: appToneStyle(context, AppTone.success).foreground,
-                ),
-              ),
-          ] else
-            Text(
-              AppLocalization.get(context, 'no_ratings_yet'),
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-            ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              _driverCategoryLabel(context, offer.providerCategory),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
+        child: Text(
+          _driverCategoryLabel(context, offer.providerCategory),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: scheme.onPrimaryContainer,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -940,29 +869,36 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text(
-          'عذراً',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          message,
-          style: const TextStyle(fontSize: 14),
-          textDirection: TextDirection.rtl,
-        ),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(AppLocalization.get(dialogContext, 'conflict_title')),
+        content: Text(message),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final confirmed = await showAppConfirmDialog(
+                context,
+                title: AppLocalization.get(
+                  context,
+                  'delete_order_confirm_title',
+                ),
+                message: AppLocalization.get(
+                  context,
+                  'delete_order_confirm_message',
+                ),
+                confirmLabel: AppLocalization.get(context, 'delete_order'),
+                destructive: true,
+              );
+              if (!confirmed || !context.mounted) return;
               context.read<OfferBloc>().add(
                 CancelOrderEvent(token: widget.token, orderId: orderId),
               );
             },
-            child: const Text('لا، حذف الطلب'),
+            child: Text(AppLocalization.get(dialogContext, 'conflict_delete')),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               context.read<OfferBloc>().add(
                 ResendOrderEvent(token: widget.token, orderId: orderId),
               );
@@ -971,7 +907,7 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
               backgroundColor: appToneStyle(context, AppTone.accent).solid,
               foregroundColor: appToneStyle(context, AppTone.accent).onSolid,
             ),
-            child: const Text('نعم، إعادة الإرسال'),
+            child: Text(AppLocalization.get(dialogContext, 'conflict_resend')),
           ),
         ],
       ),
@@ -1072,8 +1008,30 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
       );
 
       if (!confirmed || !mounted) return;
+    } else {
+      final confirmed = await showAppConfirmDialog(
+        context,
+        title: AppLocalization.get(context, 'accept_offer_confirm_title'),
+        message: AppLocalization.get(context, 'accept_offer_confirm_message')
+            .replaceFirst(
+              '%s',
+              offer.providerName.trim().isEmpty
+                  ? AppLocalization.get(context, 'driver_generic')
+                  : offer.providerName.trim(),
+            )
+            .replaceFirst(
+              '%s',
+              '${offer.price} ${AppLocalization.get(context, 'shekel')}',
+            ),
+        confirmLabel: AppLocalization.get(context, 'accept_offer_confirm'),
+        cancelLabel: AppLocalization.get(context, 'cancel'),
+      );
+
+      if (!confirmed || !mounted) return;
     }
 
+    if (_acceptInFlight) return;
+    setState(() => _acceptInFlight = true);
     context.read<OfferBloc>().add(
       AcceptOfferEvent(
         token: widget.token,
@@ -1150,7 +1108,7 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () => _confirmAcceptOffer(o),
+        onPressed: _acceptInFlight ? null : () => _confirmAcceptOffer(o),
         icon: Icon(
           Icons.check_circle,
           size: 20,

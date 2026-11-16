@@ -34,7 +34,7 @@ import 'package:swifora/services/mobile_api_client.dart';
 import 'package:swifora/services/session_storage.dart';
 import 'package:swifora/services/socket_service.dart';
 import 'package:swifora/services/theme_service.dart';
-import 'package:swifora/widgets/ui/app_action_tile.dart';
+import 'package:swifora/widgets/governorate_scope_card.dart';
 import 'package:swifora/widgets/ui/app_tone.dart';
 
 import 'mock_api_server.dart';
@@ -162,7 +162,9 @@ void main() {
       expect(mockApi.statsRequests, 1);
       // The user greeting and dashboard header are localized English text.
       expect(find.text('Ann Provider'), findsOneWidget);
-      expect(find.text('Available to receive orders'), findsOneWidget);
+      // Compact availability row: what it controls and its state.
+      expect(find.text('Receiving orders'), findsOneWidget);
+      expect(find.text('On — new orders reach you'), findsOneWidget);
 
       // The loaded stats must survive the concurrent pending/offered loads.
       // Bloc 9 runs event handlers concurrently, and a stale pre-await state
@@ -272,7 +274,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Order reception is paused'), findsOneWidget);
-        expect(find.text('Unavailable to receive orders'), findsOneWidget);
+        expect(find.text('Paused — no new orders'), findsOneWidget);
         expect(find.byType(SwitchListTile), findsNothing);
         expect(
           find.textContaining('4 order(s) are waiting for a price offer'),
@@ -291,12 +293,12 @@ void main() {
           findsOneWidget,
         );
 
-        // Support remains outside the faded, non-interactive area.
-        expect(find.text('Contact support'), findsOneWidget);
+        // Support (now in the header) stays outside the faded area.
+        expect(find.byTooltip('Contact support'), findsOneWidget);
         expect(
           find.descendant(
             of: disabledArea,
-            matching: find.text('Contact support'),
+            matching: find.byTooltip('Contact support'),
           ),
           findsNothing,
         );
@@ -530,9 +532,10 @@ void main() {
       final logicalHeight =
           tester.view.physicalSize.height / tester.view.devicePixelRatio;
 
-      // Scroll to the last tile so the bottom-most row is positioned in-viewport.
-      final lastTile = find.byType(AppActionTile).last;
-      expect(find.byType(AppActionTile), findsWidgets);
+      // Scroll to the last card (work settings) so the bottom-most row is
+      // positioned in-viewport.
+      final lastTile = find.byType(GovernorateScopeCard).last;
+      expect(lastTile, findsOneWidget);
       await tester.ensureVisible(lastTile);
       await tester.pumpAndSettle(const Duration(milliseconds: 150));
 
@@ -614,7 +617,7 @@ void main() {
       );
       try {
         await tester.pumpAndSettle();
-        expect(find.text('Available to receive orders'), findsOneWidget);
+        expect(find.text('Receiving orders'), findsOneWidget);
         expect(tester.takeException(), isNull);
       } finally {
         tester.platformDispatcher.clearAllTestValues();

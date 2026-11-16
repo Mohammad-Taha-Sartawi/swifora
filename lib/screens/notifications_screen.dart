@@ -9,6 +9,7 @@ import '../services/notification_router.dart';
 import '../services/localization_service.dart';
 import '../services/theme_service.dart';
 import '../bloc/app/app_bloc.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_badge.dart';
 import '../widgets/ui/app_tone.dart';
 import '../services/list_screen_navigation.dart';
@@ -85,10 +86,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     return const Center(child: CircularProgressIndicator());
                   if (state is NotificationsLoaded) {
                     if (state.notifications.isEmpty)
-                      return Center(
-                        child: Text(
-                          AppLocalization.get(context, 'no_notifications'),
-                          style: TextStyle(color: scheme.onSurfaceVariant),
+                      return AppEmptyState(
+                        icon: Icons.notifications_none_outlined,
+                        title: AppLocalization.get(context, 'no_notifications'),
+                        message: AppLocalization.get(
+                          context,
+                          'no_notifications_hint',
                         ),
                       );
                     return RefreshIndicator(
@@ -200,10 +203,10 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     );
                   }
                   if (state is NotificationError)
-                    return Center(
-                      child: Text(
-                        state.message,
-                        style: TextStyle(color: scheme.error),
+                    return AppErrorState(
+                      message: state.message,
+                      onRetry: () => context.read<NotificationBloc>().add(
+                        LoadNotifications(token: widget.token),
                       ),
                     );
                   return const SizedBox();
@@ -227,7 +230,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       case 'driver_taken':
         return Icons.person_off_outlined;
       case 'new_order':
-        return Icons.add_shopping_cart;
+        return Icons.assignment_outlined;
       case 'order_pending':
         return Icons.delivery_dining;
       case 'order_completed':

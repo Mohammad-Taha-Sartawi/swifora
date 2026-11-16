@@ -10,7 +10,12 @@ import '../services/provider_service.dart';
 import '../services/responsive.dart';
 import '../services/socket_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/ui/app_busy_actions.dart';
+import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/app_phone_link.dart';
+import '../widgets/ui/app_state_views.dart';
+import '../widgets/ui/rating_summary_bar.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/ui/governorate_scope_warning.dart';
@@ -29,7 +34,8 @@ class OrderDetailScreen extends StatefulWidget {
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
-class _OrderDetailScreenState extends State<OrderDetailScreen> {
+class _OrderDetailScreenState extends State<OrderDetailScreen>
+    with AppBusyActions {
   final OrderService _orderService = OrderService();
   final ProviderService _providerService = ProviderService();
 
@@ -167,6 +173,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _markFulfilling() async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'start_delivery_confirm_title'),
+      message: AppLocalization.get(context, 'start_delivery_confirm_message'),
+      confirmLabel: AppLocalization.get(context, 'start_delivery'),
+    );
+    if (!confirmed || !mounted) return;
+    await runBusyAction('trip', _sendFulfilling);
+  }
+
+  Future<void> _sendFulfilling() async {
     try {
       await _providerService.markFulfilling(widget.token, widget.orderId);
       await _load();
@@ -185,6 +202,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _markComplete() async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'complete_delivery_confirm_title'),
+      message: AppLocalization.get(
+        context,
+        'complete_delivery_confirm_message',
+      ),
+      confirmLabel: AppLocalization.get(context, 'confirm_delivery'),
+    );
+    if (!confirmed || !mounted) return;
+    await runBusyAction('trip', _sendComplete);
+  }
+
+  Future<void> _sendComplete() async {
     try {
       await _providerService.markComplete(widget.token, widget.orderId);
       await _load();
@@ -310,16 +341,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ),
-      );
+      return AppErrorState(message: _error!, onRetry: _load);
     }
 
     final order = _order;
@@ -420,26 +442,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ],
                   ),
+                  // Shown when the server sends it (drivers only).
+                  if (order.containsKey('customerRatingSummary')) ...[
+                    const SizedBox(height: 8),
+                    RatingSummaryBar.fromSummary(
+                      order['customerRatingSummary'],
+                      positiveLabelKey: 'positive_ratings_by_drivers',
+                      noRatingsKey: 'customer_no_ratings',
+                    ),
+                  ],
                 ],
                 if (phone.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.phone,
-                        size: 14,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        phone,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 2),
+                  AppPhoneLink(phone: phone),
                 ],
                 if (area.isNotEmpty || location.isNotEmpty) ...[
                   const SizedBox(height: 6),
@@ -548,7 +563,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _markFulfilling,
+              onPressed: isActionBusy('trip') ? null : _markFulfilling,
               style: ElevatedButton.styleFrom(
                 backgroundColor: appToneStyle(context, AppTone.info).solid,
                 foregroundColor: appToneStyle(context, AppTone.info).onSolid,
@@ -590,7 +605,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               : SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _markComplete,
+                    onPressed: isActionBusy('trip') ? null : _markComplete,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: appToneStyle(
                         context,

@@ -313,6 +313,7 @@ function loadPageData(page) {
     if (page === 'settings') {
       loadCommissionSettings();
       loadDriverDisplaySettings();
+      loadLegalDocuments();
     }
     if (page === 'driver-reports') loadDriverReports();
       if (page === 'user-reports') loadUserReports();
@@ -1344,7 +1345,7 @@ function renderDriverResultFromDB(data) {
     <div class="row"><span class="label">إجمالي الطلبات غير المقبولة</span><span class="value">${escapeHtml(notAcceptedOrdersCount ?? 0)}</span></div>
     <div class="driver-orders-note">المقبولة: الطلبات التي قبلها الزبون وأُسندت للسائق. غير المقبولة: الطلبات التي رفضها السائق، أو لم يقبل الزبون عرضه، أو انتهت مهلة قبول عرض السعر.</div>
     <div class="row"><span class="label">حالة الدفع</span><span class="value">${paymentLabel}</span></div>
-    ${Array.isArray(driver.financial.payments) && driver.financial.payments.length > 0 ? `<div class="row"><span class="label">آخر دفعة مسجلة</span><span class="value">${escapeHtml(driver.financial.payments[0].amount)} شيكل — ${escapeHtml(new Date(driver.financial.payments[0].paidAt).toLocaleString('ar-EG'))}</span></div>` : ''}
+    ${Array.isArray(driver.financial.payments) && driver.financial.payments.length > 0 ? `<div class="row"><span class="label">آخر دفعة مسجلة</span><span class="value">${escapeHtml(driver.financial.payments[0].amount)} شيكل — ${escapeHtml(formatDisplayDateTime(driver.financial.payments[0].paidAt))}</span></div>` : ''}
     <div class="row"><span class="label">إجمالي الأرباح (صافي)</span><span class="value" data-presentation="p002">${escapeHtml(netProfit)} </div>
     <div class="row"><span class="label">أرباح آخر 30 يوم (صافي)</span><span class="value" data-presentation="p018">${escapeHtml(last30Profit)} </div>
     <div class="row"><span class="label">عمولة المنصة المستحقة</span><span class="value" data-presentation="p019">${escapeHtml(commission)} </div>
@@ -1405,7 +1406,7 @@ function renderUserResultFromDB(user) {
     <div class="row"><span class="label">الاسم الكامل</span><span class="value">${escapeHtml(user.name)}</span></div>
     <div class="row"><span class="label">البريد الإلكتروني</span><span class="value">${escapeHtml(user.email)}</span></div>
     <div class="row"><span class="label">رقم الجوال</span><span class="value">${escapeHtml(user.phone)}</span></div>
-    <div class="row"><span class="label">تاريخ التسجيل</span><span class="value">${escapeHtml(user.joinDate)}</span></div>
+    <div class="row"><span class="label">تاريخ التسجيل</span><span class="value">${escapeHtml(formatDisplayDate(user.joinDate))}</span></div>
     <div class="row"><span class="label">المحافظة</span><span class="value">${escapeHtml(user.governorate || 'غير محدد')}</span></div>
     <div class="row"><span class="label">المدينة / القرية</span><span class="value">${escapeHtml(user.city || user.area || 'غير محدد')}</span></div>
     <div class="row"><span class="label">الحالة</span><span class="value">${getStatusBadge(user.status)}</span></div>
@@ -1739,6 +1740,122 @@ if (driverDisplaySettingsForm) {
   driverDisplaySettingsForm.addEventListener('submit', saveDriverDisplaySettings);
 }
 
+// ---- Privacy policy and terms of use ----
+// The editor always opens with the saved text; the admin edits it, or
+// clears it and writes a new one, then saves. Unsaved edits are never
+// replaced when the settings page is opened again.
+const LEGAL_KEYS = ['privacy', 'terms'];
+
+function legalElements(key) {
+  return {
+    editor: document.getElementById(`legal-${key}-content`),
+    updated: document.getElementById(`legal-${key}-updated`),
+    count: document.getElementById(`legal-${key}-count`),
+    message: document.getElementById(`legal-${key}-message`),
+  };
+}
+
+function legalIsDirty(editor) {
+  return editor.value !== (editor.dataset.savedValue ?? '');
+}
+
+function renderLegalMeta(key) {
+  const { editor, updated, count } = legalElements(key);
+  if (!editor) return;
+  if (count) count.textContent = `${editor.value.length} / ${editor.maxLength}`;
+  if (!updated) return;
+  const savedAt = editor.dataset.savedAt;
+  const savedLabel = savedAt
+    ? `آخر حفظ: ${formatDisplayDateTime(savedAt)}`
+    : editor.dataset.isDefault === 'true'
+      ? 'هذا هو النص الحالي في التطبيق (لم يُعدَّل من لوحة التحكم بعد).'
+      : 'لم يُحفظ نص بعد.';
+  updated.textContent = legalIsDirty(editor)
+    ? `${savedLabel} — تغييرات غير محفوظة`
+    : savedLabel;
+  updated.classList.toggle('legal-dirty', legalIsDirty(editor));
+}
+
+function setLegalMessage(key, text, kind) {
+  const { message } = legalElements(key);
+  if (!message) return;
+  message.textContent = text;
+  message.className = `settings-message${kind ? ` ${kind}` : ''}`;
+}
+
+function applySavedLegal(key, data) {
+  const { editor } = legalElements(key);
+  if (!editor) return;
+  editor.value = data.content || '';
+  editor.dataset.savedValue = editor.value;
+  editor.dataset.savedAt = data.updatedAt || '';
+  editor.dataset.isDefault = data.isDefault ? 'true' : 'false';
+  renderLegalMeta(key);
+}
+
+async function loadLegalDocuments() {
+  for (const key of LEGAL_KEYS) {
+    const { editor } = legalElements(key);
+    if (!editor) continue;
+    // Keep what the admin is in the middle of writing.
+    if (editor.dataset.savedValue !== undefined && legalIsDirty(editor)) continue;
+    try {
+      const res = await adminFetch(`/admin/api/legal/${key}`);
+      if (!res.ok) throw new Error('load');
+      applySavedLegal(key, await res.json());
+      setLegalMessage(key, '', '');
+    } catch (err) {
+      setLegalMessage(key, 'تعذر تحميل النص المحفوظ. أعد فتح الصفحة.', 'error');
+    }
+  }
+}
+
+async function saveLegalDocument(event) {
+  event.preventDefault();
+  const key = event.currentTarget.dataset.legalKey;
+  const { editor } = legalElements(key);
+  if (!editor) return;
+  const submit = event.currentTarget.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const res = await adminFetch(`/admin/api/legal/${key}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: editor.value }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      setLegalMessage(key, data.message || 'تعذر حفظ النص.', 'error');
+      return;
+    }
+    applySavedLegal(key, data);
+    setLegalMessage(key, data.content ? 'تم حفظ النص.' : 'تم مسح النص المحفوظ.', 'success');
+  } catch (err) {
+    setLegalMessage(key, 'تعذر حفظ النص. لم يتغير النص المحفوظ.', 'error');
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+document.querySelectorAll('.legal-form[data-legal-key]').forEach((form) => {
+  const key = form.dataset.legalKey;
+  form.addEventListener('submit', saveLegalDocument);
+  const { editor } = legalElements(key);
+  if (editor) editor.addEventListener('input', () => renderLegalMeta(key));
+});
+
+document.querySelectorAll('[data-legal-clear]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const key = button.dataset.legalClear;
+    const { editor } = legalElements(key);
+    if (!editor) return;
+    editor.value = '';
+    editor.focus();
+    renderLegalMeta(key);
+    setLegalMessage(key, 'تم مسح النص من المحرر. اكتب نصاً جديداً ثم اضغط حفظ (لن يتغير النص المحفوظ قبل الحفظ).', '');
+  });
+});
+
 async function loadCommissions() {
   try {
     const res = await adminFetch('/admin/commissions');
@@ -1972,7 +2089,7 @@ async function loadDriverReports() {
       const replyCount = report.replies ? report.replies.length : 0;
       const reporterName = report.reporterId?.fullName || report.reporter || 'غير معروف';
       const targetId = report.reportedPublicId || '';
-      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(report.date)}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
+      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
     });
     document.getElementById('driverReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات السائقين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID السائق</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading driver reports:', err); }
@@ -1987,7 +2104,7 @@ async function loadUserReports() {
       const replyCount = report.replies ? report.replies.length : 0;
       const reporterName = report.reporterId?.fullName || report.reporter || 'غير معروف';
       const targetId = report.reportedPublicId || '';
-      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(report.date)}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
+      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
     });
     document.getElementById('userReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات المستخدمين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID المستخدم</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading user reports:', err); }
@@ -2004,7 +2121,7 @@ async function openReplyModal(type, reportId) {
     const report = data.report;
 
     document.getElementById('reportDetailTitle').textContent = `إبلاغ رقم ${report.reportId} - ${report.category}`;
-    document.getElementById('reportDetailContent').innerHTML = `<div data-presentation="p023"><div class="row"><span class="label">المرسل:</span><span class="value">${escapeHtml(report.reporter)}</span></div><div class="row"><span class="label">النوع:</span><span class="value">${escapeHtml(report.category)}</span></div><div class="row"><span class="label">التاريخ:</span><span class="value">${escapeHtml(report.date)}</span></div><div class="row"><span class="label">الحالة:</span><span class="value">${getReportStatusBadge(report.status)}</span></div><div data-presentation="p024"><span data-presentation="p025">المحتوى الكامل:</span><p data-presentation="p026">${escapeHtml(report.content)}</p></div></div>`;
+    document.getElementById('reportDetailContent').innerHTML = `<div data-presentation="p023"><div class="row"><span class="label">المرسل:</span><span class="value">${escapeHtml(report.reporter)}</span></div><div class="row"><span class="label">النوع:</span><span class="value">${escapeHtml(report.category)}</span></div><div class="row"><span class="label">التاريخ:</span><span class="value">${escapeHtml(formatDisplayDate(report.date))}</span></div><div class="row"><span class="label">الحالة:</span><span class="value">${getReportStatusBadge(report.status)}</span></div><div data-presentation="p024"><span data-presentation="p025">المحتوى الكامل:</span><p data-presentation="p026">${escapeHtml(report.content)}</p></div></div>`;
     renderChatThread(report);
     document.getElementById('reportDetailModal').classList.add('show');
     document.getElementById('replyInput').value = '';
@@ -2099,7 +2216,7 @@ async function sendBroadcast(target) {
     const data = await res.json();
     if (data.success) {
       resultDiv.className = 'broadcast-result success';
-      resultDiv.innerHTML = `تم إرسال الرسالة بنجاح إلى <strong>${escapeHtml(data.count)}</strong> ${target === 'drivers' ? 'سائق' : 'مستخدم'}.<br><span data-presentation="p028">العنوان: ${escapeHtml(title)}</span><br><span data-presentation="p028">تم الإرسال في: ${escapeHtml(data.sentAt)}</span>`;
+      resultDiv.innerHTML = `تم إرسال الرسالة بنجاح إلى <strong>${escapeHtml(data.count)}</strong> ${target === 'drivers' ? 'سائق' : 'مستخدم'}.<br><span data-presentation="p028">العنوان: ${escapeHtml(title)}</span><br><span data-presentation="p028">تم الإرسال في: ${escapeHtml(formatDisplayDateTime(data.sentAt))}</span>`;
       loadBroadcastArchive(target);
     } else {
       resultDiv.className = 'broadcast-result error';
@@ -2130,7 +2247,7 @@ async function loadBroadcastArchive(target) {
     container.innerHTML = messages
       .map((message) => {
         const sentAt = message.sentAt
-          ? new Date(message.sentAt).toLocaleString('ar-EG')
+          ? formatDisplayDateTime(message.sentAt)
           : '';
 
         return `<div class="archive-item">
@@ -2419,9 +2536,7 @@ function formatProviderDocumentDate(value) {
     return 'غير معروف';
   }
 
-  return parsed.toLocaleString(
-    'ar-EG',
-  );
+  return formatDisplayDateTime(parsed);
 }
 
 function providerDocumentDownloadUrl(
@@ -2664,7 +2779,7 @@ async function viewDriverOrdersViaDB(driverId) {
     if (driver.financial && driver.financial.transactions && driver.financial.transactions.length > 0) {
       let rows = '';
       driver.financial.transactions.forEach(t => {
-        rows += `<tr><td>${escapeHtml(t.id.slice(-8))}</td><td>${escapeHtml(t.desc)}</td><td>${escapeHtml(t.date)}</td><td class="amount">${escapeHtml(t.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(t.id))}">عرض</button></td></tr>`;
+        rows += `<tr><td>${escapeHtml(t.id.slice(-8))}</td><td>${escapeHtml(t.desc)}</td><td>${escapeHtml(formatDisplayDate(t.date))}</td><td class="amount">${escapeHtml(t.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(t.id))}">عرض</button></td></tr>`;
       });
       content.innerHTML = `
         <div class="invoice-box">
@@ -2690,7 +2805,7 @@ async function viewUserOrdersViaDB(userId) {
     if (user.orders && user.orders.length > 0) {
       let rows = '';
       user.orders.forEach(o => {
-        rows += `<tr><td>${escapeHtml(o.orderId)}</td><td>${escapeHtml(o.type)}</td><td>${escapeHtml(o.date)}</td><td>${escapeHtml(o.status)}</td><td class="amount">${escapeHtml(o.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(o.fullId || ''))}">عرض</button></td></tr>`;
+        rows += `<tr><td>${escapeHtml(o.orderId)}</td><td>${escapeHtml(o.type)}</td><td>${escapeHtml(formatDisplayDate(o.date))}</td><td>${escapeHtml(o.status)}</td><td class="amount">${escapeHtml(o.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(o.fullId || ''))}">عرض</button></td></tr>`;
       });
       content.innerHTML = `<div class="invoice-box"><table class="invoice-table"><thead><tr><th>رقم الطلب</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المبلغ</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     } else {
@@ -2760,7 +2875,7 @@ function adminOrderProvider(order) {
 function adminOrderDate(value) {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ar-EG');
+  return Number.isNaN(date.getTime()) ? '' : formatDisplayDateTime(date);
 }
 
 async function loadOrders() {
@@ -3542,10 +3657,7 @@ function formatAdDate(value) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '—';
 
-  return date.toLocaleString('ar-EG', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return formatDisplayDateTime(date);
 }
 
 function toDateTimeLocal(value) {
@@ -4038,7 +4150,7 @@ async function showAdDaily(id, title) {
       ? '<tr><td colspan="4">لا توجد مشاهدات أو ضغطات في هذه الفترة.</td></tr>'
       : days.map((day) => `
         <tr>
-          <td>${escapeHtml(day.day)}</td>
+          <td>${escapeHtml(formatDisplayDate(day.day))}</td>
           <td class="ad-stats-num">${escapeHtml(formatAdCount(day.impressions))} <small>(${escapeHtml(formatAdCount(day.viewers))} مستخدم)</small></td>
           <td class="ad-stats-num">${escapeHtml(formatAdCount(day.taps))} <small>(${escapeHtml(formatAdCount(day.tappers))} مستخدم)</small></td>
           <td class="ad-stats-num">${escapeHtml(Number(day.ctr || 0).toLocaleString('ar-EG'))}%</td>
@@ -4481,6 +4593,35 @@ async function resolveChat(userId) {
   } catch (err) { console.error(err); }
 }
 
+// Dates are shown as numbers everywhere: DD/MM/YYYY, plus HH:mm when the
+// time matters. Values that are not dates (e.g. "غير محدد") are shown as is.
+function toDisplayDateValue(value) {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(value);
+}
+
+function formatDisplayDate(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${date.getFullYear()}`;
+}
+
+function formatDisplayDateTime(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${formatDisplayDate(date)} ${hours}:${minutes}`;
+}
+
 function escapeHtml(value) {
   return String(
     value ?? '',
@@ -4660,7 +4801,7 @@ async function loadPendingProviders() {
           + `<td>${escapeHtml(providerServiceTypesLabel(provider.serviceTypes))}</td>`
           + `<td>${escapeHtml(provider.governorate || 'غير محدد')}</td>`
           + `<td>${escapeHtml(provider.city || provider.area || 'غير محدد')}</td>`
-          + `<td>${escapeHtml(new Date(provider.createdAt).toLocaleDateString('ar-EG'))}</td>`
+          + `<td>${escapeHtml(formatDisplayDate(provider.createdAt))}</td>`
           + `<td><span class="${statusClass}">${escapeHtml(documentStatusText)}</span></td>`
           + `<td>`
           + `<button class="action-btn info" `

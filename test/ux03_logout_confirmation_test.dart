@@ -8,9 +8,10 @@ import 'package:swifora/screens/provider_home_screen.dart';
 
 import 'ux03_screen_harness.dart';
 
-/// Logout now lives in the account menu (approved home header/bottom nav).
+/// Logout lives in the account menu, opened from the "Account" tab of the
+/// bottom bar (the header has no initial-letter button any more).
 Future<void> _openLogout(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('accountMenuButton')));
+  await tester.tap(find.text('Account').last);
   await tester.pumpAndSettle(const Duration(milliseconds: 50));
   await tester.tap(find.byKey(const Key('accountLogout')));
 }

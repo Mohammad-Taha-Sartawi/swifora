@@ -8,6 +8,9 @@ const notificationSchema = new mongoose.Schema({
   body: { type: String, required: true },
   read: { type: Boolean, default: false },
   pinned: { type: Boolean, default: false },
+  // When the user confirmed the pop-up of a broadcast message. The message
+  // itself stays pinned in the notifications list until it expires.
+  acknowledgedAt: { type: Date, default: null },
   expireAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
 });

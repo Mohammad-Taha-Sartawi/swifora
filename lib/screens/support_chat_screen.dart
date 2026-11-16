@@ -4,6 +4,7 @@ import '../services/support_chat_service.dart';
 import '../services/socket_service.dart';
 import '../services/localization_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_tone.dart';
 
 class SupportChatScreen extends StatefulWidget {
@@ -20,6 +21,8 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   late final ChatService _service;
   bool _loading = true;
+  // The history could not be loaded (not the same as "no messages yet").
+  bool _loadFailed = false;
   StreamSubscription? _replySub;
   Timer? _refreshTimer;
 
@@ -51,16 +54,29 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   }
 
   Future<void> _loadHistory() async {
+    if (!_loading || _loadFailed) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
+    }
     try {
       final list = await _service.getHistory();
       if (!mounted) return;
       setState(() {
-        _messages.addAll(list);
+        _messages
+          ..clear()
+          ..addAll(list);
         _loading = false;
       });
       _scrollToBottom();
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadFailed = true;
+        });
+      }
     }
   }
 
@@ -145,18 +161,28 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     final failedTone = appToneStyle(context, AppTone.danger);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('التواصل مع الدعم'), centerTitle: true),
+      appBar: AppBar(
+        title: Text(AppLocalization.get(context, 'contact_support')),
+        centerTitle: true,
+      ),
       body: Column(
         children: [
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _messages.isEmpty
-                ? Center(
-                    child: Text(
-                      'ابدأ محادثة مع فريق الدعم',
-                      style: TextStyle(color: scheme.onSurfaceVariant),
+                : _loadFailed && _messages.isEmpty
+                ? AppErrorState(
+                    message: AppLocalization.get(
+                      context,
+                      'support_history_failed',
                     ),
+                    onRetry: _loadHistory,
+                  )
+                : _messages.isEmpty
+                ? AppEmptyState(
+                    icon: Icons.support_agent_outlined,
+                    title: AppLocalization.get(context, 'support_start_title'),
+                    message: AppLocalization.get(context, 'support_start_hint'),
                   )
                 : ListView.builder(
                     controller: _scrollController,
@@ -256,9 +282,12 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _textController,
-                      decoration: const InputDecoration(
-                        hintText: 'اكتب رسالتك...',
-                        border: OutlineInputBorder(
+                      decoration: InputDecoration(
+                        hintText: AppLocalization.get(
+                          context,
+                          'support_message_hint',
+                        ),
+                        border: const OutlineInputBorder(
                           borderRadius: BorderRadius.all(Radius.circular(24)),
                         ),
                         contentPadding: EdgeInsets.symmetric(
