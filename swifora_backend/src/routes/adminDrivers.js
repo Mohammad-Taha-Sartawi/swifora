@@ -62,6 +62,7 @@ const {
   normalizeMobileEmail,
   isValidMobileEmail,
 } = require('../security/mobileEmail');
+const { findAccounts, accountSummary } = require('../services/accountSearch');
 const { newAccountEmailProblem } = require('../services/emailCheck');
 
 router.put('/:id/availability', async (req, res) => {
@@ -213,25 +214,22 @@ router.get('/', async (req, res) => {
 
 router.get('/search', async (req, res) => {
   try {
-    const { id } = req.query;
-    if (!id) return res.json({ error: 'الرجاء إدخال رقم السائق أو الاسم' });
-
-    const searchTerms = [
-      { publicId: id },
-      { fullName: { $regex: id, $options: 'i' } },
-    ];
-
-    if (mongoose.isValidObjectId(id)) {
-      searchTerms.push({ _id: id });
+    const id = typeof req.query.id === 'string' ? req.query.id : '';
+    if (!id.trim()) {
+      return res.json({ error: 'الرجاء إدخال ID السائق أو رقم الهاتف أو البريد الإلكتروني أو الاسم' });
     }
 
-    const match = await User.findOne({
-      role: 'provider',
-      deleted: { $ne: true },
-      $or: searchTerms,
-    }).lean();
-
-    if (!match) return res.json({ error: 'لم يتم العثور على سائق' });
+    // ID, email, any phone number of the account, or part of the name.
+    const found = await findAccounts(
+      User,
+      { role: 'provider', deleted: { $ne: true } },
+      id,
+    );
+    if (found.accounts.length === 0) return res.json({ error: 'لم يتم العثور على سائق' });
+    if (found.accounts.length > 1) {
+      return res.json({ matches: found.accounts.map(accountSummary), more: found.more });
+    }
+    const match = found.accounts[0];
 
     const orders = await Order.find({
       providerId: match._id,

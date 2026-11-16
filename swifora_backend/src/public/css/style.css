@@ -855,3 +855,19 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
 .action-btn.undo-commission:hover { background: #f39c1222; }
 .commission-last-action .value { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .undo-reset-all { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 16px; border: 1px solid #f39c1266; border-radius: 12px; background: #f39c1211; color: #f5b041; }
+
+/* Search boxes on the commissions, support and areas pages, and the
+   "choose an account" list when a search finds several. */
+.search-container.compact-search { padding: 16px 20px; margin: 0 0 16px; }
+.search-status { margin: 8px 2px 0; color: #8892a8; font-size: 13px; min-height: 1em; }
+.search-status:empty { display: none; }
+.search-matches h4 { margin: 0 0 12px; color: #00d4ff; }
+.search-matches .more-matches { margin: 10px 2px 0; color: #8892a8; font-size: 13px; }
+.area-search-results { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 260px; overflow-y: auto; }
+.area-search-results:empty { display: none; }
+.area-search-hit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; width: 100%; text-align: start; padding: 10px 14px; border-radius: 12px; border: 1px solid #2a3546; background: #0f141c; color: #e5e9f0; cursor: pointer; font: inherit; }
+.area-search-hit:hover, .area-search-hit:focus-visible { border-color: #00d4ff; outline: none; }
+.area-search-hit .hit-role { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #1e2733; color: #00d4ff; }
+.area-search-hit .hit-place, .area-search-hit .hit-contact { color: #8892a8; font-size: 12px; }
+.areas-detail .account-chip.search-hit { border-color: #f1c40f; box-shadow: 0 0 0 2px #f1c40f55; }
+tr.search-empty td { text-align: center; color: #8892a8; padding: 18px; }
