@@ -190,7 +190,7 @@ void main() {
       expect(find.text('Offers'), findsOneWidget);
       expect(find.text('3 new offers'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_left), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.byType(AppActionTile));
@@ -347,9 +347,9 @@ void main() {
         expect(tester.takeException(), isNull);
 
         if (scenario.$2.languageCode == 'ar') {
-          expect(find.text('سويفورا'), findsOneWidget);
+          expect(find.text('سويفورا دليفري'), findsOneWidget);
         } else {
-          expect(find.text('Swifora'), findsOneWidget);
+          expect(find.text('Swifora Delivery'), findsOneWidget);
         }
 
         if (scenario.$3.width >= 900) {

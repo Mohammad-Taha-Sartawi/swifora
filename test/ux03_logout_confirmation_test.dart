@@ -8,6 +8,13 @@ import 'package:swifora/screens/provider_home_screen.dart';
 
 import 'ux03_screen_harness.dart';
 
+/// Logout now lives in the account menu (approved home header/bottom nav).
+Future<void> _openLogout(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('accountMenuButton')));
+  await tester.pumpAndSettle(const Duration(milliseconds: 50));
+  await tester.tap(find.byKey(const Key('accountLogout')));
+}
+
 void main() {
   late Ux03Harness harness;
 
@@ -24,7 +31,7 @@ void main() {
     await harness.pumpCustomerHome(tester);
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Log out'));
+    await _openLogout(tester);
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
 
     expect(find.text('Log out?'), findsOneWidget);
@@ -40,7 +47,7 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 
-    await tester.tap(find.byTooltip('Log out'));
+    await _openLogout(tester);
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
     await tester.tap(find.widgetWithText(ElevatedButton, 'Log out'));
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
@@ -55,7 +62,7 @@ void main() {
     await harness.pumpProviderHome(tester);
     expect(find.byType(ProviderHomeScreen), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Log out'));
+    await _openLogout(tester);
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
     expect(find.text('Log out?'), findsOneWidget);
 

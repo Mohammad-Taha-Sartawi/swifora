@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:swifora/services/api_config.dart';
+import 'package:swifora/bloc/order/order_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:swifora/services/theme_service.dart';
 import 'package:swifora/services/user_service.dart';
@@ -214,8 +217,16 @@ void main() {
         publicId: 'CUS-1',
       );
 
+      ApiConfig.initForTesting('http://127.0.0.1:1');
       await tester.pumpWidget(
-        _app(CreateOrderScreen(user: user, token: 'token')),
+        // The real app opens this screen with its OrderBloc (no request is
+        // sent in this test).
+        _app(
+          BlocProvider(
+            create: (_) => OrderBloc(),
+            child: CreateOrderScreen(user: user, token: 'token'),
+          ),
+        ),
       );
 
       expect(find.byKey(const Key('governorateOrderBanner')), findsNothing);

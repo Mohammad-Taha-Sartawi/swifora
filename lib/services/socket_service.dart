@@ -34,6 +34,35 @@ class SocketService {
   final _sessionRevokedController = StreamController<void>.broadcast();
   final _connectedController = StreamController<void>.broadcast();
 
+  // "Something changed, reload it" events, sent by the server when the data
+  // changes (often from the dashboard): see services/liveUpdates.js.
+  late final Map<String, StreamController<void>> _liveControllers = {
+    'ads_changed': StreamController<void>.broadcast(),
+    'drivers_changed': StreamController<void>.broadcast(),
+    'account_changed': StreamController<void>.broadcast(),
+    'earnings_changed': StreamController<void>.broadcast(),
+  };
+
+  /// Ads were added, edited, paused or removed in the dashboard.
+  Stream<void> get onAdsChanged => _liveControllers['ads_changed']!.stream;
+
+  /// Drivers' availability changed (customers' "drivers available" figure).
+  Stream<void> get onDriversChanged =>
+      _liveControllers['drivers_changed']!.stream;
+
+  /// This user's own account was changed (e.g. edited by an admin).
+  Stream<void> get onAccountChanged =>
+      _liveControllers['account_changed']!.stream;
+
+  /// A commission payment was recorded for this driver.
+  Stream<void> get onEarningsChanged =>
+      _liveControllers['earnings_changed']!.stream;
+
+  /// Delivers a live event as if the server had sent it (tests only).
+  @visibleForTesting
+  void debugReceiveLiveEvent(String event) =>
+      _liveControllers[event]?.add(null);
+
   Stream<Map<String, dynamic>> get onNewOrder => _newOrderController.stream;
   Stream<Map<String, dynamic>> get onNewOffer => _newOfferController.stream;
   Stream<Map<String, dynamic>> get onOfferAccepted =>
@@ -205,6 +234,10 @@ class SocketService {
     _socket!.on('account_deleted', (_) {
       _accountDeletedController.add(null);
     });
+
+    for (final entry in _liveControllers.entries) {
+      _socket!.on(entry.key, (_) => entry.value.add(null));
+    }
 
     _socket!.connect();
   }

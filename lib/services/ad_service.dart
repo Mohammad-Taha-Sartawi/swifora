@@ -31,4 +31,17 @@ class AdService {
         .map((item) => AdModel.fromJson(Map<String, dynamic>.from(item)))
         .toList();
   }
+
+  /// Reports banner views/taps: `[{adId, type: 'impression' | 'tap'}]`,
+  /// at most 20 per call (`POST /api/ads/events`).
+  Future<void> sendEvents(
+    String token,
+    List<Map<String, String>> events,
+  ) async {
+    await _dio.post(
+      '/ads/events',
+      data: {'events': events},
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
 }

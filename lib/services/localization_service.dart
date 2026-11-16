@@ -22,7 +22,114 @@ class AppLocalization {
   static final Map<String, Map<String, String>> _strings = {
     // App
     'app_title': {'ar': 'سويفورا', 'en': 'Swifora'},
-    'app_name': {'ar': 'سويفورا', 'en': 'Swifora'},
+    'app_name': {'ar': 'سويفورا دليفري', 'en': 'Swifora Delivery'},
+    'app_name_latin': {'ar': 'SWIFORA DELIVERY', 'en': 'SWIFORA DELIVERY'},
+    'app_tagline': {
+      'ar': 'خدمة توصيل سريعة وموثوقة',
+      'en': 'Fast, reliable delivery',
+    },
+    'show_password': {'ar': 'إظهار كلمة المرور', 'en': 'Show password'},
+    'hide_password': {'ar': 'إخفاء كلمة المرور', 'en': 'Hide password'},
+    'theme_day': {'ar': 'نهاري', 'en': 'Day'},
+    'theme_dark': {'ar': 'ليلي', 'en': 'Dark'},
+    'nav_home': {'ar': 'الرئيسية', 'en': 'Home'},
+    'nav_orders': {'ar': 'طلباتي', 'en': 'My orders'},
+    'nav_requests': {'ar': 'الطلبات', 'en': 'Orders'},
+    'nav_earnings': {'ar': 'الأرباح', 'en': 'Earnings'},
+    'nav_notifications': {'ar': 'الإشعارات', 'en': 'Notifications'},
+    'nav_account': {'ar': 'حسابي', 'en': 'Account'},
+    'home_greeting': {'ar': 'أهلاً بعودتك', 'en': 'Welcome back'},
+    'home_subtitle': {
+      'ar': 'كل ما تحتاجه لتوصيل أسهل وأسرع',
+      'en': 'Everything you need for easier, faster delivery',
+    },
+    'hero_tag': {
+      'ar': 'توصيل سريع • خيارات متعددة',
+      'en': 'Fast delivery • Many options',
+    },
+    'hero_title': {'ar': 'طلبك يبدأ من هنا', 'en': 'Your order starts here'},
+    'hero_body': {
+      'ar': 'منتجات، أشخاص، بضائع — كل شيء في مكان واحد.',
+      'en': 'Products, people, goods — all in one place.',
+    },
+    'drivers_nearby_title': {
+      'ar': 'سائقون جاهزون بالقرب منك',
+      'en': 'Drivers ready near you',
+    },
+    'drivers_available_now': {'ar': 'متاحون الآن', 'en': 'Available now'},
+    'view_all_orders': {'ar': 'عرض جميع الطلبات', 'en': 'View all orders'},
+    'offers_waiting_decision': {
+      'ar': 'عروض جديدة بانتظار قرارك',
+      'en': 'New offers awaiting your decision',
+    },
+    'offers_none_waiting': {
+      'ar': 'ستظهر عروض السائقين هنا',
+      'en': 'Driver offers will appear here',
+    },
+    'track_orders_live': {
+      'ar': 'تابع رحلة طلبك لحظة بلحظة',
+      'en': 'Follow your order step by step',
+    },
+    'order_on_the_way': {
+      'ar': 'طلبك في الطريق',
+      'en': 'Your order is on the way',
+    },
+    'view_details': {'ar': 'عرض التفاصيل', 'en': 'View details'},
+    'driver_greeting': {'ar': 'أهلاً بك، كابتن!', 'en': 'Welcome, captain!'},
+    'driver_greeting_subtitle': {
+      'ar': 'جاهز لرحلة توصيل جديدة؟',
+      'en': 'Ready for a new delivery?',
+    },
+    'quick_overview': {'ar': 'نظرة سريعة', 'en': 'Quick overview'},
+    'stat_new_requests': {'ar': 'طلبات جديدة', 'en': 'New requests'},
+    'stat_my_offers': {'ar': 'عروضي', 'en': 'My offers'},
+    'stat_active_delivery': {'ar': 'توصيل نشط', 'en': 'Active delivery'},
+    'awaiting_your_price': {
+      'ar': 'ينتظرون عرض السعر منك',
+      'en': 'Waiting for your price',
+    },
+    'view_requests': {'ar': 'عرض الطلبات', 'en': 'View requests'},
+    'active_delivery_title': {
+      'ar': 'لديك توصيل قيد التنفيذ',
+      'en': 'You have a delivery in progress',
+    },
+    'active_delivery_body': {
+      'ar': 'افتح الطلب لمتابعة التوصيل وتأكيد التسليم',
+      'en': 'Open the order to continue and confirm delivery',
+    },
+    'follow_delivery': {'ar': 'متابعة التوصيل', 'en': 'Follow delivery'},
+    'stale_figures_note': {
+      'ar': 'آخر أرقام محفوظة — تعذّر التحديث',
+      'en': 'Last saved figures — refresh failed',
+    },
+    'what_to_deliver': {
+      'ar': 'ماذا تريد أن نوصل لك؟',
+      'en': 'What should we deliver for you?',
+    },
+    'order_description_label': {'ar': 'وصف الطلب', 'en': 'Order description'},
+    'order_description_hint': {
+      'ar':
+          'مثال: دواء من صيدلية، أو طلب بقالة… أخبر السائق ماذا يحتاج أن يحضر لك',
+      'en':
+          'E.g. medicine from a pharmacy, or groceries… tell the driver what to bring',
+    },
+    'delivery_location_label': {
+      'ar': 'موقع التوصيل',
+      'en': 'Delivery location',
+    },
+    'delivery_location_hint': {
+      'ar': 'المدينة، الحي، وأقرب معلم واضح',
+      'en': 'City, neighbourhood and the nearest clear landmark',
+    },
+    'clearer_description_helper': {
+      'ar': 'كلما كان الوصف أوضح، كانت عروض السائقين أدق.',
+      'en': 'The clearer the description, the more accurate the offers.',
+    },
+    'contact_phone_label': {'ar': 'رقم الهاتف للتواصل', 'en': 'Contact phone'},
+    'order_reaches_drivers': {
+      'ar': 'سيصل طلبك إلى السائقين المتاحين في منطقتك',
+      'en': 'Your order goes to available drivers in your area',
+    },
     'welcome_back': {'ar': 'مرحباً بعودتك', 'en': 'Welcome back!'},
     'create_account_hint': {
       'ar': 'إنشاء حساب جديد',
@@ -295,6 +402,7 @@ class AppLocalization {
     'ad_label': {'ar': 'إعلان', 'en': 'Ad'},
     'ad_ends_in': {'ar': 'ينتهي بعد', 'en': 'Ends in'},
     'ad_ended': {'ar': 'انتهى الإعلان', 'en': 'Ad ended'},
+    'ad_position': {'ar': 'الإعلان %1 من %2', 'en': 'Ad %1 of %2'},
     'rating_prompt_title': {
       'ar': 'كيف ترى أداء هذا السائق؟',
       'en': "How was this driver's performance?",
@@ -312,12 +420,15 @@ class AppLocalization {
     'submit_rating': {'ar': 'إرسال التقييم', 'en': 'Submit rating'},
     'rate_customer': {'ar': 'قيّم الزبون', 'en': 'Rate the customer'},
     'guest_waiting_reply': {
-      'ar': 'وصلت رسالتك. سيظهر رد فريق الدعم هنا، وعلى بريدك الإلكتروني أيضاً.',
-      'en': 'Message received. The support reply will appear here and in your email.',
+      'ar':
+          'وصلت رسالتك. سيظهر رد فريق الدعم هنا، وعلى بريدك الإلكتروني أيضاً.',
+      'en':
+          'Message received. The support reply will appear here and in your email.',
     },
     'guest_thread_closed': {
       'ar': 'لم تعد هذه المحادثة متاحة. يمكنك إرسال رسالة جديدة.',
-      'en': 'This conversation is no longer available. You can send a new message.',
+      'en':
+          'This conversation is no longer available. You can send a new message.',
     },
     'guest_new_message': {'ar': 'رسالة جديدة', 'en': 'New message'},
     'rate_customer_title': {
@@ -332,10 +443,7 @@ class AppLocalization {
       'ar': 'تقييمك للزبون: %d من 5',
       'en': 'Your rating: %d of 5',
     },
-    'customer_rating_label': {
-      'ar': 'تقييم الزبون',
-      'en': 'Customer rating',
-    },
+    'customer_rating_label': {'ar': 'تقييم الزبون', 'en': 'Customer rating'},
     'rating_thanks': {
       'ar': 'شكراً لك، تم إرسال تقييمك.',
       'en': 'Thank you, your rating was submitted.',
@@ -668,9 +776,9 @@ class AppLocalization {
     },
     'driver_taken_notification_body': {
       'ar':
-          'قام السائق بقبول طلب آخر، لذلك تم إلغاء عرض سعره. يمكنك إعادة إرسال الطلب أو الموافقة على عرض سائق آخر.',
+          'هذا السائق استلم طلباً آخر، لذلك أُلغي عرض سعره. يمكنك إعادة إرسال الطلب مرة أخرى لسائق آخر متاح، أو قبول عرض سائق آخر.',
       'en':
-          'The driver accepted another order, so their offer was cancelled. You can resend the order or accept another driver offer.',
+          'This driver took another order, so their offer was cancelled. You can resend the order to another available driver, or accept another driver offer.',
     },
     'another_driver_selected_title': {
       'ar': 'تم اختيار سائق آخر',
@@ -685,8 +793,8 @@ class AppLocalization {
       'en': 'Continue viewing offers',
     },
     'driver_taken_short': {
-      'ar': 'السائق لم يعد متاحاً',
-      'en': 'Driver no longer available',
+      'ar': 'هذا السائق استلم طلباً آخر',
+      'en': 'This driver took another order',
     },
     'order_suspended': {'ar': 'الطلب معلق', 'en': 'Order suspended'},
     'order_suspended_report_in': {
@@ -753,7 +861,8 @@ class AppLocalization {
     },
     'dashboard_load_failed': {
       'ar': 'تعذّر تحميل لوحة التحكم. تحقّق من الاتصال ثم أعد المحاولة.',
-      'en': 'Could not load your dashboard. Check your connection and try again.',
+      'en':
+          'Could not load your dashboard. Check your connection and try again.',
     },
     'dashboard_refresh_failed': {
       'ar': 'تعذّر تحديث البيانات. الأرقام المعروضة هي آخر قيم محفوظة.',
@@ -860,6 +969,15 @@ class AppLocalization {
       'en': 'Send failed. Try again.',
     },
     'retry': {'ar': 'إعادة المحاولة', 'en': 'Retry'},
+    'governoratesLoading': {
+      'ar': 'جاري تحميل المحافظات...',
+      'en': 'Loading governorates...',
+    },
+    'governoratesLoadFailed': {
+      'ar': 'تعذّر تحميل المحافظات. تحقق من الاتصال بالخادم ثم أعد المحاولة.',
+      'en':
+          'Could not load the governorates. Check the connection to the server and try again.',
+    },
     'profile': {'ar': 'الملف الشخصي', 'en': 'Profile'},
     'logout': {'ar': 'تسجيل الخروج', 'en': 'Log out'},
     'send': {'ar': 'إرسال', 'en': 'Send'},

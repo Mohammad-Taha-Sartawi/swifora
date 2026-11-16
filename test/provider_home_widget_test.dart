@@ -180,6 +180,74 @@ void main() {
     });
   });
 
+  group('commission card setting from the dashboard', () {
+    testWidgets('shown by default, hidden when the dashboard hides it', (
+      tester,
+    ) async {
+      mockApi.statsJson = <String, dynamic>{
+        'totalCommissionDue': 12.5,
+        'isAvailable': true,
+      };
+      await tester.pumpWidget(
+        screenHarness(themeMode: ThemeMode.light, locale: const Locale('en')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('driverCommissionCard')), findsOneWidget);
+
+      // The admin hides the card: the server says so and the app is told
+      // to reload its stats.
+      mockApi.statsJson = <String, dynamic>{
+        'totalCommissionDue': 12.5,
+        'isAvailable': true,
+        'showCommissionCard': false,
+      };
+      socket!.debugReceiveLiveEvent('earnings_changed');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('driverCommissionCard')), findsNothing);
+      expect(find.byKey(const Key('payCommissionButton')), findsNothing);
+      // The rest of the finance section stays.
+      expect(find.text('Ann Provider'), findsOneWidget);
+
+      // Shown again.
+      mockApi.statsJson = <String, dynamic>{
+        'totalCommissionDue': 12.5,
+        'isAvailable': true,
+        'showCommissionCard': true,
+      };
+      socket!.debugReceiveLiveEvent('earnings_changed');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('driverCommissionCard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('live updates from the dashboard', () {
+    testWidgets('a recorded commission payment reloads the driver stats', (
+      tester,
+    ) async {
+      mockApi.statsJson = <String, dynamic>{
+        'pendingOrdersCount': 4,
+        'offeredOrdersCount': 2,
+        'isAvailable': true,
+      };
+      await tester.pumpWidget(
+        screenHarness(themeMode: ThemeMode.light, locale: const Locale('en')),
+      );
+      await tester.pumpAndSettle();
+      expect(mockApi.statsRequests, 1);
+
+      socket!.debugReceiveLiveEvent('earnings_changed');
+      await tester.pumpAndSettle();
+      expect(mockApi.statsRequests, 2);
+
+      // An admin editing the account reloads the stats as well.
+      socket!.debugReceiveLiveEvent('account_changed');
+      await tester.pumpAndSettle();
+      expect(mockApi.statsRequests, 3);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('UX01-005 availability toggle', () {
     testWidgets(
       'paused availability fades actions but keeps support and live count',
@@ -218,7 +286,7 @@ void main() {
         expect(
           find.descendant(
             of: disabledArea,
-            matching: find.text('New Orders Awaiting Your Offer'),
+            matching: find.text('New requests'),
           ),
           findsOneWidget,
         );
@@ -482,9 +550,9 @@ void main() {
 
   group('UX01-005 theme/locale matrix', () {
     for (final (themeMode, locale, expectedTitle) in [
-      (ThemeMode.dark, const Locale('en'), 'New Orders Awaiting Your Offer'),
-      (ThemeMode.light, const Locale('ar'), 'طلبات جديدة تنتظر تقديم عرض سعر'),
-      (ThemeMode.dark, const Locale('ar'), 'طلبات جديدة تنتظر تقديم عرض سعر'),
+      (ThemeMode.dark, const Locale('en'), 'New requests'),
+      (ThemeMode.light, const Locale('ar'), 'طلبات جديدة'),
+      (ThemeMode.dark, const Locale('ar'), 'طلبات جديدة'),
     ]) {
       testWidgets(
         'renders the dashboard in ${themeMode.name}/${locale.languageCode}',

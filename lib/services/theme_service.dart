@@ -2,63 +2,69 @@ import 'package:flutter/material.dart';
 
 /// Core brand and semantic colors.
 ///
-/// The palette keeps the established Swifora indigo/orange identity.
+/// Owner-approved Swifora Delivery language (2026-11-14): Dark Mode is a
+/// midnight navy with teal/cyan actions and restrained warm gold; Day Mode is
+/// a warm off-white with navy text, teal actions and soft gold highlights.
+/// Values follow `.claude/skills/swifora-ui-ux/references/design-system.md`,
+/// adjusted where needed for WCAG AA contrast (Day primary is a deeper teal
+/// so white labels stay readable).
+///
 /// Components should prefer semantic [ColorScheme] roles or
 /// [AppSemanticColors] instead of referencing these constants directly.
 abstract final class AppColors {
-  static const primary = Color(0xFF1A237E);
-  static const primaryLight = Color(0xFF534BAE);
-  static const primaryDark = Color(0xFF000051);
-  static const accent = Color(0xFFFF6F00);
-  static const accentStrong = Color(0xFFA84300);
+  static const primary = Color(0xFF00838F);
+  static const primaryLight = Color(0xFF00A8B8);
+  static const primaryDark = Color(0xFF10273B);
+  static const accent = Color(0xFFC8872C);
+  static const accentStrong = Color(0xFF9A6416);
 
-  static const lightBackground = Color(0xFFF6F7FB);
+  static const lightBackground = Color(0xFFF8F8F5);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightSurfaceMuted = Color(0xFFEEF0F7);
-  static const lightOutline = Color(0xFFC7CAD8);
-  static const lightTextPrimary = Color(0xFF171A2B);
-  static const lightTextSecondary = Color(0xFF4E5568);
+  static const lightSurfaceMuted = Color(0xFFF1F5F5);
+  static const lightOutline = Color(0xFFD7E2E6);
+  static const lightTextPrimary = Color(0xFF10273B);
+  static const lightTextSecondary = Color(0xFF526B7B);
 
-  static const darkBackground = Color(0xFF121322);
-  static const darkSurface = Color(0xFF1A1B2E);
-  static const darkSurfaceMuted = Color(0xFF24263D);
-  static const darkOutline = Color(0xFF464A67);
-  static const darkTextPrimary = Color(0xFFF2EFFA);
-  static const darkTextSecondary = Color(0xFFC5C1D2);
-  static const darkPrimary = Color(0xFFC3C8FF);
-  static const darkAccent = Color(0xFFFFB86B);
+  static const darkBackground = Color(0xFF061624);
+  static const darkSurface = Color(0xFF102838);
+  static const darkSurfaceMuted = Color(0xFF173342);
+  static const darkOutline = Color(0xFF345366);
+  static const darkTextPrimary = Color(0xFFF5FAFC);
+  static const darkTextSecondary = Color(0xFFB3C8D2);
+  static const darkPrimary = Color(0xFF0BCBD0);
+  static const darkAccent = Color(0xFFE9B35B);
 
-  static const success = Color(0xFF1B6E3A);
-  static const successContainer = Color(0xFFDDF5E5);
-  static const onSuccessContainer = Color(0xFF07361A);
-  static const warning = Color(0xFF8A4F00);
-  static const warningContainer = Color(0xFFFFF0D5);
-  static const onWarningContainer = Color(0xFF3D2200);
+  static const success = Color(0xFF17704C);
+  static const successContainer = Color(0xFFDDF4E9);
+  static const onSuccessContainer = Color(0xFF00301D);
+  static const warning = Color(0xFF8A5A10);
+  static const warningContainer = Color(0xFFFCEFD6);
+  static const onWarningContainer = Color(0xFF3D2600);
   static const error = Color(0xFFB3261E);
   static const errorContainer = Color(0xFFFFDAD6);
   static const onErrorContainer = Color(0xFF410002);
-  static const info = Color(0xFF1257A6);
-  static const infoContainer = Color(0xFFE0EEFF);
-  static const onInfoContainer = Color(0xFF06203D);
-  static const neutral = Color(0xFF4E5568);
-  static const neutralContainer = Color(0xFFEEF0F5);
-  static const onNeutralContainer = Color(0xFF171A2B);
+  static const info = Color(0xFF00727D);
+  static const infoContainer = Color(0xFFDDF4F6);
+  static const onInfoContainer = Color(0xFF00363C);
+  static const neutral = Color(0xFF526B7B);
+  static const neutralContainer = Color(0xFFEDF2F3);
+  static const onNeutralContainer = Color(0xFF10273B);
 
-  static const darkSuccess = Color(0xFF7FDB9C);
-  static const darkSuccessContainer = Color(0xFF0C3B24);
-  static const darkOnSuccessContainer = Color(0xFFC8F5D8);
-  static const darkWarning = Color(0xFFFFC56E);
-  static const darkWarningContainer = Color(0xFF4A2E00);
-  static const darkOnWarningContainer = Color(0xFFFFE1AE);
+  static const darkSuccess = Color(0xFF4FD9A0);
+  static const darkSuccessContainer = Color(0xFF0E3A2B);
+  static const darkOnSuccessContainer = Color(0xFFC2F5DE);
+  static const darkWarning = Color(0xFFF2C06E);
+  static const darkWarningContainer = Color(0xFF3B2C14);
+  static const darkOnWarningContainer = Color(0xFFFFE2B0);
   static const darkError = Color(0xFFFFB4AB);
   static const darkErrorContainer = Color(0xFF5C1714);
   static const darkOnErrorContainer = Color(0xFFFFDAD6);
-  static const darkInfo = Color(0xFF9CCBFF);
-  static const darkInfoContainer = Color(0xFF0A2D52);
-  static const darkOnInfoContainer = Color(0xFFD6E9FF);
-  static const darkNeutral = Color(0xFFC9C5D6);
-  static const darkNeutralContainer = Color(0xFF2A2C42);
-  static const darkOnNeutralContainer = Color(0xFFEAE7F4);
+  static const darkInfo = Color(0xFF6FE3E6);
+  static const darkInfoContainer = Color(0xFF0B3F4B);
+  static const darkOnInfoContainer = Color(0xFFC4F5F6);
+  static const darkNeutral = Color(0xFFB3C8D2);
+  static const darkNeutralContainer = Color(0xFF1D3B4C);
+  static const darkOnNeutralContainer = Color(0xFFE3EEF2);
 
   // Compatibility aliases for older code.
   static const surface = lightBackground;
@@ -110,7 +116,7 @@ abstract final class AppRadius {
 /// Standard component dimensions.
 abstract final class AppSizes {
   static const double minTouchTarget = 48;
-  static const double buttonHeight = 52;
+  static const double buttonHeight = 56;
   static const double inputHeight = 56;
   static const double iconSm = 18;
   static const double iconMd = 22;
@@ -200,19 +206,19 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
 
   static const dark = AppSemanticColors(
     success: AppColors.darkSuccess,
-    onSuccess: Color(0xFF00391B),
+    onSuccess: Color(0xFF00391F),
     successContainer: AppColors.darkSuccessContainer,
     onSuccessContainer: AppColors.darkOnSuccessContainer,
     warning: AppColors.darkWarning,
-    onWarning: Color(0xFF422A00),
+    onWarning: Color(0xFF3A2600),
     warningContainer: AppColors.darkWarningContainer,
     onWarningContainer: AppColors.darkOnWarningContainer,
     info: AppColors.darkInfo,
-    onInfo: Color(0xFF003258),
+    onInfo: Color(0xFF002530),
     infoContainer: AppColors.darkInfoContainer,
     onInfoContainer: AppColors.darkOnInfoContainer,
     neutral: AppColors.darkNeutral,
-    onNeutral: Color(0xFF1B1B2D),
+    onNeutral: Color(0xFF061624),
     neutralContainer: AppColors.darkNeutralContainer,
     onNeutralContainer: AppColors.darkOnNeutralContainer,
   );
@@ -350,7 +356,7 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadiusDirectional.all(
-            const Radius.circular(AppRadius.xl),
+            const Radius.circular(AppRadius.xxl),
           ),
           side: BorderSide(color: scheme.outlineVariant),
         ),
@@ -369,9 +375,12 @@ class AppTheme {
             vertical: AppSpacing.md,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
-          textStyle: textTheme.labelLarge?.copyWith(fontSize: 15),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -384,7 +393,7 @@ class AppTheme {
             vertical: AppSpacing.md,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
           textStyle: textTheme.labelLarge?.copyWith(fontSize: 15),
         ),
@@ -411,23 +420,23 @@ class AppTheme {
           vertical: AppSpacing.lg,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(color: scheme.error, width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: BorderSide(color: scheme.error, width: 2),
         ),
         labelStyle: textTheme.bodyMedium?.copyWith(
@@ -514,6 +523,29 @@ class AppTheme {
           borderRadius: BorderRadiusDirectional.circular(AppRadius.lg),
         ),
       ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primaryContainer,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return textTheme.labelMedium?.copyWith(
+            color: selected ? scheme.primary : scheme.onSurfaceVariant,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          return IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+          );
+        }),
+      ),
       iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
       listTileTheme: ListTileThemeData(
         iconColor: scheme.onSurfaceVariant,
@@ -572,21 +604,21 @@ class AppTheme {
 
     if (isDark) {
       return ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
+        seedColor: AppColors.darkPrimary,
         brightness: Brightness.dark,
       ).copyWith(
         primary: AppColors.darkPrimary,
-        onPrimary: const Color(0xFF17215F),
-        primaryContainer: const Color(0xFF2C367A),
-        onPrimaryContainer: const Color(0xFFE1E4FF),
+        onPrimary: const Color(0xFF002530),
+        primaryContainer: const Color(0xFF0B3F4B),
+        onPrimaryContainer: const Color(0xFFB4F4F6),
         secondary: AppColors.darkAccent,
-        onSecondary: const Color(0xFF4A2600),
-        secondaryContainer: const Color(0xFF5A2F00),
-        onSecondaryContainer: const Color(0xFFFFDCC2),
-        tertiary: const Color(0xFF5CDBCB),
-        onTertiary: const Color(0xFF003731),
-        tertiaryContainer: const Color(0xFF005047),
-        onTertiaryContainer: const Color(0xFFB8F3E9),
+        onSecondary: const Color(0xFF3A2600),
+        secondaryContainer: const Color(0xFF3B2D16),
+        onSecondaryContainer: const Color(0xFFFFE2B0),
+        tertiary: AppColors.darkSuccess,
+        onTertiary: const Color(0xFF00391F),
+        tertiaryContainer: AppColors.darkSuccessContainer,
+        onTertiaryContainer: AppColors.darkOnSuccessContainer,
         error: AppColors.darkError,
         onError: const Color(0xFF690005),
         errorContainer: AppColors.darkErrorContainer,
@@ -594,15 +626,15 @@ class AppTheme {
         surface: AppColors.darkBackground,
         onSurface: AppColors.darkTextPrimary,
         onSurfaceVariant: AppColors.darkTextSecondary,
-        surfaceContainerLowest: const Color(0xFF0E0F1C),
+        surfaceContainerLowest: const Color(0xFF0A1F2F),
         surfaceContainerLow: AppColors.darkSurface,
         surfaceContainer: AppColors.darkSurfaceMuted,
-        surfaceContainerHigh: const Color(0xFF2C2E49),
-        surfaceContainerHighest: const Color(0xFF363855),
+        surfaceContainerHigh: const Color(0xFF1D3B4C),
+        surfaceContainerHighest: const Color(0xFF24475A),
         outline: AppColors.darkOutline,
-        outlineVariant: const Color(0xFF3A3D58),
-        inverseSurface: const Color(0xFFE9E7F2),
-        onInverseSurface: const Color(0xFF2E3045),
+        outlineVariant: const Color(0xFF23404F),
+        inverseSurface: const Color(0xFFE6F0F3),
+        onInverseSurface: AppColors.lightTextPrimary,
         inversePrimary: AppColors.primary,
         shadow: Colors.black,
         scrim: Colors.black,
@@ -615,16 +647,16 @@ class AppTheme {
     ).copyWith(
       primary: AppColors.primary,
       onPrimary: Colors.white,
-      primaryContainer: const Color(0xFFE3E6FF),
-      onPrimaryContainer: AppColors.primaryDark,
+      primaryContainer: const Color(0xFFD8F4F6),
+      onPrimaryContainer: const Color(0xFF00363C),
       secondary: AppColors.accentStrong,
       onSecondary: Colors.white,
-      secondaryContainer: const Color(0xFFFFE8D6),
-      onSecondaryContainer: const Color(0xFF3D1900),
-      tertiary: const Color(0xFF00695C),
+      secondaryContainer: const Color(0xFFFCEBC9),
+      onSecondaryContainer: const Color(0xFF3D2600),
+      tertiary: AppColors.success,
       onTertiary: Colors.white,
-      tertiaryContainer: const Color(0xFFB8F3E9),
-      onTertiaryContainer: const Color(0xFF00201C),
+      tertiaryContainer: AppColors.successContainer,
+      onTertiaryContainer: AppColors.onSuccessContainer,
       error: AppColors.error,
       onError: Colors.white,
       errorContainer: AppColors.errorContainer,
@@ -635,14 +667,14 @@ class AppTheme {
       surfaceContainerLowest: AppColors.lightSurface,
       surfaceContainerLow: AppColors.lightSurface,
       surfaceContainer: AppColors.lightSurfaceMuted,
-      surfaceContainerHigh: const Color(0xFFE7E9F2),
-      surfaceContainerHighest: const Color(0xFFDFE2ED),
-      outline: const Color(0xFF74798C),
+      surfaceContainerHigh: const Color(0xFFE9F0F1),
+      surfaceContainerHighest: const Color(0xFFDFE8EA),
+      outline: const Color(0xFF7D93A0),
       outlineVariant: AppColors.lightOutline,
-      inverseSurface: const Color(0xFF2D3042),
-      onInverseSurface: const Color(0xFFF2F3FA),
-      inversePrimary: const Color(0xFFC3C8FF),
-      shadow: Colors.black,
+      inverseSurface: AppColors.lightTextPrimary,
+      onInverseSurface: const Color(0xFFEEF5F7),
+      inversePrimary: AppColors.darkPrimary,
+      shadow: const Color(0xFF10273B),
       scrim: Colors.black,
     );
   }

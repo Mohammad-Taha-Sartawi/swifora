@@ -14,6 +14,7 @@ import '../services/theme_service.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
+import '../services/list_screen_navigation.dart';
 
 class ProviderActiveOrdersScreen extends StatefulWidget {
   final String token;
@@ -23,8 +24,8 @@ class ProviderActiveOrdersScreen extends StatefulWidget {
       _ProviderActiveOrdersScreenState();
 }
 
-class _ProviderActiveOrdersScreenState
-    extends State<ProviderActiveOrdersScreen> {
+class _ProviderActiveOrdersScreenState extends State<ProviderActiveOrdersScreen>
+    with ListScreenNavigation {
   final ProviderService _service = ProviderService();
   List<Map<String, dynamic>>? _orders;
   bool _loading = true;
@@ -218,7 +219,11 @@ class _ProviderActiveOrdersScreenState
   }
 
   @override
+  String get listScreenTag => 'driver:active';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(_loading || _error != null ? null : (_orders?.length ?? 0));
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final scheme = Theme.of(context).colorScheme;
     return Directionality(

@@ -15,6 +15,7 @@ import '../bloc/app/app_bloc.dart';
 import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_tone.dart';
+import '../services/list_screen_navigation.dart';
 
 class OrderOffersScreen extends StatefulWidget {
   final String token, orderId;
@@ -27,7 +28,8 @@ class OrderOffersScreen extends StatefulWidget {
   State<OrderOffersScreen> createState() => _OrderOffersScreenState();
 }
 
-class _OrderOffersScreenState extends State<OrderOffersScreen> {
+class _OrderOffersScreenState extends State<OrderOffersScreen>
+    with ListScreenNavigation {
   final Set<String> _expiredOfferIds = {};
   final OrderService _orderService = OrderService();
   Timer? _offerTimer;
@@ -155,7 +157,11 @@ class _OrderOffersScreenState extends State<OrderOffersScreen> {
   }
 
   @override
+  String get listScreenTag => 'offers:${widget.orderId}';
+
+  @override
   Widget build(BuildContext context) {
+    trackListItems(null);
     final isAr = context.watch<AppBloc>().state.locale.languageCode == 'ar';
     final typeLabel = _typeLabel(_orderType);
     return Directionality(
@@ -221,6 +227,11 @@ class _OrderOffersScreenState extends State<OrderOffersScreen> {
                   }
                 },
                 builder: (context, state) {
+                  trackListItems(
+                    state is OffersLoaded
+                        ? _openOfferCount(state.offers)
+                        : null,
+                  );
                   if (state is OfferLoading)
                     return const Center(child: CircularProgressIndicator());
                   if (state is OffersLoaded) {
@@ -1018,6 +1029,25 @@ class _OrderOffersScreenState extends State<OrderOffersScreen> {
         ],
       ),
     );
+  }
+
+  /// Offers the customer can still act on or is waiting for: pending ones
+  /// that have not expired, the accepted one, and offers withdrawn because
+  /// the driver took another order (they carry the "resend to another
+  /// driver" choice until the customer resends). When the last of them
+  /// goes (expired, resent, …), the screen returns to the home screen.
+  int _openOfferCount(List<OfferModel> offers) {
+    final now = DateTime.now();
+    return offers.where((offer) {
+      if (offer.status == 'accepted') return true;
+      if (offer.status == 'rejected' &&
+          offer.rejectionReason == 'provider_unavailable') {
+        return true;
+      }
+      if (offer.status != 'pending') return false;
+      final expiresAt = offer.expiresAt;
+      return expiresAt == null || expiresAt.isAfter(now);
+    }).length;
   }
 
   Future<void> _confirmAcceptOffer(OfferModel offer) async {
