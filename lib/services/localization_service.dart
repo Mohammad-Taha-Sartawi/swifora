@@ -402,6 +402,7 @@ class AppLocalization {
     'ad_label': {'ar': 'إعلان', 'en': 'Ad'},
     'ad_ends_in': {'ar': 'ينتهي بعد', 'en': 'Ends in'},
     'ad_ended': {'ar': 'انتهى الإعلان', 'en': 'Ad ended'},
+    'ad_position': {'ar': 'الإعلان %1 من %2', 'en': 'Ad %1 of %2'},
     'rating_prompt_title': {
       'ar': 'كيف ترى أداء هذا السائق؟',
       'en': "How was this driver's performance?",
@@ -775,9 +776,9 @@ class AppLocalization {
     },
     'driver_taken_notification_body': {
       'ar':
-          'قام السائق بقبول طلب آخر، لذلك تم إلغاء عرض سعره. يمكنك إعادة إرسال الطلب أو الموافقة على عرض سائق آخر.',
+          'هذا السائق استلم طلباً آخر، لذلك أُلغي عرض سعره. يمكنك إعادة إرسال الطلب مرة أخرى لسائق آخر متاح، أو قبول عرض سائق آخر.',
       'en':
-          'The driver accepted another order, so their offer was cancelled. You can resend the order or accept another driver offer.',
+          'This driver took another order, so their offer was cancelled. You can resend the order to another available driver, or accept another driver offer.',
     },
     'another_driver_selected_title': {
       'ar': 'تم اختيار سائق آخر',
@@ -792,8 +793,8 @@ class AppLocalization {
       'en': 'Continue viewing offers',
     },
     'driver_taken_short': {
-      'ar': 'السائق لم يعد متاحاً',
-      'en': 'Driver no longer available',
+      'ar': 'هذا السائق استلم طلباً آخر',
+      'en': 'This driver took another order',
     },
     'order_suspended': {'ar': 'الطلب معلق', 'en': 'Order suspended'},
     'order_suspended_report_in': {

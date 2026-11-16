@@ -27,6 +27,7 @@ import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/brand/swifora_brand.dart';
 import '../widgets/brand/swifora_home_chrome.dart';
+import '../services/ad_repository.dart';
 import 'create_order_screen.dart';
 import 'my_orders_screen.dart';
 import 'order_offers_screen.dart';
@@ -61,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int? _availableDriversCount;
   int _supportUnreadCount = 0;
   int _adRefreshTick = 0;
+  late final ApiAdEvents _adEvents;
   late ChatService _supportChatService;
   StreamSubscription? _newOfferSub;
   StreamSubscription? _deliveryConfirmationSub;
@@ -69,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _orderStatusSub;
   StreamSubscription? _offerAcceptedSub;
   StreamSubscription? _broadcastSub;
+  final List<StreamSubscription> _liveSubs = [];
   StreamSubscription? _accountDeletedSub;
   StreamSubscription? _sessionRevokedSub;
   StreamSubscription? _httpSessionRejectedSub;
@@ -81,6 +84,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Ad banner: views/taps go to the dashboard's tracking tab; a tap opens
+    // the screen or web page chosen in the dashboard.
+    _adEvents = ApiAdEvents(
+      token: widget.token,
+      screens: {
+        'create_order': _openCreateOrder,
+        'my_orders': _openOrdersReport,
+        'support': () => unawaited(_openSupport()),
+        'notifications': () =>
+            unawaited(openSwiforaNotifications(context, widget.token)),
+      },
+    );
     WidgetsBinding.instance.addObserver(this);
 
     _httpSessionRejectedSub = MobileSessionFailure.instance.onRejected.listen((
@@ -151,16 +166,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           unawaited(_openDeliveryConfirmation());
         });
 
-    _offerCancelledSub = SocketService.instance.onOfferCancelled.listen((_) {
+    _offerCancelledSub = SocketService.instance.onOfferCancelled.listen((data) {
       if (!mounted) return;
       _loadOrderCounts();
       context.read<NotificationBloc>().add(
         LoadNotifications(token: widget.token),
       );
-      AppFeedback.warning(
-        context,
-        AppLocalization.get(context, 'driver_taken_notification_body'),
-      );
+      // The driver took another order: show that order's offers, where the
+      // customer can resend it to another available driver. When the offers
+      // screen cannot open here (a form is on top), say it in a message.
+      final orderId = data['orderId']?.toString() ?? '';
+      if (orderId.isNotEmpty && _canOpenForLiveEvent({'offers:$orderId'})) {
+        unawaited(_openOffersForIncomingOffer(orderId));
+      } else if (VisibleListScreen.tag != 'offers:$orderId') {
+        AppFeedback.warning(
+          context,
+          AppLocalization.get(context, 'driver_taken_notification_body'),
+        );
+      }
     });
 
     _orderStatusSub = SocketService.instance.onOrderStatusChanged.listen((
@@ -178,6 +201,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       _loadOrderCounts();
     });
+
+    // Live changes made elsewhere (mostly in the dashboard).
+    _liveSubs.addAll([
+      SocketService.instance.onAdsChanged.listen((_) {
+        if (mounted) setState(() => _adRefreshTick += 1);
+      }),
+      SocketService.instance.onDriversChanged.listen((_) {
+        if (mounted) _loadAvailableDriversCount();
+      }),
+      SocketService.instance.onAccountChanged.listen((_) {
+        if (mounted) unawaited(_refreshCurrentUser());
+      }),
+    ]);
 
     _broadcastSub = SocketService.instance.onBroadcast.listen((_) {
       if (!mounted) return;
@@ -435,6 +471,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _adEvents.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _pushOpenedSub?.cancel();
     _pushForegroundSub?.cancel();
@@ -446,6 +483,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _orderStatusSub?.cancel();
     _offerAcceptedSub?.cancel();
     _broadcastSub?.cancel();
+    for (final subscription in _liveSubs) {
+      subscription.cancel();
+    }
     _accountDeletedSub?.cancel();
     _sessionRevokedSub?.cancel();
     _httpSessionRejectedSub?.cancel();
@@ -552,6 +592,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       AdBannerCarousel(
                         token: widget.token,
                         refreshTick: _adRefreshTick,
+                        events: _adEvents,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       SwiforaSectionTitle(
@@ -657,16 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                             tone: AppTone.accent,
                             badgeCount: _supportUnreadCount,
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      SupportChatScreen(token: widget.token),
-                                ),
-                              );
-                              _reloadSupportAfterChat();
-                            },
+                            onTap: _openSupport,
                           ),
                         ],
                       ),
@@ -680,6 +712,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  /// Reloads the signed-in account (e.g. after an admin edited it).
+  Future<void> _refreshCurrentUser() async {
+    try {
+      final data = await AuthService().validateSession(widget.token);
+      final rawUser = data['user'];
+      if (rawUser is! Map) return;
+      final updated = UserModel.fromJson(Map<String, dynamic>.from(rawUser));
+      if (!mounted) return;
+      setState(() => _user = updated);
+      _loadAvailableDriversCount();
+    } catch (_) {
+      // Session failures are handled by the session listeners.
+    }
+  }
+
+  Future<void> _openSupport() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SupportChatScreen(token: widget.token)),
+    );
+    _reloadSupportAfterChat();
   }
 
   void _openCreateOrder() {

@@ -32,6 +32,7 @@ import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_tone.dart';
 import '../widgets/brand/swifora_brand.dart';
 import '../widgets/brand/swifora_home_chrome.dart';
+import '../services/ad_repository.dart';
 import '../widgets/governorate_scope_card.dart';
 import 'commission_payment_screen.dart';
 import 'login_screen.dart';
@@ -71,6 +72,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   StreamSubscription? _providerProfileUpdatedSub;
   StreamSubscription? _deliveryResultSub;
   StreamSubscription? _broadcastSub;
+  final List<StreamSubscription> _liveSubs = [];
   StreamSubscription? _accountDeletedSub;
   StreamSubscription? _sessionRevokedSub;
   StreamSubscription? _httpSessionRejectedSub;
@@ -82,6 +84,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   String? _openingAcceptedOrderId;
   int _supportUnreadCount = 0;
   int _adRefreshTick = 0;
+  late final ApiAdEvents _adEvents;
   final GlobalKey _financeKey = GlobalKey();
   late ChatService _supportChatService;
 
@@ -187,6 +190,17 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   @override
   void initState() {
     super.initState();
+    // Ad banner: views/taps go to the dashboard's tracking tab. "Create
+    // order" ads are for customers and stay plain banners here.
+    _adEvents = ApiAdEvents(
+      token: widget.token,
+      screens: {
+        'my_orders': _openOrdersReport,
+        'support': () => unawaited(_openSupport()),
+        'notifications': () =>
+            unawaited(openSwiforaNotifications(context, widget.token)),
+      },
+    );
     WidgetsBinding.instance.addObserver(this);
 
     _httpSessionRejectedSub = MobileSessionFailure.instance.onRejected.listen((
@@ -374,6 +388,26 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
           }
         });
 
+    // Live changes made elsewhere (mostly in the dashboard).
+    _liveSubs.addAll([
+      SocketService.instance.onAdsChanged.listen((_) {
+        if (mounted) setState(() => _adRefreshTick += 1);
+      }),
+      SocketService.instance.onAccountChanged.listen((_) {
+        if (!mounted) return;
+        unawaited(_refreshCurrentUser());
+        context.read<ProviderBloc>().add(
+          LoadProviderStats(token: widget.token),
+        );
+      }),
+      SocketService.instance.onEarningsChanged.listen((_) {
+        if (!mounted) return;
+        context.read<ProviderBloc>().add(
+          LoadProviderStats(token: widget.token),
+        );
+      }),
+    ]);
+
     _broadcastSub = SocketService.instance.onBroadcast.listen((_) {
       if (!mounted) return;
       // Admin broadcasts are notification-only; do not show a home snackbar
@@ -495,6 +529,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
   @override
   void dispose() {
+    _adEvents.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _pushOpenedSub?.cancel();
     _pushForegroundSub?.cancel();
@@ -509,6 +544,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     _providerProfileUpdatedSub?.cancel();
     _deliveryResultSub?.cancel();
     _broadcastSub?.cancel();
+    for (final subscription in _liveSubs) {
+      subscription.cancel();
+    }
     _accountDeletedSub?.cancel();
     _sessionRevokedSub?.cancel();
     _httpSessionRejectedSub?.cancel();
@@ -1033,8 +1071,11 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                           ),
                           _buildEarnings(context, s),
                           const SizedBox(height: AppSpacing.md),
-                          _buildCommissionCard(context, s),
-                          const SizedBox(height: AppSpacing.md),
+                          // Shown or hidden from the dashboard (Settings).
+                          if (s.showCommissionCard) ...[
+                            _buildCommissionCard(context, s),
+                            const SizedBox(height: AppSpacing.md),
+                          ],
                           _buildRatingCard(context, s),
                           const SizedBox(height: AppSpacing.lg),
                           SwiforaSectionTitle(
@@ -1112,6 +1153,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                   AdBannerCarousel(
                     token: widget.token,
                     refreshTick: _adRefreshTick,
+                    events: _adEvents,
                   ),
                   const SizedBox(height: AppSpacing.xl),
                 ],
@@ -1308,19 +1350,19 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
       title: AppLocalization.get(context, 'contact_support'),
       tone: AppTone.accent,
       badgeCount: _supportUnreadCount,
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SupportChatScreen(token: widget.token),
-          ),
-        );
-
-        if (mounted) {
-          _loadSupportUnreadCount();
-        }
-      },
+      onTap: _openSupport,
     );
+  }
+
+  Future<void> _openSupport() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SupportChatScreen(token: widget.token)),
+    );
+
+    if (mounted) {
+      _loadSupportUnreadCount();
+    }
   }
 
   Widget _buildAvailabilityCard(BuildContext context, ProviderStats s) {
@@ -1687,6 +1729,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     final tone = appToneStyle(context, AppTone.warning);
 
     return Material(
+      key: const Key('driverCommissionCard'),
       color: tone.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadiusDirectional.circular(AppRadius.lg),

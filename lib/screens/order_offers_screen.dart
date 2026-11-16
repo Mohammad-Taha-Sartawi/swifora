@@ -1032,13 +1032,18 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
   }
 
   /// Offers the customer can still act on or is waiting for: pending ones
-  /// that have not expired, and the accepted one. When the last of them
-  /// goes (expired, withdrawn, the driver took another order), the screen
-  /// returns to the home screen.
+  /// that have not expired, the accepted one, and offers withdrawn because
+  /// the driver took another order (they carry the "resend to another
+  /// driver" choice until the customer resends). When the last of them
+  /// goes (expired, resent, …), the screen returns to the home screen.
   int _openOfferCount(List<OfferModel> offers) {
     final now = DateTime.now();
     return offers.where((offer) {
       if (offer.status == 'accepted') return true;
+      if (offer.status == 'rejected' &&
+          offer.rejectionReason == 'provider_unavailable') {
+        return true;
+      }
       if (offer.status != 'pending') return false;
       final expiresAt = offer.expiresAt;
       return expiresAt == null || expiresAt.isAfter(now);

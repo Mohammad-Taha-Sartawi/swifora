@@ -17,6 +17,9 @@ class ProviderStats {
   final String? offerCooldownUntil;
   final bool isAvailable;
 
+  /// Dashboard setting: show the "commission due" card on the home screen.
+  final bool showCommissionCard;
+
   ProviderStats({
     required this.dailyEarnings,
     required this.monthlyEarnings,
@@ -35,6 +38,7 @@ class ProviderStats {
     this.blockedUntil,
     this.offerCooldownUntil,
     this.isAvailable = true,
+    this.showCommissionCard = true,
   });
 
   factory ProviderStats.fromJson(Map<String, dynamic> json) {
@@ -56,6 +60,8 @@ class ProviderStats {
       blockedUntil: json['blockedUntil']?.toString(),
       offerCooldownUntil: json['offerCooldownUntil']?.toString(),
       isAvailable: json['isAvailable'] != false,
+      // Older servers do not send it: keep showing the card.
+      showCommissionCard: json['showCommissionCard'] != false,
     );
   }
 }
