@@ -39,6 +39,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="swifora_default" />
+        <!-- Push notifications show the Swifora mark. Android draws the
+             notification icon as a single-color shape, so it is a white
+             silhouette of the logo, tinted with the brand teal. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_swifora" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
