@@ -1,13 +1,11 @@
 const Notification = require('../models/Notification');
 const { sendPushToUser } = require('./pushNotifications');
+const { notificationExpiry, visibleUnreadCount } = require('./notificationWindow');
 
 async function emitUnreadNotificationCount(io, userId) {
   if (!io || !userId) return;
 
-  const unreadCount = await Notification.countDocuments({
-    userId,
-    read: false,
-  });
+  const unreadCount = await visibleUnreadCount(userId);
   io.to(`user:${userId}`).emit('notification_count', { unreadCount });
 }
 
@@ -31,7 +29,9 @@ async function createUserNotification({
     title,
     body,
     pinned,
-    ...(expireAt ? { expireAt } : {}),
+    // Deleted once it can no longer be shown (30 days), unless the caller
+    // gives a shorter life (pinned messages, account notices).
+    expireAt: expireAt || notificationExpiry(),
   });
 
   await emitUnreadNotificationCount(io, userId).catch(() => {});

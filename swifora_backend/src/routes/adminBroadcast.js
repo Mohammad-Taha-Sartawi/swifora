@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const BroadcastMessage = require('../models/BroadcastMessage');
 const { sendPushToUsers } = require('../services/pushNotifications');
+const { visibleUnreadCount } = require('../services/notificationWindow');
 
 // Broadcast messages stay pinned in the apps' notifications for 72 hours.
 const BROADCAST_PIN_MS = 72 * 60 * 60 * 1000;
@@ -71,10 +72,7 @@ router.post('/:target', async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       for (const u of users) {
-        const unreadCount = await Notification.countDocuments({
-          userId: u._id,
-          read: false,
-        });
+        const unreadCount = await visibleUnreadCount(u._id);
         io.to(`user:${u._id}`).emit('notification_count', { unreadCount });
         io.to(`user:${u._id}`).emit('broadcast', { title: normalizedTitle, body: normalizedBody });
       }
