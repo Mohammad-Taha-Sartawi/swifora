@@ -1,7 +1,9 @@
 const { sendInternalServerError, sendInternalServerFailure } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id']);
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const {
@@ -16,6 +18,7 @@ const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
   isValidMobilePassword,
+  PASSWORD_HASH_ROUNDS,
 } = require('../security/passwordPolicy');
 const {
   mobileSessionRotationFilter,
@@ -429,7 +432,7 @@ router.put('/:id/password', async (req, res) => {
     const hashedPassword =
       await bcrypt.hash(
         password,
-        10,
+        PASSWORD_HASH_ROUNDS,
       );
 
     const rotationFilter =

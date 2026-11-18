@@ -53,6 +53,18 @@ class AppLocalization {
       'ar': 'رقم الهاتف غير صحيح',
       'en': 'Invalid phone number',
     },
+    'name_invalid': {
+      'ar': 'اكتب الاسم الكامل (من حرفين إلى 80 حرفاً)',
+      'en': 'Enter the full name (2 to 80 characters)',
+    },
+    'something_went_wrong': {
+      'ar': 'تعذّر إتمام الطلب. حاول مرة أخرى.',
+      'en': 'Something went wrong. Please try again.',
+    },
+    'contact_need_email_or_phone': {
+      'ar': 'أدخل بريداً إلكترونياً أو رقم هاتف لنرد عليك',
+      'en': 'Enter an email or a phone number so we can reply',
+    },
     'phone_invalid_hint': {
       'ar':
           'رقم غير صحيح. أدخل رقم جوال من 10 أرقام يبدأ بـ 05، مثل 0599123456',
@@ -939,7 +951,10 @@ class AppLocalization {
     'submit_offer': {'ar': 'تقديم عرض سعر', 'en': 'Submit Offer'},
     'send_offer': {'ar': 'إرسال العرض', 'en': 'Send Offer'},
     'price_required': {'ar': 'السعر مطلوب', 'en': 'Price required'},
-    'invalid_price': {'ar': 'سعر غير صالح', 'en': 'Invalid price'},
+    'invalid_price': {
+      'ar': 'أدخل السعر بالأرقام فقط، مثل 15 أو 12.5',
+      'en': 'Enter the price in numbers only, like 15 or 12.5',
+    },
     'price_below_minimum': {
       'ar': 'أقل سعر مسموح هو {min} شيكل',
       'en': 'The lowest allowed price is {min} ILS',
@@ -949,7 +964,10 @@ class AppLocalization {
       'en': 'Lowest allowed price: {min} ILS',
     },
     'time_required': {'ar': 'الوقت مطلوب', 'en': 'Time required'},
-    'invalid_time': {'ar': 'وقت غير صالح', 'en': 'Invalid time'},
+    'invalid_time': {
+      'ar': 'أدخل الوقت بالدقائق من 1 إلى 1440',
+      'en': 'Enter the time in minutes, from 1 to 1440',
+    },
     'offer_sent': {'ar': 'تم إرسال عرض السعر', 'en': 'Offer sent successfully'},
     'delivery_progress': {
       'ar': 'مضى: %d من %t دقيقة',

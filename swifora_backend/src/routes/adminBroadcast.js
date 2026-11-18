@@ -11,6 +11,12 @@ const BROADCAST_PIN_MS = 72 * 60 * 60 * 1000;
 
 router.post('/:target', async (req, res) => {
   try {
+    // Only the two audiences exist; anything else must not fall through to
+    // "customers".
+    if (req.params.target !== 'drivers' && req.params.target !== 'users') {
+      return res.status(400).json({ success: false, message: 'جهة الإرسال غير صالحة' });
+    }
+
     const { title, body } = req.body;
     if (!title || !body) {
       return res.json({ success: false, message: 'الرجاء إدخال عنوان ونص للرسالة' });

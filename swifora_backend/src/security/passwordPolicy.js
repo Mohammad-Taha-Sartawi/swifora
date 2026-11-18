@@ -32,6 +32,10 @@ function isValidAdminPassword(password) {
     && !isObviousPlaceholderPassword(password);
 }
 
+// bcrypt work factor for app (customer/driver) passwords. Old hashes with a
+// lower cost still verify; new and changed passwords use this.
+const PASSWORD_HASH_ROUNDS = 12;
+
 const MIN_MOBILE_PASSWORD_LENGTH = 12;
 const MAX_MOBILE_PASSWORD_LENGTH = 128;
 
@@ -53,6 +57,7 @@ function isValidProviderBootstrapPassword(password) {
 }
 
 module.exports = {
+  PASSWORD_HASH_ROUNDS,
   MIN_ADMIN_PASSWORD_LENGTH,
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,

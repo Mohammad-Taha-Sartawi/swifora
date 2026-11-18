@@ -1,3 +1,9 @@
+const {
+  INVALID_PHONE_MESSAGE,
+  isValidPhoneNumber,
+  normalizePhoneNumber,
+} = require('./phoneNumbers');
+
 const CONTACT_PREFIX = 'contact:';
 
 const LIMITS = Object.freeze({
@@ -76,7 +82,16 @@ function normalizeContactPayload(payload = {}) {
     );
   }
 
-  return { name, email, phone, text };
+  // Support calls this number back: "abc" or a half number is refused.
+  const normalizedPhone = phone ? normalizePhoneNumber(phone) : '';
+  if (phone && !isValidPhoneNumber(normalizedPhone)) {
+    throw new ContactValidationError(
+      'CONTACT_PHONE_INVALID',
+      INVALID_PHONE_MESSAGE,
+    );
+  }
+
+  return { name, email, phone: normalizedPhone, text };
 }
 
 function contactConversationId(id) {

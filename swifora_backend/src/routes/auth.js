@@ -3,6 +3,7 @@ const {
 } = require('../services/providerServiceTypes');
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const { personName, PERSON_NAME_MESSAGE } = require('../security/requestInput');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -43,6 +44,7 @@ const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
   isValidMobilePassword,
+  PASSWORD_HASH_ROUNDS,
 } = require('../security/passwordPolicy');
 const {
   createMobileLoginLimiter,
@@ -86,6 +88,11 @@ router.post('/register', mobileRegistrationLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Invalid registration role' });
     }
 
+    const name = personName(fullName);
+    if (!name) {
+      return res.status(400).json({ error: PERSON_NAME_MESSAGE, code: 'INVALID_NAME' });
+    }
+
     if (
       !isValidMobileEmail(normalizedEmail)
       || isReservedGuestEmail(normalizedEmail)
@@ -122,12 +129,12 @@ router.post('/register', mobileRegistrationLimiter, async (req, res) => {
     const existingPending = await PendingProvider.findOne({ email: normalizedEmail });
     if (existingPending) return res.status(400).json({ error: 'Email already pending review' });
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS);
 
     // Providers go through admin approval flow.
     if (role === 'provider') {
       await PendingProvider.create({
-        fullName,
+        fullName: name,
         email: normalizedEmail,
         phone,
         password: hashed,
@@ -146,7 +153,7 @@ router.post('/register', mobileRegistrationLimiter, async (req, res) => {
     // Customers register immediately
     const publicId = await generatePublicId();
     const user = await User.create({
-      fullName,
+      fullName: name,
       email: normalizedEmail,
       password: hashed,
       role,
@@ -325,7 +332,7 @@ function issueMobileSession(user) {
 /** A password nobody knows: Google accounts sign in with Google (or set
  *  a password later through "forgot password"). */
 async function unusablePasswordHash() {
-  return bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+  return bcrypt.hash(crypto.randomBytes(32).toString('hex'), PASSWORD_HASH_ROUNDS);
 }
 
 function roleMismatchMessage(accountRole) {
@@ -433,7 +440,7 @@ router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
   try {
     let claims;
     try {
-      claims = jwt.verify(String(req.body?.registrationToken || ''), JWT_SECRET);
+      claims = jwt.verify(String(req.body?.registrationToken || ''), JWT_SECRET, { algorithms: ['HS256'] });
     } catch (_) {
       claims = null;
     }

@@ -115,6 +115,7 @@ function accountSummary(user) {
 }
 
 module.exports = {
+  escapeRegex,
   phoneCore,
   accountSearchConditions,
   findAccounts,

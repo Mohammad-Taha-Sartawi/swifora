@@ -6,6 +6,7 @@ import '../services/responsive.dart';
 import '../services/theme_service.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
+import '../widgets/ui/latin_digits_formatter.dart';
 import '../widgets/ui/app_state_views.dart';
 import '../widgets/ui/app_status_chip.dart';
 import '../widgets/ui/app_tone.dart';
@@ -83,7 +84,13 @@ class _ReportScreenState extends State<ReportScreen> {
       _loadHistory();
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.error(context, e.toString().replaceFirst('Exception: ', ''));
+      final message = e is ReportException ? e.message : '';
+      AppFeedback.error(
+        context,
+        message.isNotEmpty
+            ? message
+            : AppLocalization.get(context, 'something_went_wrong'),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -164,6 +171,10 @@ class _ReportScreenState extends State<ReportScreen> {
                         prefixIcon: const Icon(Icons.person_search),
                       ),
                       keyboardType: TextInputType.number,
+                      // Account IDs are digits: Arabic-Indic digits are
+                      // converted, anything else is not typed at all.
+                      inputFormatters: const [LatinDigitsFormatter()],
+                      maxLength: 12,
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? AppLocalization.get(context, 'required')
                           : null,
@@ -184,6 +195,8 @@ class _ReportScreenState extends State<ReportScreen> {
                         prefixIcon: const Icon(Icons.description),
                       ),
                       maxLines: 4,
+                      // Same limit as the server (reports.js).
+                      maxLength: 2000,
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? AppLocalization.get(context, 'required')
                           : null,

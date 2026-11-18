@@ -3,6 +3,7 @@ const {
   sendInternalServerFailure,
 } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Ad = require('../models/Ad');
 const AdStat = require('../models/AdStat');
@@ -18,6 +19,7 @@ const {
 } = require('../services/adImageStorage');
 
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id']);
 
 function serializeAd(ad) {
   return {

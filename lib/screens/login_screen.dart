@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/auth/auth_bloc.dart';
@@ -396,13 +397,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _nameController,
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.name],
+                  // Same limit as the server (requestInput.js personName).
+                  maxLength: Validators.maxNameLength,
                   decoration: _inputDecoration(
                     AppLocalization.get(context, 'full_name'),
                     Icons.person_outline,
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? AppLocalization.get(context, 'required')
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return AppLocalization.get(context, 'required');
+                    }
+                    return Validators.isValidName(v)
+                        ? null
+                        : AppLocalization.get(context, 'name_invalid');
+                  },
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
@@ -1003,6 +1011,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: nameCtrl,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.name],
+                      maxLength: 100,
                       decoration: InputDecoration(
                         labelText: AppLocalization.get(ctx, 'name_field'),
                       ),
@@ -1016,12 +1025,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.email],
+                      maxLength: 254,
                       decoration: InputDecoration(
                         labelText: AppLocalization.get(ctx, 'email_field'),
+                        errorMaxLines: 3,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? AppLocalization.get(ctx, 'required')
-                          : null,
+                      // Email or phone: one is enough for us to reply, and
+                      // whichever is given must be a real one.
+                      validator: (v) {
+                        final email = (v ?? '').trim();
+                        if (email.isEmpty) {
+                          return phoneCtrl.text.trim().isEmpty
+                              ? AppLocalization.get(
+                                  ctx,
+                                  'contact_need_email_or_phone',
+                                )
+                              : null;
+                        }
+                        return Validators.isCompleteEmail(email)
+                            ? null
+                            : AppLocalization.get(ctx, 'email_incomplete');
+                      },
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
@@ -1029,17 +1053,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.telephoneNumber],
+                      textDirection: TextDirection.ltr,
+                      maxLength: 20,
                       decoration: InputDecoration(
                         labelText: AppLocalization.get(ctx, 'phone_field'),
+                        errorMaxLines: 3,
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? AppLocalization.get(ctx, 'required')
-                          : null,
+                      validator: (v) {
+                        final phone = (v ?? '').trim();
+                        if (phone.isEmpty) return null;
+                        return Validators.isValidPhone(phone)
+                            ? null
+                            : AppLocalization.get(ctx, 'phone_invalid_hint');
+                      },
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: msgCtrl,
                       maxLines: 3,
+                      maxLength: 2000,
                       decoration: InputDecoration(
                         labelText: AppLocalization.get(ctx, 'message_field'),
                         hintText: AppLocalization.get(ctx, 'message_hint'),
@@ -1071,7 +1103,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           final thread = await _guestSupport.start(
                             name: nameCtrl.text.trim(),
                             email: emailCtrl.text.trim(),
-                            phone: phoneCtrl.text.trim(),
+                            phone: phoneCtrl.text.trim().isEmpty
+                                ? ''
+                                : Validators.normalizePhone(phoneCtrl.text),
                             text: msgCtrl.text.trim(),
                           );
 
@@ -1087,15 +1121,27 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Our replies from the dashboard show up here.
                             if (thread != null) _openGuestThread(thread);
                           }
-                        } catch (_) {
+                        } catch (error) {
                           if (!ctx.mounted) {
                             return;
                           }
                           setDialogState(() => sending = false);
                           if (mounted) {
+                            // Say which field the server refused.
+                            final data = error is DioException
+                                ? error.response?.data
+                                : null;
+                            final code = data is Map ? data['code'] : null;
+                            final key = switch (code) {
+                              'CONTACT_PHONE_INVALID' => 'phone_invalid_hint',
+                              'CONTACT_EMAIL_INVALID' => 'email_incomplete',
+                              'CONTACT_METHOD_REQUIRED' =>
+                                'contact_need_email_or_phone',
+                              _ => 'contact_failed',
+                            };
                             AppFeedback.error(
                               context,
-                              AppLocalization.get(context, 'contact_failed'),
+                              AppLocalization.get(context, key),
                             );
                           }
                         }

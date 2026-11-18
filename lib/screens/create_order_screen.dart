@@ -8,6 +8,7 @@ import '../services/responsive.dart';
 import '../services/localization_service.dart';
 import '../services/api_config.dart';
 import '../services/theme_service.dart';
+import '../services/validators.dart';
 import '../widgets/brand/swifora_brand.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
@@ -253,6 +254,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                         controller: _descController,
                         minLines: 3,
                         maxLines: 5,
+                        // Same limit as the server (orders.js).
+                        maxLength: 2000,
                         decoration: InputDecoration(
                           alignLabelWithHint: true,
                           hintText: AppLocalization.get(
@@ -284,6 +287,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                         ),
                         maxLines: 2,
                         minLines: 1,
+                        maxLength: 500,
                         validator: (v) => v == null || v.trim().isEmpty
                             ? AppLocalization.get(context, 'required')
                             : null,
@@ -309,14 +313,25 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                             'phone_hint',
                           ),
                           helperMaxLines: 2,
+                          errorMaxLines: 3,
                           prefixIcon: const Icon(Icons.phone_outlined),
                         ),
                         keyboardType: TextInputType.phone,
                         textDirection: TextDirection.ltr,
                         autofillHints: const [AutofillHints.telephoneNumber],
-                        validator: (v) => v == null || v.trim().isEmpty
-                            ? AppLocalization.get(context, 'required')
-                            : null,
+                        maxLength: 20,
+                        // The driver calls this number: a real mobile only.
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return AppLocalization.get(context, 'required');
+                          }
+                          return Validators.isValidPhone(v)
+                              ? null
+                              : AppLocalization.get(
+                                  context,
+                                  'phone_invalid_hint',
+                                );
+                        },
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       BlocConsumer<OrderBloc, OrderState>(
@@ -392,7 +407,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         token: widget.token,
         type: _selectedType!,
         description: _descController.text.trim(),
-        phone: _phoneController.text.trim(),
+        phone: Validators.normalizePhone(_phoneController.text),
         area: ApiConfig.detectedArea,
         location: _locationController.text.trim(),
       ),

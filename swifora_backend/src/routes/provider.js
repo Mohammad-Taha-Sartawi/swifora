@@ -1,5 +1,6 @@
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Offer = require('../models/Offer');
@@ -20,6 +21,7 @@ const {
 
 const { getDriverDisplaySettings } = require('../services/commissionSettings');
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['orderId']);
 router.use(auth, requireRole('provider'));
 
 router.put('/availability', async (req, res) => {

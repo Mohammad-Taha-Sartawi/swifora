@@ -43,6 +43,51 @@ class Validators {
     return null;
   }
 
+  /// Arabic-Indic (٠-٩) and Persian (۰-۹) digits become 0-9, and the Arabic
+  /// decimal separator (٫) or a comma becomes a dot, so "١٢٫٥" and "12,5"
+  /// read as 12.5. Other characters are kept.
+  static String latinDigits(String value) {
+    final buffer = StringBuffer();
+    for (final rune in value.runes) {
+      if (rune >= 0x0660 && rune <= 0x0669) {
+        buffer.write(rune - 0x0660);
+      } else if (rune >= 0x06F0 && rune <= 0x06F9) {
+        buffer.write(rune - 0x06F0);
+      } else if (rune == 0x066B || rune == 0x2C) {
+        buffer.write('.');
+      } else {
+        buffer.writeCharCode(rune);
+      }
+    }
+    return buffer.toString();
+  }
+
+  static final RegExp _amount = RegExp(r'^\d{1,7}(\.\d{1,2})?$');
+
+  /// A money amount typed by a person (digits, at most two decimals), or
+  /// null for anything else: letters, "NaN", "1e6", "-5", empty.
+  static double? parseAmount(String value) {
+    final text = latinDigits(value.trim());
+    if (!_amount.hasMatch(text)) return null;
+    return double.tryParse(text);
+  }
+
+  /// A whole number typed by a person (digits only), or null.
+  static int? parseWholeNumber(String value) {
+    final text = latinDigits(value.trim());
+    if (!RegExp(r'^\d{1,6}$').hasMatch(text)) return null;
+    return int.tryParse(text);
+  }
+
+  /// Longest name the server accepts (requestInput.js MAX_PERSON_NAME).
+  static const int maxNameLength = 80;
+
+  /// A person's name: 2-80 characters once extra spaces are removed.
+  static bool isValidName(String value) {
+    final name = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return name.length >= 2 && name.length <= maxNameLength;
+  }
+
   static String? phone(String? value) {
     if (value == null || value.trim().isEmpty) return 'مطلوب / Required';
     if (!isValidPhone(value)) return 'رقم غير صالح / Invalid number';

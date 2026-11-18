@@ -1,11 +1,13 @@
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id']);
 router.use(auth, requireRole('customer', 'provider'));
 
 router.get('/', async (req, res) => {

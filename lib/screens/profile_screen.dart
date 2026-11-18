@@ -291,7 +291,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveName() async {
     final name = _nameCtrl.text.trim();
-    if (name.isEmpty) return;
+    if (!Validators.isValidName(name)) {
+      AppFeedback.error(context, AppLocalization.get(context, 'name_invalid'));
+      return;
+    }
     try {
       final dio = _client();
       await dio.put('/users/profile', data: {'fullName': name});
@@ -302,7 +305,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.error(context, e.toString());
+      // The server's own message (e.g. name too long), never raw exception text.
+      final data = e is DioException ? e.response?.data : null;
+      final message = data is Map ? data['error'] : null;
+      AppFeedback.error(
+        context,
+        message is String && message.trim().isNotEmpty
+            ? message
+            : AppLocalization.get(context, 'something_went_wrong'),
+      );
     }
   }
 
@@ -547,6 +558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   AppLocalization.get(context, 'profile_name'),
                   _nameCtrl,
                   onSave: _saveName,
+                  maxLength: Validators.maxNameLength,
                 ),
                 _buildSection(
                   AppLocalization.get(context, 'email'),
@@ -949,6 +961,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextEditingController ctrl, {
     VoidCallback? onSave,
     bool latin = false,
+    int? maxLength,
   }) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(bottom: 12),
@@ -957,6 +970,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Expanded(
             child: TextField(
               controller: ctrl,
+              maxLength: maxLength,
               textDirection: latin ? TextDirection.ltr : null,
               decoration: InputDecoration(
                 labelText: label,

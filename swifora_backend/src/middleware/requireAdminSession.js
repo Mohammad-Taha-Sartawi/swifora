@@ -8,6 +8,9 @@ const {
   adminSessionVersionMatches,
 } = require('../services/adminAccounts');
 
+// Longest an admin stays signed in, counted from sign-in.
+const ADMIN_SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
 function isAdminSession(req) {
   return req.session?.admin?.id
     && req.session.admin.role === 'admin';
@@ -75,6 +78,16 @@ function createRequireAdminSession({
       return rejectAdminSession(req, res);
     }
 
+    // A session lives at most ADMIN_SESSION_MAX_AGE_MS from sign-in, however
+    // often it is used: a stolen cookie cannot be kept alive forever.
+    // Sessions from before this rule get their clock started now.
+    const loginAt = Number(sessionAdmin.loginAt);
+    if (!Number.isFinite(loginAt) || loginAt <= 0) {
+      sessionAdmin.loginAt = Date.now();
+    } else if (Date.now() - loginAt > ADMIN_SESSION_MAX_AGE_MS) {
+      return rejectAdminSession(req, res);
+    }
+
     try {
       const admin = await loadAdmin(sessionAdmin.id);
 
@@ -112,5 +125,8 @@ requireAdminSession.createRequireAdminSession =
   createRequireAdminSession;
 requireAdminSession.loadAdminById =
   loadAdminById;
+
+requireAdminSession.ADMIN_SESSION_MAX_AGE_MS =
+  ADMIN_SESSION_MAX_AGE_MS;
 
 module.exports = requireAdminSession;

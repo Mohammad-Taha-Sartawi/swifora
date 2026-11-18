@@ -1,6 +1,8 @@
 const { sendInternalServerError, sendInternalServerFailure } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id', 'actionId']);
 const User = require('../models/User');
 const Order = require('../models/Order');
 const CommissionPayment = require('../models/CommissionPayment');

@@ -18,7 +18,7 @@ function authenticateSocket(socket, jwtSecret) {
   if (!token) throw new Error('Authentication required');
 
   try {
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
     if (!isMobileRole(decoded.role)) throw new Error('Invalid mobile role');
 
     const sessionVersion =

@@ -175,7 +175,7 @@ test(
 
     assert.match(
       reset,
-      /bcrypt\.hash\(\s*password,\s*10/,
+      /bcrypt\.hash\(\s*password,\s*PASSWORD_HASH_ROUNDS/,
     );
 
     assert.doesNotMatch(
@@ -253,7 +253,7 @@ test(
 
     assert.match(
       reset,
-      /bcrypt\.hash\(\s*password,\s*10/,
+      /bcrypt\.hash\(\s*password,\s*PASSWORD_HASH_ROUNDS/,
     );
 
     assert.doesNotMatch(

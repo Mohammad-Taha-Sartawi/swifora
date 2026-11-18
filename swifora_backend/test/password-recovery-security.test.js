@@ -781,7 +781,7 @@ test(
 
     assert.match(
       block,
-      /bcrypt\.hash\(\s*newPassword,\s*10/,
+      /bcrypt\.hash\(\s*newPassword,\s*PASSWORD_HASH_ROUNDS/,
     );
 
     assert.match(
