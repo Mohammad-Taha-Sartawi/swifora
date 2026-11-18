@@ -10,6 +10,7 @@ const path = require('node:path');
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'swifora-integration-jwt-secret-2026-11-push';
+process.env.SESSION_SECRET = 'swifora-integration-session-secret-2026-11-push';
 
 // The admin session and CSRF checks have their own tests; here they let the
 // stand-in admin through so the support-reply route can be called directly.
