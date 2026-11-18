@@ -1,5 +1,6 @@
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Offer = require('../models/Offer');
 const Order = require('../models/Order');
@@ -37,6 +38,7 @@ const {
 const { announceOrderToDrivers } = require('../services/orderAnnouncement');
 
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id', 'orderId']);
 
 async function notifyOfferNotSelected(io, providerId, orderId, price) {
   if (io) {
@@ -92,15 +94,25 @@ router.post('/', auth, requireRole('provider'), offerCreateLimiter, offerCreateI
           max: 1440,
         });
 
-    if (
-      !orderId
-      || !mongoose.isValidObjectId(orderId)
-      || rawPrice === null
-      || estimatedTime === null
-    ) {
+    if (!orderId || !mongoose.isValidObjectId(orderId)) {
       return res.status(400).json({
-        error: 'Valid price is required',
+        error: 'الطلب غير موجود.',
         code: 'INVALID_OFFER_INPUT',
+      });
+    }
+
+    if (rawPrice === null) {
+      return res.status(400).json({
+        error: `أدخل سعراً صحيحاً بالأرقام بين ${MIN_OFFER_PRICE} و ${MAX_OFFER_PRICE} شيكل.`,
+        code: 'INVALID_OFFER_INPUT',
+      });
+    }
+
+    // Its own message: the driver must know it is the time, not the price.
+    if (estimatedTime === null) {
+      return res.status(400).json({
+        error: 'أدخل وقت توصيل صحيحاً بالدقائق بين 1 و 1440 دقيقة.',
+        code: 'INVALID_ESTIMATED_TIME',
       });
     }
 

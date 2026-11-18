@@ -1,5 +1,6 @@
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const { personName, PERSON_NAME_MESSAGE, boundedTrimmedString } = require('../security/requestInput');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const PendingProvider = require('../models/PendingProvider');
@@ -37,6 +38,7 @@ const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
   isValidMobilePassword,
+  PASSWORD_HASH_ROUNDS,
 } = require('../security/passwordPolicy');
 const {
   normalizePhoneNumber,
@@ -352,7 +354,7 @@ router.put('/password', async (req, res) => {
     const hashedPassword =
       await bcrypt.hash(
         newPassword,
-        10,
+        PASSWORD_HASH_ROUNDS,
       );
 
     const rotationFilter =
@@ -622,8 +624,12 @@ router.put('/profile', async (req, res) => {
 
     const update = {};
 
-    if (fullName) {
-      update.fullName = fullName;
+    if (fullName !== undefined) {
+      const name = personName(fullName);
+      if (!name) {
+        return res.status(400).json({ error: PERSON_NAME_MESSAGE, code: 'INVALID_NAME' });
+      }
+      update.fullName = name;
     }
 
     if (Object.keys(update).length === 0) {
@@ -665,12 +671,27 @@ router.get('/frequent-items', async (req, res) => {
   }
 });
 
+// A saved item is short text, and an account keeps a bounded list of them.
+const MAX_FREQUENT_ITEM_LENGTH = 100;
+const MAX_FREQUENT_ITEMS = 50;
+
 router.post('/frequent-items', async (req, res) => {
   try {
-    const { item } = req.body;
-    if (!item) return res.status(400).json({ error: 'Item required' });
+    const item = boundedTrimmedString(req.body?.item, MAX_FREQUENT_ITEM_LENGTH);
+    if (!item) {
+      return res.status(400).json({
+        error: `اكتب العنصر كنص لا يزيد عن ${MAX_FREQUENT_ITEM_LENGTH} حرف.`,
+        code: 'INVALID_ITEM',
+      });
+    }
     const user = await User.findById(req.userId);
     if (!user.frequentItems.includes(item)) {
+      if (user.frequentItems.length >= MAX_FREQUENT_ITEMS) {
+        return res.status(400).json({
+          error: `لا يمكن حفظ أكثر من ${MAX_FREQUENT_ITEMS} عنصراً.`,
+          code: 'TOO_MANY_ITEMS',
+        });
+      }
       user.frequentItems.push(item);
       await user.save();
     }
@@ -682,7 +703,7 @@ router.post('/frequent-items', async (req, res) => {
 
 router.delete('/frequent-items', async (req, res) => {
   try {
-    const { item } = req.body;
+    const item = typeof req.body?.item === 'string' ? req.body.item.trim() : '';
     const user = await User.findById(req.userId);
     user.frequentItems = user.frequentItems.filter(i => i !== item);
     await user.save();

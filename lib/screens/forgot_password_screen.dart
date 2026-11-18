@@ -10,6 +10,7 @@ import '../services/validators.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_password_toggle.dart';
+import '../widgets/ui/latin_digits_formatter.dart';
 
 class ForgotPasswordScreen extends StatelessWidget {
   final String initialEmail;
@@ -244,8 +245,10 @@ class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
           controller: _codeController,
           keyboardType: TextInputType.number,
           autofillHints: const [AutofillHints.oneTimeCode],
+          // An Arabic keyboard types ١٢٣: converted to 1 2 3 (digitsOnly
+          // alone would drop them and leave the field empty).
           inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
+            const LatinDigitsFormatter(),
             LengthLimitingTextInputFormatter(8),
           ],
           decoration: InputDecoration(

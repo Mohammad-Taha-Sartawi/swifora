@@ -50,7 +50,7 @@ function createAuthMiddleware({
 
     try {
       decoded =
-        jwt.verify(token, jwtSecret);
+        jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
     } catch (err) {
       return rejectInvalidSession(
         res,

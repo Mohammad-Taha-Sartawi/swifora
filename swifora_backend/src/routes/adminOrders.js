@@ -3,16 +3,19 @@ const {
   sendInternalServerFailure,
 } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Offer = require('../models/Offer');
 const RejectedOrder = require('../models/RejectedOrder');
 const User = require('../models/User');
 const lifecycle = require('../services/orderLifecycle');
+const { escapeRegex } = require('../services/accountSearch');
 const { announceOrderToDrivers } = require('../services/orderAnnouncement');
 const { createUserNotification } = require('../services/mobileNotifications');
 
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id', 'offerId']);
 
 function activeOfferFilter(orderId, now = new Date()) {
   return {
@@ -28,7 +31,13 @@ function activeOfferFilter(orderId, now = new Date()) {
 
 router.get('/', async (req, res) => {
   try {
-    const { status, type, area, q } = req.query;
+    // A repeated query key arrives as an array: use the first value only.
+    const single = (value, max = 100) =>
+      String(Array.isArray(value) ? value[0] ?? '' : value ?? '').trim().slice(0, max);
+    const status = single(req.query.status, 40);
+    const type = single(req.query.type, 40);
+    const area = single(req.query.area);
+    const q = single(req.query.q);
     const filter = {};
 
     if (status && status !== 'all') {
@@ -40,16 +49,16 @@ router.get('/', async (req, res) => {
     }
 
     if (area) {
-      filter.area = String(area).trim();
+      filter.area = area;
     }
 
-    if (q && String(q).trim()) {
-      const text = String(q).trim();
-
-      if (mongoose.isValidObjectId(text)) {
-        filter._id = text;
+    if (q) {
+      if (mongoose.isValidObjectId(q)) {
+        filter._id = q;
       } else {
-        filter.description = { $regex: text, $options: 'i' };
+        // The text is matched literally: "(a+)+$" or "(" must not become a
+        // slow or broken regular expression in the database.
+        filter.description = { $regex: escapeRegex(q), $options: 'i' };
       }
     }
 

@@ -115,6 +115,37 @@ test('authenticated admin session is accepted after database revalidation', asyn
   assert.equal(result.nextCalled, true);
 });
 
+test('an admin session ends 12 hours after sign-in, however often it is used', async () => {
+  const middleware = requireAdminSession.createRequireAdminSession({
+    loadAdmin: async () => activeAdmin(),
+  });
+  const limit = requireAdminSession.ADMIN_SESSION_MAX_AGE_MS;
+  assert.equal(limit, 12 * 60 * 60 * 1000);
+  const session = (loginAt) => ({
+    admin: { id: '507f1f77bcf86cd799439011', role: 'admin', sessionVersion: 0, loginAt },
+  });
+
+  const fresh = await runAdminMiddleware(session(Date.now() - 60 * 1000), '/admin', middleware);
+  assert.equal(fresh.nextCalled, true);
+
+  const almost = await runAdminMiddleware(session(Date.now() - limit + 60 * 1000), '/admin', middleware);
+  assert.equal(almost.nextCalled, true);
+
+  const expired = await runAdminMiddleware(session(Date.now() - limit - 1000), '/admin', middleware);
+  assert.equal(expired.nextCalled, false);
+  assert.equal(expired.redirectPath, '/admin/login');
+
+  const expiredApi = await runAdminMiddleware(session(Date.now() - limit - 1000), '/admin/api/stats', middleware);
+  assert.equal(expiredApi.statusCode, 401);
+
+  // A session from before this rule starts its clock now instead of ending.
+  const legacy = session(undefined);
+  const before = Date.now();
+  const kept = await runAdminMiddleware(legacy, '/admin', middleware);
+  assert.equal(kept.nextCalled, true);
+  assert.ok(legacy.admin.loginAt >= before);
+});
+
 test('deleted, inactive, and version-mismatched admin sessions are rejected', async () => {
   for (const admin of [
     activeAdmin({ deleted: true }),

@@ -297,6 +297,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                       ),
                       minLines: 1,
                       maxLines: 4,
+                      // Same limit as the server (chat.js); the counter shows
+                      // it before a long message is refused.
+                      maxLength: 2000,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
                     ),

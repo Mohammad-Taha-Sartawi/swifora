@@ -9,7 +9,7 @@ const { adminCsrfProtection } = require('../security/adminCsrf');
 const { isValidAdminPassword, MIN_ADMIN_PASSWORD_LENGTH } = require('../security/passwordPolicy');
 const {
   generateTotpSecret,
-  verifyTotpCode,
+  matchTotpStep,
   buildTotpUri,
   generateRecoveryCodes,
   hashRecoveryCode,
@@ -61,6 +61,28 @@ const adminLoginAccountLimiter = rateLimit({
   handler: (req, res) => res.status(429).render('login', { error: tooManyAttemptsMessage }),
 });
 
+/**
+ * True when [code] is a current authenticator code that has not been used
+ * before. The accepted time step is claimed atomically, so a code seen over
+ * someone's shoulder (or replayed) is refused for the rest of its lifetime.
+ */
+async function acceptTotpCode(admin, code) {
+  const step = matchTotpStep(admin.adminTotpSecret, code);
+  if (step < 0) return false;
+
+  const claimed = await Admin.updateOne(
+    {
+      _id: admin._id,
+      $or: [
+        { adminTotpLastStep: null },
+        { adminTotpLastStep: { $lt: step } },
+      ],
+    },
+    { $set: { adminTotpLastStep: step } },
+  );
+  return claimed.modifiedCount === 1;
+}
+
 async function syncAdminSessionVersion(req, version) {
   if (!req.session?.admin) return;
 
@@ -106,8 +128,8 @@ router.post('/login', adminCsrfProtection, adminLoginLimiter, adminLoginAccountL
       const twoFactorCode = typeof req.body.twoFactorCode === 'string'
         ? req.body.twoFactorCode.trim()
         : '';
-      const validTotp = verifyTotpCode(
-        admin.adminTotpSecret,
+      const validTotp = await acceptTotpCode(
+        admin,
         twoFactorCode,
       );
       const recoveryDigest = hashRecoveryCode(
@@ -139,6 +161,8 @@ router.post('/login', adminCsrfProtection, adminLoginLimiter, adminLoginAccountL
         fullName: admin.fullName,
         role: 'admin',
         sessionVersion: admin.sessionVersion ?? 0,
+        // Start of the session's fixed lifetime (requireAdminSession).
+        loginAt: Date.now(),
       };
       req.session.save((saveErr) => {
         if (saveErr) return res.status(500).render('login', { error: 'حدث خطأ. يرجى المحاولة مرة أخرى.' });
@@ -292,7 +316,7 @@ router.post('/2fa/enable', requireAdminSession, adminCsrfProtection, async (req,
       });
     }
 
-    if (!verifyTotpCode(admin.adminTotpSecret, code)) {
+    if (!(await acceptTotpCode(admin, code))) {
       return res.status(400).json({
         success: false,
         message: 'رمز التحقق غير صحيح.',
@@ -353,10 +377,7 @@ router.post('/2fa/disable', requireAdminSession, adminCsrfProtection, async (req
     }
 
     if (admin.adminTotpEnabled === true) {
-      const validTotp = verifyTotpCode(
-        admin.adminTotpSecret,
-        code,
-      );
+      const validTotp = await acceptTotpCode(admin, code);
       const recoveryDigest = hashRecoveryCode(code);
       const recoveryIndex = validTotp
         ? -1

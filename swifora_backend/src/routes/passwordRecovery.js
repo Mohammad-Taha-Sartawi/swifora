@@ -36,6 +36,7 @@ const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
   isValidMobilePassword,
+  PASSWORD_HASH_ROUNDS,
 } = require('../security/passwordPolicy');
 
 const {
@@ -534,7 +535,7 @@ router.post(
       const passwordHash =
         await bcrypt.hash(
           newPassword,
-          10,
+          PASSWORD_HASH_ROUNDS,
         );
 
       const rotationFilter =

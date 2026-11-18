@@ -98,7 +98,11 @@ function timingSafeCodeEqual(expected, supplied) {
     );
 }
 
-function verifyTotpCode(
+/**
+ * The time step a valid code belongs to, or -1. Callers store the step they
+ * accepted so the same code cannot be used twice (RFC 6238 section 5.2).
+ */
+function matchTotpStep(
   secret,
   suppliedCode,
   {
@@ -110,7 +114,7 @@ function verifyTotpCode(
     .replace(/\s+/g, '');
 
   if (!new RegExp(`^\\d{${TOTP_DIGITS}}$`).test(code)) {
-    return false;
+    return -1;
   }
 
   let secretValue;
@@ -118,11 +122,11 @@ function verifyTotpCode(
   try {
     secretValue = base32Decode(secret);
   } catch (_error) {
-    return false;
+    return -1;
   }
 
   if (secretValue.length < 10) {
-    return false;
+    return -1;
   }
 
   const counter = Math.floor(
@@ -137,11 +141,15 @@ function verifyTotpCode(
     const expected = hotp(secret, counter + offset);
 
     if (timingSafeCodeEqual(expected, code)) {
-      return true;
+      return counter + offset;
     }
   }
 
-  return false;
+  return -1;
+}
+
+function verifyTotpCode(secret, suppliedCode, options = {}) {
+  return matchTotpStep(secret, suppliedCode, options) >= 0;
 }
 
 function buildTotpUri({
@@ -197,6 +205,7 @@ module.exports = {
   generateTotpSecret,
   generateTotpCode,
   verifyTotpCode,
+  matchTotpStep,
   buildTotpUri,
   generateRecoveryCodes,
   hashRecoveryCode,

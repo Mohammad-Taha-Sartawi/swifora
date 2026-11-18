@@ -29,6 +29,8 @@ const adminSchema = new mongoose.Schema(
       select: false,
     },
     adminTotpEnabledAt: { type: Date, default: null },
+    // Last accepted authenticator time step: each code works only once.
+    adminTotpLastStep: { type: Number, default: null, select: false },
     lastLoginAt: { type: Date, default: null },
   },
   {

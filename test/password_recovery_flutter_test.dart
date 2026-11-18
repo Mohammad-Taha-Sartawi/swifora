@@ -309,7 +309,8 @@ void main() {
         isTrue,
       );
 
-      expect(source, contains('FilteringTextInputFormatter.digitsOnly'));
+      // Digits only, and Arabic-Indic digits typed on an Arabic keyboard count.
+      expect(source, contains('const LatinDigitsFormatter()'));
 
       expect(
         RegExp(

@@ -3,6 +3,7 @@ const {
   isDatabaseUnavailableError,
   sendDatabaseUnavailable,
 } = require('./security/errorResponse');
+const { clientRequestError } = require('./security/requestInput');
 const { createAdminBrowserHeaders } = require('./security/adminBrowserHeaders');
 const { adminCsrfProtection } = require('./security/adminCsrf');
 const adminAuditLogger = require('./middleware/adminAuditLog');
@@ -473,7 +474,9 @@ io.on('connection', async (socket) => {
     socket.join(`admin:${socket.userId}`);
     console.log('Admin socket connected (support room)');
   } else if (socket.userRole === 'provider') {
-    // Registered area is authoritative; GPS-detected query param is a fallback
+    // Only the driver's registered area decides which new orders they hear
+    // about. An area sent by the client is never trusted: it would let a
+    // driver listen to another area's orders.
     let area = '';
     let governorate = '';
     let governorateLevel = false;
@@ -482,13 +485,15 @@ io.on('connection', async (socket) => {
         socket.userId,
         'area governorate governorateLevel',
       );
-      area = u?.area || socket.handshake.query?.area || '';
+      area = typeof u?.area === 'string' ? u.area : '';
       governorate = governorateKey(u || {});
       governorateLevel = u?.governorateLevel === true;
     } catch {
-      area = socket.handshake.query?.area || '';
+      area = '';
     }
-    socket.join(`area:${area}`);
+    if (area) {
+      socket.join(`area:${area}`);
+    }
     if (governorate && governorateLevel) {
       socket.join(`governorate:${governorate}`);
     }
@@ -591,6 +596,14 @@ app.use((err, req, res, next) => {
     }
 
     return sendDatabaseUnavailable(res);
+  }
+
+  // A body the client got wrong (not JSON, a bare number or text, too big,
+  // wrong charset) is the client's error: 400/413 with a short reason, not a
+  // 500 and not a stack trace in the log.
+  const clientError = clientRequestError(err);
+  if (clientError) {
+    return res.status(clientError.status).json(clientError.body);
   }
 
   console.error('Unhandled error:', err);

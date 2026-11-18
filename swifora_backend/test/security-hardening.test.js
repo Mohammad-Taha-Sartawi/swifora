@@ -21,6 +21,7 @@ const {
   generateTotpSecret,
   generateTotpCode,
   verifyTotpCode,
+  matchTotpStep,
   generateRecoveryCodes,
   hashRecoveryCode,
 } = require('../src/security/totp');
@@ -261,6 +262,14 @@ test('administrator TOTP codes and recovery codes are verified and hashed', () =
   assert.equal(verifyTotpCode(secret, code), true);
   assert.equal(verifyTotpCode(secret, '000000'), false);
 
+  // The matched time step is returned so a used code can be refused later.
+  const now = Date.now();
+  const step = Math.floor(now / 30000);
+  assert.equal(matchTotpStep(secret, generateTotpCode(secret, now), { now }), step);
+  assert.equal(matchTotpStep(secret, generateTotpCode(secret, now - 30000), { now }), step - 1);
+  assert.equal(matchTotpStep(secret, generateTotpCode(secret, now - 120000), { now }), -1);
+  assert.equal(matchTotpStep(secret, 'abcdef', { now }), -1);
+
   const recoveryCodes = generateRecoveryCodes(8);
   assert.equal(recoveryCodes.length, 8);
   assert.equal(new Set(recoveryCodes).size, 8);
@@ -275,7 +284,11 @@ test('administrator TOTP codes and recovery codes are verified and hashed', () =
 
   assert.match(auth, /router\.post\('\/2fa\/setup'/);
   assert.match(auth, /router\.post\('\/2fa\/enable'/);
-  assert.match(auth, /verifyTotpCode/);
+  // Every code check goes through acceptTotpCode, which claims the time step.
+  assert.match(auth, /async function acceptTotpCode/);
+  assert.match(auth, /adminTotpLastStep: \{ \$lt: step \}/);
+  assert.doesNotMatch(auth, /verifyTotpCode\(/);
+  assert.equal((auth.match(/await acceptTotpCode\(/g) || []).length, 3);
   assert.match(login, /name="twoFactorCode"/);
   assert.match(dashboard, /data-admin-action="manageTwoFactor"/);
 });

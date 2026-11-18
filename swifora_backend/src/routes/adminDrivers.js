@@ -20,7 +20,9 @@ const {
 } = require('../services/registrationLocation');
 const { sendInternalServerError, sendInternalServerFailure } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id']);
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const RejectedOrder = require('../models/RejectedOrder');
@@ -54,6 +56,7 @@ const {
   MIN_PROVIDER_BOOTSTRAP_PASSWORD_LENGTH,
   isValidMobilePassword,
   isValidProviderBootstrapPassword,
+  PASSWORD_HASH_ROUNDS,
 } = require('../security/passwordPolicy');
 const {
   mobileSessionRotationFilter,
@@ -506,7 +509,7 @@ router.post('/', async (req, res) => {
     const hashedPassword =
       await bcrypt.hash(
         password,
-        10,
+        PASSWORD_HASH_ROUNDS,
       );
 
     const publicId =
@@ -961,7 +964,7 @@ router.put('/:id/password', async (req, res) => {
     const hashedPassword =
       await bcrypt.hash(
         password,
-        10,
+        PASSWORD_HASH_ROUNDS,
       );
 
     const rotationFilter =

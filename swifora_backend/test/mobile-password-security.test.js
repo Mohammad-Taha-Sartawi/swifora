@@ -104,7 +104,7 @@ test(
 
     const hashIndex =
       registrationSource.indexOf(
-        'bcrypt.hash(password, 10)',
+        'bcrypt.hash(password, PASSWORD_HASH_ROUNDS)',
       );
 
     assert.ok(
@@ -210,7 +210,7 @@ test(
 
     assert.match(
       passwordSource,
-      /bcrypt\.hash\(\s*newPassword,\s*10/,
+      /bcrypt\.hash\(\s*newPassword,\s*PASSWORD_HASH_ROUNDS/,
     );
 
     assert.match(

@@ -23,6 +23,11 @@ class OfferService {
   /// same figure (`swifora_backend/src/services/offerPricing.js`).
   static const int minOfferPrice = 9;
 
+  /// Highest price and delivery time the server accepts
+  /// (`offerPricing.js` MAX_OFFER_PRICE, and 1440 minutes in `offers.js`).
+  static const int maxOfferPrice = 100000;
+  static const int maxEstimatedMinutes = 1440;
+
   /// Quick-pick prices on the offer screen; all at or above [minOfferPrice].
   static const List<int> quickPrices = [9, 12, 15, 20];
 

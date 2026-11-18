@@ -8,7 +8,9 @@ import '../services/responsive.dart';
 import '../services/localization_service.dart';
 import '../services/offer_service.dart';
 import '../services/theme_service.dart';
+import '../services/validators.dart';
 import '../bloc/app/app_bloc.dart';
+import '../widgets/ui/latin_digits_formatter.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_tone.dart';
@@ -177,7 +179,13 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _priceController,
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: const [
+                          LatinDigitsFormatter(allowDecimal: true),
+                        ],
+                        maxLength: 9,
                         textDirection: TextDirection.ltr,
                         decoration: InputDecoration(
                           labelText: AppLocalization.get(
@@ -187,10 +195,14 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                           prefixIcon: const Icon(
                             Icons.monetization_on_outlined,
                           ),
-                          helperText: AppLocalization.get(
-                            context,
-                            'min_offer_price_hint',
-                          ).replaceAll('{min}', '${OfferService.minOfferPrice}'),
+                          helperText:
+                              AppLocalization.get(
+                                context,
+                                'min_offer_price_hint',
+                              ).replaceAll(
+                                '{min}',
+                                '${OfferService.minOfferPrice}',
+                              ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -202,8 +214,10 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                               'price_required',
                             );
                           }
-                          final p = double.tryParse(v);
-                          if (p == null || p <= 0) {
+                          final p = Validators.parseAmount(v);
+                          if (p == null ||
+                              p <= 0 ||
+                              p > OfferService.maxOfferPrice) {
                             return AppLocalization.get(
                               context,
                               'invalid_price',
@@ -250,6 +264,8 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                       TextFormField(
                         controller: _timeController,
                         keyboardType: TextInputType.number,
+                        inputFormatters: const [LatinDigitsFormatter()],
+                        maxLength: 4,
                         textDirection: TextDirection.ltr,
                         decoration: InputDecoration(
                           labelText: AppLocalization.get(
@@ -262,7 +278,7 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                           ),
                         ),
                         onChanged: (v) {
-                          final t = int.tryParse(v);
+                          final t = Validators.parseWholeNumber(v);
                           if (t != null) setState(() => _estimatedTime = t);
                         },
                         validator: (v) {
@@ -273,9 +289,11 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
                             );
                           }
 
-                          final t = int.tryParse(v.trim());
+                          final t = Validators.parseWholeNumber(v);
 
-                          if (t == null || t <= 0) {
+                          if (t == null ||
+                              t <= 0 ||
+                              t > OfferService.maxEstimatedMinutes) {
                             return AppLocalization.get(context, 'invalid_time');
                           }
 
@@ -377,12 +395,14 @@ class _SubmitOfferScreenState extends State<SubmitOfferScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    final estimatedTime = int.parse(_timeController.text.trim());
+    final estimatedTime = Validators.parseWholeNumber(_timeController.text);
+    final price = Validators.parseAmount(_priceController.text);
+    if (estimatedTime == null || price == null) return;
     context.read<OfferBloc>().add(
       SubmitOfferEvent(
         token: widget.token,
         orderId: widget.orderId,
-        price: double.parse(_priceController.text.trim()),
+        price: price,
         estimatedTime: estimatedTime,
       ),
     );

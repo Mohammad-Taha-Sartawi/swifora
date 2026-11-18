@@ -1,5 +1,6 @@
 const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
+const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Offer = require('../models/Offer');
@@ -31,28 +32,44 @@ const {
 } = require('../services/mobileNotifications');
 const { announceOrderToDrivers } = require('../services/orderAnnouncement');
 
+const {
+  INVALID_PHONE_MESSAGE,
+  isValidPhoneNumber,
+  normalizePhoneNumber,
+} = require('../services/phoneNumbers');
+
+const MAX_ORDER_DESCRIPTION = 2000;
+const MAX_ORDER_LOCATION = 500;
+
 const router = express.Router();
+rejectInvalidObjectIdParams(router, ['id']);
 
 router.post('/', auth, requireRole('customer'), orderCreateLimiter, orderCreateIpLimiter, async (req, res) => {
   try {
     const type = boundedTrimmedString(req.body?.type, 20);
-    const description = boundedTrimmedString(req.body?.description, 2000);
-    const phone = boundedTrimmedString(req.body?.phone, 30);
+    const description = boundedTrimmedString(req.body?.description, MAX_ORDER_DESCRIPTION);
+    // The driver calls this number: it must be a real mobile number, stored
+    // in one form whatever way it was typed (spaces, ٠٥٩..., +970...).
+    const phone = typeof req.body?.phone === 'string'
+      ? normalizePhoneNumber(req.body.phone)
+      : '';
     const area = optionalBoundedTrimmedString(req.body?.area, 100);
-    const requestedLocation = optionalBoundedTrimmedString(req.body?.location, 500);
+    const requestedLocation = optionalBoundedTrimmedString(req.body?.location, MAX_ORDER_LOCATION);
 
-    if (
-      !type
-      || !['product', 'people', 'goods'].includes(type)
-      || !description
-      || !phone
-      || area === null
-      || requestedLocation === null
-    ) {
-      return res.status(400).json({
-        error: 'All fields are required',
-        code: 'INVALID_ORDER_INPUT',
-      });
+    const invalid = (error, code) => res.status(400).json({ error, code });
+    if (!type || !['product', 'people', 'goods'].includes(type) || area === null) {
+      return invalid('بيانات الطلب غير صالحة.', 'INVALID_ORDER_INPUT');
+    }
+    if (!description) {
+      return typeof req.body?.description === 'string' && req.body.description.trim()
+        ? invalid(`وصف الطلب أطول من ${MAX_ORDER_DESCRIPTION} حرف.`, 'DESCRIPTION_TOO_LONG')
+        : invalid('اكتب وصف الطلب.', 'DESCRIPTION_REQUIRED');
+    }
+    if (!isValidPhoneNumber(phone)) {
+      return invalid(INVALID_PHONE_MESSAGE, 'INVALID_PHONE');
+    }
+    if (requestedLocation === null) {
+      return invalid(`عنوان الطلب أطول من ${MAX_ORDER_LOCATION} حرف.`, 'LOCATION_TOO_LONG');
     }
 
     const user = await User.findById(req.userId);

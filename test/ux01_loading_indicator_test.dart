@@ -222,7 +222,7 @@ Future<void> main() async {
 
         await tester.enterText(dialogFields.at(0), 'Ann Smith');
         await tester.enterText(dialogFields.at(1), 'test@example.com');
-        await tester.enterText(dialogFields.at(2), '0501234');
+        await tester.enterText(dialogFields.at(2), '0501234567');
         await tester.enterText(
           dialogFields.at(3),
           'Hello from the widget test',

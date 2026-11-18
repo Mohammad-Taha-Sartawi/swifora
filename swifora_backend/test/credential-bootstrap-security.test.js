@@ -159,7 +159,7 @@ test(
 
     assert.match(
       directCreate,
-      /bcrypt\.hash\(\s*password,\s*10,\s*\)/,
+      /bcrypt\.hash\(\s*password,\s*PASSWORD_HASH_ROUNDS,\s*\)/,
     );
 
     assert.doesNotMatch(
