@@ -1,5 +1,6 @@
 const { sendInternalServerError, sendInternalServerFailure } = require('../security/errorResponse');
 const express = require('express');
+const { notificationExpiry } = require('../services/notificationWindow');
 const router = express.Router();
 const Report = require('../models/Report');
 const {
@@ -56,7 +57,7 @@ router.post('/reply/:id', async (req, res) => {
       type: 'report_reply',
       title: 'رد جديد على بلاغك',
       body: text,
-      expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.json({ success: true, report });
@@ -100,7 +101,7 @@ router.put('/:id/status', async (req, res) => {
       type: 'report_reply',
       title: 'تحديث حالة البلاغ',
       body: `أصبحت حالة بلاغك: ${statusLabel}.`,
-      expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.json({ success: true });

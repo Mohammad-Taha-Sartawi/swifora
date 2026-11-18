@@ -11,17 +11,22 @@ function source(file) {
 
 test('customer and driver notification feeds include all notification types', () => {
   const notifications = source('src/routes/notifications.js');
+  const windowRule = source('src/services/notificationWindow.js');
 
+  // List and badge go through the 30-day / 30-item window, which filters
+  // by user and age only: every notification type is included.
+  assert.match(notifications, /visibleNotifications\(req\.userId\)/);
+  assert.match(notifications, /visibleUnreadCount\(req\.userId\)/);
   assert.match(
-    notifications,
-    /Notification\.find\(\{\s*userId: req\.userId,\s*\}\)/s,
+    windowRule,
+    /Notification\.find\(\{\s*userId,\s*createdAt: \{ \$gte: notificationCutoff\(now\) \},\s*\}\)/s,
   );
+  assert.doesNotMatch(windowRule, /type:/);
   assert.doesNotMatch(
     notifications,
     /type: 'broadcast',\s*read: false/,
   );
 
-  assert.match(notifications, /Notification\.countDocuments/);
   assert.match(notifications, /Notification\.updateMany/);
 });
 

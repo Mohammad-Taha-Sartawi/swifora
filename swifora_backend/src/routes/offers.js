@@ -37,6 +37,7 @@ const {
 
 const { announceOrderToDrivers } = require('../services/orderAnnouncement');
 
+const { notificationExpiry } = require('../services/notificationWindow');
 const router = express.Router();
 rejectInvalidObjectIdParams(router, ['id', 'orderId']);
 
@@ -55,7 +56,7 @@ async function notifyOfferNotSelected(io, providerId, orderId, price) {
     type: 'offer_not_selected',
     title: 'تم اختيار سائق آخر',
     body: `تم قبول عرض سائق آخر لهذا الطلب بقيمة ${price} شيكل.`,
-    expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expireAt: notificationExpiry(),
   }).catch(() => {});
 }
 
@@ -76,7 +77,7 @@ async function notifyDriverTaken(io, customerId, orderId, offerId, providerId) {
     title: 'السائق لم يعد متاحاً',
     body:
       'هذا السائق استلم طلباً آخر، لذلك أُلغي عرض سعره. يمكنك إعادة إرسال الطلب مرة أخرى لسائق آخر متاح، أو قبول عرض سائق آخر.',
-    expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expireAt: notificationExpiry(),
   }).catch(() => {});
 }
 
@@ -151,7 +152,7 @@ router.post('/', auth, requireRole('provider'), offerCreateLimiter, offerCreateI
       type: 'new_offer',
       title: 'عرض سعر جديد',
       body: `قدم ${result.providerName} عرض سعر بقيمة ${price} شيكل.`,
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.status(201).json(result.offer);
@@ -308,7 +309,7 @@ router.post('/:id/accept', auth, requireRole('customer'), async (req, res) => {
       type: 'offer_accepted',
       title: 'تم قبول عرضك',
       body: 'قبل الزبون عرض السعر الخاص بك. يمكنك بدء تنفيذ الطلب.',
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     for (const providerId of result.competingProviderIds || []) {

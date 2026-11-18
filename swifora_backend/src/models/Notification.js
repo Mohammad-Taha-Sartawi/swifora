@@ -11,7 +11,10 @@ const notificationSchema = new mongoose.Schema({
   // When the user confirmed the pop-up of a broadcast message. The message
   // itself stays pinned in the notifications list until it expires.
   acknowledgedAt: { type: Date, default: null },
-  expireAt: { type: Date },
+  // Deleted by the TTL index below. 30 days unless set shorter (pinned
+  // messages, account notices): the screen never shows anything older
+  // (services/notificationWindow.js), so nothing is kept longer either.
+  expireAt: { type: Date, default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
   createdAt: { type: Date, default: Date.now },
 });
 

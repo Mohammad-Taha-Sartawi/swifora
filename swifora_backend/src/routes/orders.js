@@ -41,6 +41,7 @@ const {
 const MAX_ORDER_DESCRIPTION = 2000;
 const MAX_ORDER_LOCATION = 500;
 
+const { notificationExpiry } = require('../services/notificationWindow');
 const router = express.Router();
 rejectInvalidObjectIdParams(router, ['id']);
 
@@ -364,7 +365,7 @@ router.post('/:id/rating', auth, requireRole('customer'), async (req, res) => {
       type: 'new_rating',
       title: 'تقييم جديد',
       body: `قيّم الزبون خدمتك بـ ${rating} من 5.`,
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.status(201).json({
@@ -436,7 +437,7 @@ router.post('/:id/customer-rating', auth, requireRole('provider'), async (req, r
       type: 'new_rating',
       title: 'تقييم جديد',
       body: `قيّمك السائق بـ ${rating} من 5 على طلبك.`,
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.status(201).json({
@@ -463,7 +464,7 @@ router.put('/:id/fulfilling', auth, requireRole('provider'), async (req, res) =>
       type: 'order_pending',
       title: 'طلبك قيد التنفيذ',
       body: 'بدأ السائق العمل على طلبك.',
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.json(order);
@@ -492,7 +493,7 @@ router.put('/:id/complete', auth, requireRole('provider'), async (req, res) => {
       type: 'delivery_confirmation',
       title: 'السائق يطلب تأكيد التسليم',
       body: 'يرجى تأكيد استلام الطلب أو عدم الموافقة على التسليم.',
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.json(order);
@@ -529,7 +530,7 @@ router.put('/:id/confirm-delivery', auth, requireRole('customer'), async (req, r
       type: 'delivery_confirmed',
       title: 'تم تأكيد التسليم',
       body: 'أكد الزبون استلام الطلب وتم إكماله بنجاح.',
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.json(order);
@@ -566,7 +567,7 @@ router.put('/:id/reject-delivery', auth, requireRole('customer'), async (req, re
       body: order.deliveryRejectionReason
         ? `سبب الرفض: ${order.deliveryRejectionReason}`
         : 'يرجى التواصل مع الزبون وإعادة تأكيد التسليم.',
-      expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expireAt: notificationExpiry(),
     }).catch(() => {});
 
     res.json(order);

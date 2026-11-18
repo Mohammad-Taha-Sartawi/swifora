@@ -3,6 +3,10 @@ const express = require('express');
 const { rejectInvalidObjectIdParams } = require('../middleware/objectIdParams');
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
+const {
+  visibleNotifications,
+  visibleUnreadCount,
+} = require('../services/notificationWindow');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 
@@ -12,13 +16,8 @@ router.use(auth, requireRole('customer', 'provider'));
 
 router.get('/', async (req, res) => {
   try {
-    const notifications = await Notification.find({
-      userId: req.userId,
-    })
-      .sort({ pinned: -1, createdAt: -1 })
-      .limit(50)
-      .lean();
-    res.json(notifications);
+    // The latest 30 from the last 30 days; older ones stay hidden.
+    res.json(await visibleNotifications(req.userId));
   } catch (err) {
     sendInternalServerError(res);
   }
@@ -76,11 +75,9 @@ router.put('/read-all', async (req, res) => {
 
 router.get('/unread-count', async (req, res) => {
   try {
-    const count = await Notification.countDocuments({
-      userId: req.userId,
-      read: false,
-    });
-    res.json({ count });
+    // Only what the list shows: a hidden old notification never keeps the
+    // badge lit.
+    res.json({ count: await visibleUnreadCount(req.userId) });
   } catch (err) {
     sendInternalServerError(res);
   }

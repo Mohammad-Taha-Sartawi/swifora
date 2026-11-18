@@ -78,3 +78,11 @@ test('app passwords are hashed with bcrypt cost 12', () => {
     assert.doesNotMatch(text, /bcrypt\.hash\([^)]*,\s*10\s*,?\s*\)/, file);
   }
 });
+
+test('order and offer notifications are kept 30 days (no shorter hard-coded life)', () => {
+  for (const file of ['src/routes/orders.js', 'src/routes/offers.js', 'src/routes/adminReports.js']) {
+    const text = source(file);
+    assert.doesNotMatch(text, /expireAt: new Date\(Date\.now\(\) \+ \d+ \* 24 \* 60 \* 60 \* 1000\)/, file);
+    assert.match(text, /expireAt: notificationExpiry\(\)/, file);
+  }
+});
