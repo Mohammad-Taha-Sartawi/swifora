@@ -136,7 +136,12 @@ void main() {
 
     expect(offers, contains("'offer_cancelled'"));
 
-    expect(offers, contains("'new_order'"));
+    // A resent order is announced like a new one (live event + push).
+    final announcement = File(
+      'swifora_backend/src/services/orderAnnouncement.js',
+    ).readAsStringSync();
+    expect(offers, contains('announceOrderToDrivers'));
+    expect(announcement, contains("'new_order'"));
 
     final provider = File(
       'swifora_backend/src/routes/provider.js',

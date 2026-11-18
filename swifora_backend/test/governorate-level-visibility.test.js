@@ -131,7 +131,11 @@ test('orders store governorate scope and socket rooms follow the setting', () =>
   assert.match(ordersRoute, /governorate:\s*orderGovernorate/);
   assert.match(ordersRoute, /governorateLevel:\s*orderGovernorateLevel/);
   assert.match(ordersRoute, /canProviderSeeOrder\(req\.authUser, order\)/);
-  assert.match(ordersRoute, /except\(governorateRoom\)/);
+  // New and resent orders are announced by one shared function.
+  const announcement = source('src/services/orderAnnouncement.js');
+  assert.match(ordersRoute, /announceOrderToDrivers\(req\.app\.get\('io'\), order\)/);
+  assert.match(announcement, /except\(governorateRoom\)/);
+  assert.match(announcement, /orderResponderFilter\(value\)/);
   assert.match(lifecycle, /providerVisibilityFilter\(provider\)/);
   assert.match(lifecycle, /orderResponderFilter\(order\)/);
 

@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
+const { sendPushToUser, supportReplyPush } = require('../services/pushNotifications');
 
 const router = express.Router();
 
@@ -118,6 +119,8 @@ router.post('/send/:type/:id', async (req, res) => {
         createdAt: message.createdAt,
       });
     }
+
+    sendPushToUser(target._id, supportReplyPush(text)).catch(() => {});
 
     const messages = await loadMessages(target._id);
 

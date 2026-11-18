@@ -247,6 +247,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         return Icons.support_agent;
       case 'broadcast':
         return Icons.campaign;
+      case 'order_cancelled':
+        return Icons.cancel_outlined;
       default:
         return Icons.notifications;
     }

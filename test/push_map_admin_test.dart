@@ -47,7 +47,12 @@ void main() {
     expect(sender, contains('sendEachForMulticast'));
     expect(sender, contains('FIREBASE_SERVICE_ACCOUNT_JSON'));
     expect(notifications, contains('sendPushToUser'));
-    expect(orders, contains('sendPushToUsers'));
+    // New and resent orders go through one announcer (live event + push).
+    final announcement = File(
+      'swifora_backend/src/services/orderAnnouncement.js',
+    ).readAsStringSync();
+    expect(orders, contains('announceOrderToDrivers'));
+    expect(announcement, contains('sendPushToUsers'));
     expect(users, contains("router.post('/push-token'"));
     expect(users, contains("router.delete('/push-token'"));
   });

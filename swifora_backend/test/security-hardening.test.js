@@ -136,7 +136,9 @@ test('customer phone is not broadcast in new-order socket payloads', () => {
 
   assert.doesNotMatch(orders, /phone:\s*orderPhone/);
   assert.doesNotMatch(offers, /phone:\s*order\.phone/);
-  assert.match(orders, /phoneMasked:\s*maskedPhone\(order\.phone\)/);
+  const announcement = source('src/services/orderAnnouncement.js');
+  assert.doesNotMatch(announcement, /\bphone:\s*value\.phone/);
+  assert.match(announcement, /phoneMasked:\s*maskedPhone\(value\.phone\)/);
 });
 
 test('uploads are served only with safe image extensions and hardened headers', () => {
