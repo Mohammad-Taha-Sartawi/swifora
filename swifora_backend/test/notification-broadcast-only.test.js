@@ -37,8 +37,12 @@ test('resending an order broadcasts it to drivers again', () => {
   const offers = source('src/routes/offers.js');
 
   assert.match(offers, /router\.post\('\/:orderId\/resend'/);
-  assert.match(offers, /emit\('new_order'/);
-  assert.match(offers, /governorate:\$\{order\.governorate\}/);
+  // Resending uses the same announcer as a new order (live event + push).
+  const announcement = source('src/services/orderAnnouncement.js');
+  assert.match(offers, /announceOrderToDrivers\(req\.app\.get\('io'\), order\)/);
+  assert.match(announcement, /emit\('new_order'/);
+  assert.match(announcement, /governorate:\$\{value\.governorate\}/);
+  assert.match(announcement, /sendPushToUsers/);
 });
 
 test('order, offer and report activity creates persisted notifications', () => {

@@ -4,6 +4,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const BroadcastMessage = require('../models/BroadcastMessage');
+const { sendPushToUsers } = require('../services/pushNotifications');
 
 // Broadcast messages stay pinned in the apps' notifications for 72 hours.
 const BROADCAST_PIN_MS = 72 * 60 * 60 * 1000;
@@ -72,6 +73,13 @@ router.post('/:target', async (req, res) => {
         io.to(`user:${u._id}`).emit('broadcast', { title: normalizedTitle, body: normalizedBody });
       }
     }
+
+    // Phones with the app closed or in the background get it as a push.
+    sendPushToUsers(users.map((u) => u._id), {
+      title: normalizedTitle,
+      body: normalizedBody,
+      data: { type: 'broadcast' },
+    }).catch(() => {});
 
     res.json({
       success: true,

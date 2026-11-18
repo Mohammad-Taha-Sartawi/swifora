@@ -34,6 +34,8 @@ const {
   MAX_OFFER_PRICE,
 } = require('../services/offerPricing');
 
+const { announceOrderToDrivers } = require('../services/orderAnnouncement');
+
 const router = express.Router();
 
 async function notifyOfferNotSelected(io, providerId, orderId, price) {
@@ -154,29 +156,8 @@ router.post('/:orderId/resend', auth, requireRole('customer'), orderCreateLimite
   try {
     const order = await lifecycle.resetOrder({ orderId: req.params.orderId, customerId: req.userId });
 
-    const io = req.app.get('io');
-    if (io && order) {
-      const phone = order.phone || '';
-      const payload = {
-        _id: order._id,
-        type: order.type,
-        description: order.description,
-        area: order.area,
-        governorate: order.governorate,
-        governorateLevel: order.governorateLevel,
-        location: order.location,
-        status: order.status,
-        createdAt: order.createdAt,
-        phoneMasked: phone.length > 3 ? `${phone.slice(0, -3)}***` : '***',
-      };
-      const areaRoom = `area:${order.area || ''}`;
-      if (order.governorate) {
-        const governorateRoom = `governorate:${order.governorate}`;
-        io.to(areaRoom).except(governorateRoom).emit('new_order', payload);
-        io.to(governorateRoom).emit('new_order', payload);
-      } else {
-        io.to(areaRoom).emit('new_order', payload);
-      }
+    if (order) {
+      announceOrderToDrivers(req.app.get('io'), order).catch(() => {});
     }
 
     res.json({ success: true, message: 'تم إعادة إرسال الطلب لمزودي الخدمة الآخرين' });

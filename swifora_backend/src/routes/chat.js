@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const ChatMessage = require('../models/ChatMessage');
 const ContactRequest = require('../models/ContactRequest');
 const User = require('../models/User');
+const { sendPushToUser, supportReplyPush } = require('../services/pushNotifications');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 const requireAdminSession = require('../middleware/requireAdminSession');
@@ -484,6 +485,8 @@ router.post('/admin/reply/:userId', async (req, res) => {
         createdAt: msg.createdAt,
       });
     }
+
+    sendPushToUser(rawConversationId, supportReplyPush(text)).catch(() => {});
 
     res.status(201).json(msg.toObject());
   } catch (err) {

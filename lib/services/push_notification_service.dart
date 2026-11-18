@@ -74,8 +74,13 @@ class PushNotificationService {
     }
   }
 
+  /// Push types the open app already shows through its live connection
+  /// (a broadcast opens its own pop-up), so a second message is not shown.
+  static const shownByLiveConnection = {'broadcast'};
+
   @visibleForTesting
   void handleForeground(ForegroundPush push) {
+    if (shownByLiveConnection.contains(push.data['type']?.toString())) return;
     _foregroundController.add(push);
   }
 

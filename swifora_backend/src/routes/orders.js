@@ -24,26 +24,14 @@ const {
 } = require('../services/registrationLocation');
 const {
   canProviderSeeOrder,
-  orderResponderFilter,
 } = require('../services/orderVisibility');
-const { arabicAreaName } = require('../services/locationCatalog');
 const { attachCustomerRatings } = require('../services/customerRatings');
 const {
   createUserNotification,
 } = require('../services/mobileNotifications');
-const {
-  sendPushToUsers,
-} = require('../services/pushNotifications');
+const { announceOrderToDrivers } = require('../services/orderAnnouncement');
 
 const router = express.Router();
-
-function maskedPhone(phone) {
-  const value = String(phone || '');
-
-  return value.length > 3
-    ? `${value.slice(0, -3)}***`
-    : '***';
-}
 
 router.post('/', auth, requireRole('customer'), orderCreateLimiter, orderCreateIpLimiter, async (req, res) => {
   try {
@@ -97,87 +85,8 @@ router.post('/', auth, requireRole('customer'), orderCreateLimiter, orderCreateI
     });
     console.log(`[CREATE] saved order=${order._id} status=${order.status}`);
 
-    // Emit a real-time event to providers who can see this order. A
-    // governorate-level order also reaches providers across the governorate.
-    // Never include the full customer phone in this broadcast.
-    const io = req.app.get('io');
-    if (io) {
-      const {
-        _id,
-        type: orderType,
-        description: orderDescription,
-        area: oArea,
-        governorate: oGovernorate,
-        governorateLevel: oGovernorateLevel,
-        location: oLocation,
-        status,
-        createdAt,
-      } = order.toObject();
-      const payload = {
-        _id,
-        type: orderType,
-        description: orderDescription,
-        area: oArea,
-        governorate: oGovernorate,
-        governorateLevel: oGovernorateLevel,
-        location: oLocation,
-        status,
-        createdAt,
-        phoneMasked: maskedPhone(order.phone),
-      };
-      const areaRoom = `area:${orderArea || ''}`;
-      // Governorate-level drivers sit in the governorate room; reach them
-      // too, without sending the same-village drivers a duplicate.
-      if (orderGovernorate) {
-        const governorateRoom = `governorate:${orderGovernorate}`;
-        io.to(areaRoom).except(governorateRoom).emit('new_order', payload);
-        io.to(governorateRoom).emit('new_order', payload);
-      } else {
-        io.to(areaRoom).emit('new_order', payload);
-      }
-    }
-
-    const pushAnd = [
-      {
-        $or: [
-          { blockedUntil: null },
-          { blockedUntil: { $exists: false } },
-          { blockedUntil: { $lte: new Date() } },
-        ],
-      },
-      {
-        $or: [
-          { serviceTypes: { $exists: false } },
-          { serviceTypes: { $size: 0 } },
-          { serviceTypes: order.type },
-        ],
-      },
-    ];
-    const responderVisibility = orderResponderFilter(order);
-    if (responderVisibility) {
-      pushAnd.push(responderVisibility);
-    }
-    const eligibleDrivers = await User.find({
-      role: 'provider',
-      status: 'active',
-      deleted: { $ne: true },
-      isAvailable: { $ne: false },
-      $and: pushAnd,
-    })
-      .select('_id')
-      .lean();
-
-    sendPushToUsers(
-      eligibleDrivers.map((driver) => driver._id),
-      {
-        title: 'طلب جديد',
-        body: `${order.description || 'طلب جديد'} — ${await arabicAreaName(order.area)}`.trim(),
-        data: {
-          type: 'new_order',
-          orderId: order._id.toString(),
-        },
-      },
-    ).catch(() => {});
+    // Live event for open apps and a push for closed ones.
+    announceOrderToDrivers(req.app.get('io'), order).catch(() => {});
 
     res.status(201).json(order.toObject());
   } catch (err) {

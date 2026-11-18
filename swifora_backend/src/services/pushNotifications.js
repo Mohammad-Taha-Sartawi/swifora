@@ -63,10 +63,19 @@ function stringData(data = {}) {
   );
 }
 
-async function sendPushToTokens(tokens, { title, body, data = {} }) {
+// Firebase accepts at most 500 devices in one multicast call.
+const MAX_TOKENS_PER_CALL = 500;
+
+async function sendPushToTokens(tokens, payload) {
   const app = getFirebaseApp();
   if (!app || !messagingClient || tokens.length === 0) return;
 
+  for (let start = 0; start < tokens.length; start += MAX_TOKENS_PER_CALL) {
+    await sendPushBatch(tokens.slice(start, start + MAX_TOKENS_PER_CALL), payload);
+  }
+}
+
+async function sendPushBatch(tokens, { title, body, data = {} }) {
   const message = {
     tokens,
     notification: { title, body },
@@ -131,6 +140,16 @@ async function sendPushToUsers(userIds, payload) {
   await sendPushToTokens(tokens.map((row) => row.token), payload);
 }
 
+/** Push for a support-team reply; the text is shortened for the tray. */
+function supportReplyPush(text) {
+  const value = String(text || '').trim();
+  return {
+    title: 'رد من فريق الدعم',
+    body: value.length > 180 ? `${value.slice(0, 177)}...` : value,
+    data: { type: 'support_reply' },
+  };
+}
+
 /** Test seam: replace the FCM client (and mark Firebase as ready). */
 function setMessagingClientForTesting(client) {
   messagingClient = client;
@@ -142,5 +161,6 @@ module.exports = {
   sendPushToUser,
   sendPushToUsers,
   sendPushToTokens,
+  supportReplyPush,
   setMessagingClientForTesting,
 };

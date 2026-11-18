@@ -9,6 +9,8 @@ const Offer = require('../models/Offer');
 const RejectedOrder = require('../models/RejectedOrder');
 const User = require('../models/User');
 const lifecycle = require('../services/orderLifecycle');
+const { announceOrderToDrivers } = require('../services/orderAnnouncement');
+const { createUserNotification } = require('../services/mobileNotifications');
 
 const router = express.Router();
 
@@ -103,7 +105,7 @@ router.post('/:id/cancel', async (req, res) => {
     }
 
     const order = await Order.findById(req.params.id)
-      .select('status providerId')
+      .select('status providerId customerId description')
       .lean();
 
     if (!order) {
@@ -140,6 +142,31 @@ router.post('/:id/cancel', async (req, res) => {
       );
     }
 
+    // Tell the customer and the assigned driver (in the app and by push).
+    const io = req.app.get('io');
+    const what = order.description ? `«${String(order.description).slice(0, 80)}»` : '';
+    const notices = [
+      createUserNotification({
+        io,
+        userId: order.customerId,
+        orderId: order._id,
+        type: 'order_cancelled',
+        title: 'تم إلغاء طلبك',
+        body: `ألغت إدارة سويفورا طلبك ${what}. للاستفسار تواصل مع الدعم.`.replace(/s+./, '.'),
+      }),
+    ];
+    if (order.providerId) {
+      notices.push(createUserNotification({
+        io,
+        userId: order.providerId,
+        orderId: order._id,
+        type: 'order_cancelled',
+        title: 'تم إلغاء طلب',
+        body: `ألغت إدارة سويفورا الطلب ${what}. لا حاجة لتوصيله.`.replace(/s+./, '.'),
+      }));
+    }
+    await Promise.allSettled(notices);
+
     res.json({ success: true, message: 'تم إلغاء الطلب' });
   } catch (err) {
     sendInternalServerFailure(res);
@@ -160,10 +187,13 @@ router.post('/:id/resend', async (req, res) => {
       return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
     }
 
-    await lifecycle.resetOrder({
+    const resent = await lifecycle.resetOrder({
       orderId: order._id,
       customerId: order.customerId,
     });
+
+    // Same as a new order: live in open apps, push to closed ones.
+    announceOrderToDrivers(req.app.get('io'), resent).catch(() => {});
 
     res.json({ success: true, message: 'تم إعادة إرسال الطلب للسائقين' });
   } catch (err) {

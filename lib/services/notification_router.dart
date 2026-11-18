@@ -7,6 +7,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/order_detail_screen.dart';
 import '../screens/order_offers_screen.dart';
 import '../screens/rejected_orders_screen.dart';
+import '../screens/support_chat_screen.dart';
 
 /// Screen to open for a notification, shared by the in-app notifications
 /// list and push-notification taps so both behave the same.
@@ -59,19 +60,28 @@ abstract final class NotificationRouter {
     return null;
   }
 
-  /// Opens the screen for a tapped push notification. Notifications without
-  /// an order screen (broadcasts, report replies, …) open the notifications
-  /// list, where the full text is shown.
-  static Future<void> openFromPush(
-    BuildContext context, {
+  /// The screen for a tapped push notification. A support-team reply opens
+  /// the support chat; notifications without an order screen (broadcasts,
+  /// report replies, …) open the notifications list, where the full text is
+  /// shown.
+  static Widget pushPageFor({
     required Map<String, dynamic> data,
     required String token,
   }) {
     final type = (data['type'] ?? '').toString();
     final orderId = (data['orderId'] ?? '').toString();
-    final page =
-        pageFor(type: type, orderId: orderId, token: token) ??
+    if (type == 'support_reply') return SupportChatScreen(token: token);
+    return pageFor(type: type, orderId: orderId, token: token) ??
         NotificationsScreen(token: token);
+  }
+
+  /// Opens the screen for a tapped push notification ([pushPageFor]).
+  static Future<void> openFromPush(
+    BuildContext context, {
+    required Map<String, dynamic> data,
+    required String token,
+  }) {
+    final page = pushPageFor(data: data, token: token);
     return Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 }

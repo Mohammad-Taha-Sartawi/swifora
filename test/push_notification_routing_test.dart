@@ -1,10 +1,13 @@
 // Push notification taps and foreground pushes (no Firebase needed: the
 // service's handlers are exercised directly).
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:swifora/screens/my_orders_screen.dart';
+import 'package:swifora/screens/notifications_screen.dart';
 import 'package:swifora/screens/order_detail_screen.dart';
 import 'package:swifora/screens/rejected_orders_screen.dart';
+import 'package:swifora/screens/support_chat_screen.dart';
 import 'package:swifora/services/notification_router.dart';
 import 'package:swifora/services/push_notification_service.dart';
 
@@ -83,5 +86,49 @@ void main() {
       expect(received.single.title, 'عرض جديد');
       await sub.cancel();
     });
+
+    test(
+      'a broadcast push in the open app is left to the pop-up (no duplicate)',
+      () async {
+        final received = <ForegroundPush>[];
+        final sub = service.onForeground.listen(received.add);
+        service.handleForeground(
+          const ForegroundPush(
+            title: 'رسالة الإدارة',
+            body: 'نص',
+            data: {'type': 'broadcast'},
+          ),
+        );
+        service.handleForeground(
+          const ForegroundPush(
+            title: 'رد من فريق الدعم',
+            body: 'أهلاً',
+            data: {'type': 'support_reply'},
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(received.map((push) => push.title), ['رد من فريق الدعم']);
+        await sub.cancel();
+      },
+    );
+  });
+
+  test('tapped pushes: support reply opens the support chat', () {
+    Widget page(Map<String, dynamic> data) =>
+        NotificationRouter.pushPageFor(data: data, token: 't');
+
+    expect(page({'type': 'support_reply'}), isA<SupportChatScreen>());
+    expect(
+      page({'type': 'new_order', 'orderId': 'o1'}),
+      isA<OrderDetailScreen>(),
+    );
+    // Broadcasts, account notices and cancelled orders show their full text
+    // in the notifications list.
+    for (final data in [
+      {'type': 'broadcast'},
+      {'type': 'order_cancelled', 'orderId': 'o1'},
+    ]) {
+      expect(page(data), isA<NotificationsScreen>(), reason: '$data');
+    }
   });
 }

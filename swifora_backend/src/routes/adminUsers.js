@@ -11,6 +11,7 @@ const {
 const Order = require('../models/Order');
 const { customerRatingSummaries } = require('../services/customerRatings');
 const Notification = require('../models/Notification');
+const { sendPushToUser } = require('../services/pushNotifications');
 const {
   MIN_MOBILE_PASSWORD_LENGTH,
   MAX_MOBILE_PASSWORD_LENGTH,
@@ -328,6 +329,12 @@ router.put('/:id/status', async (req, res) => {
               body: 'تم تجميد حسابك بسبب كثرة البلاغات. يرجى التواصل مع فريق الدعم.',
               expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
             });
+            // Reaches the phone even when the app is closed.
+            sendPushToUser(user._id, {
+              title: 'تم تجميد حسابك',
+              body: 'تم تجميد حسابك بسبب كثرة البلاغات. يرجى التواصل مع فريق الدعم.',
+              data: { type: 'broadcast' },
+            }).catch(() => {});
 
             io.to(`user:${user._id}`).emit(
               'notification_count',
@@ -346,6 +353,12 @@ router.put('/:id/status', async (req, res) => {
               body: 'مبروك! تم إعادة تفعيل حسابك بنجاح. يمكنك الآن استخدام التطبيق بشكل طبيعي.',
               expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
             });
+            // Reaches the phone even when the app is closed.
+            sendPushToUser(user._id, {
+              title: 'تم تفعيل حسابك',
+              body: 'مبروك! تم إعادة تفعيل حسابك بنجاح. يمكنك الآن استخدام التطبيق بشكل طبيعي.',
+              data: { type: 'broadcast' },
+            }).catch(() => {});
 
             io.to(`user:${user._id}`).emit(
               'notification_count',
