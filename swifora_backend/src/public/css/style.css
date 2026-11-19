@@ -544,6 +544,7 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
 .search-box select:focus { border-color: #00d4ff; box-shadow: 0 0 0 3px #00d4ff33; }
 .orders-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .orders-table th { background: #141a24; color: #00d4ff; padding: 12px 10px; text-align: right; border-bottom: 1px solid #2a3546; white-space: nowrap; }
+.time-cell { direction: ltr; unicode-bidi: isolate; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .orders-table td { padding: 12px 10px; border-bottom: 1px solid #1e2733; color: #dfe7f1; vertical-align: top; }
 .orders-table tr:last-child td { border-bottom: none; }
 .orders-table .order-actions { display: flex; gap: 6px; flex-wrap: wrap; }

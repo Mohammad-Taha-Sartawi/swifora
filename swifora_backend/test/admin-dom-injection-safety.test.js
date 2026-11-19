@@ -155,7 +155,7 @@ test('commission and area HTML builders encode displayed database values', () =>
 
 test('report table builders encode reporter, category, ids, dates, and preview content', () => {
   const hardenedPrefix =
-    'rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td>';
+    'rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.createdAt || report.date))}</td>${timeCell(report.createdAt)}';
 
   assert.equal(
     source.split(
@@ -172,6 +172,20 @@ test('report table builders encode reporter, category, ids, dates, and preview c
   );
 });
 
+test('the time column of every table is encoded', () => {
+  assert.ok(
+    source.includes("return `<td class=\"time-cell\">${escapeHtml(formatDisplayTime(value) || '—')}</td>`;"),
+    'timeCell encodes its text',
+  );
+  for (const marker of [
+    '${timeCell(request.requestedAt)}',
+    '${timeCell(order.createdAt)}',
+    '+ timeCell(provider.createdAt)',
+  ]) {
+    assert.ok(source.includes(marker), marker);
+  }
+});
+
 test('documents, financial rows, orders, broadcast, and pending providers encode visible text', () => {
   for (const marker of [
     '${escapeHtml(completionText)}',
@@ -183,11 +197,11 @@ test('documents, financial rows, orders, broadcast, and pending providers encode
     '${escapeHtml(documentStatusText)}',
     '${escapeHtml(t.id.slice(-8))}',
     '${escapeHtml(t.desc)}',
-    '${escapeHtml(formatDisplayDate(t.date))}',
+    '${escapeHtml(formatDisplayDate(t.at || t.date))}</td>${timeCell(t.at)}',
     '${escapeHtml(t.amount)}',
     '${escapeHtml(o.orderId)}',
     '${escapeHtml(o.type)}',
-    '${escapeHtml(formatDisplayDate(o.date))}',
+    '${escapeHtml(formatDisplayDate(o.at || o.date))}</td>${timeCell(o.at)}',
     '${escapeHtml(o.status)}',
     '${escapeHtml(o.amount)}',
     '${escapeHtml(data.count)}',

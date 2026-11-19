@@ -129,6 +129,7 @@ router.get('/search', async (req, res) => {
         orderId: o._id.toString().slice(-8),
         type: o.type || 'غير محدد',
         date: o.createdAt ? o.createdAt.toISOString().split('T')[0] : 'غير محدد',
+        at: o.createdAt || null,
         status: o.status,
         amount: o.price || 0,
         driver: o.providerId?.toString() || 'غير محدد',
