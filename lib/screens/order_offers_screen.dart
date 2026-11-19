@@ -37,6 +37,7 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
   Timer? _offerTimer;
   StreamSubscription? _newOfferSub;
   StreamSubscription? _offerCancelledSub;
+  StreamSubscription? _offerWithdrawnSub;
   bool _cancelRequested = false;
   bool _resendRequested = false;
   // Set while an accept request is on its way; blocks a second tap.
@@ -66,6 +67,18 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
           LoadOffersEvent(token: widget.token, orderId: widget.orderId),
         );
       }
+    });
+    _offerWithdrawnSub = SocketService.instance.onOfferWithdrawn.listen((data) {
+      if (!mounted) return;
+      if (data['orderId']?.toString() != widget.orderId) return;
+      context.read<OfferBloc>().add(
+        LoadOffersEvent(token: widget.token, orderId: widget.orderId),
+      );
+      _loadOrderWindowState();
+      AppFeedback.info(
+        context,
+        AppLocalization.get(context, 'offer_withdrawn_by_driver'),
+      );
     });
     _offerCancelledSub = SocketService.instance.onOfferCancelled.listen((data) {
       if (!mounted) return;
@@ -118,6 +131,7 @@ class _OrderOffersScreenState extends State<OrderOffersScreen>
     _offerTimer?.cancel();
     _newOfferSub?.cancel();
     _offerCancelledSub?.cancel();
+    _offerWithdrawnSub?.cancel();
     super.dispose();
   }
 

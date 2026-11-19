@@ -1326,6 +1326,30 @@ class AppLocalization {
     // Offered orders
     'no_offered_orders': {'ar': 'لا توجد طلبات', 'en': 'No orders'},
     'awaiting_response': {'ar': 'بانتظار الرد', 'en': 'Awaiting Response'},
+    'withdraw_offer': {'ar': 'إلغاء عرض السعر', 'en': 'Withdraw offer'},
+    'withdraw_offer_confirm_title': {
+      'ar': 'إلغاء عرض السعر؟',
+      'en': 'Withdraw your offer?',
+    },
+    'withdraw_offer_confirm': {
+      'ar':
+          'سيختفي عرضك عند الزبون، ويعود الطلب إلى قائمة الطلبات الجديدة، فتستطيع تقديم عرض جديد إن أردت.',
+      'en':
+          'The customer will no longer see your offer. The order goes back to your new orders, where you can send a new offer.',
+    },
+    'withdraw_offer_done': {
+      'ar': 'تم إلغاء عرض السعر. الطلب عاد إلى الطلبات الجديدة.',
+      'en': 'Offer withdrawn. The order is back in your new orders.',
+    },
+    'withdraw_offer_gone': {
+      'ar': 'لم يعد بالإمكان إلغاء عرض السعر هذا: قُبل أو انتهت مدته.',
+      'en':
+          'This offer can no longer be withdrawn: it was accepted or has expired.',
+    },
+    'offer_withdrawn_by_driver': {
+      'ar': 'ألغى أحد السائقين عرض السعر الذي قدّمه.',
+      'en': 'A driver withdrew their price offer.',
+    },
 
     // Contact form
     'name_field': {'ar': 'الاسم', 'en': 'Name'},

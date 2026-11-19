@@ -17,6 +17,8 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _offerCancelledController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _offerWithdrawnController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _providerProfileUpdatedController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _orderStatusController =
@@ -71,6 +73,10 @@ class SocketService {
       _offerNotSelectedController.stream;
   Stream<Map<String, dynamic>> get onOfferCancelled =>
       _offerCancelledController.stream;
+
+  /// A driver took back their price offer (the customer's side).
+  Stream<Map<String, dynamic>> get onOfferWithdrawn =>
+      _offerWithdrawnController.stream;
   Stream<Map<String, dynamic>> get onProviderProfileUpdated =>
       _providerProfileUpdatedController.stream;
   Stream<Map<String, dynamic>> get onOrderStatusChanged =>
@@ -185,6 +191,12 @@ class SocketService {
       }
     });
 
+    _socket!.on('offer_withdrawn', (data) {
+      if (data is Map) {
+        _offerWithdrawnController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
     _socket!.on('provider_profile_updated', (data) {
       if (data is Map) {
         _providerProfileUpdatedController.add(Map<String, dynamic>.from(data));
@@ -255,6 +267,7 @@ class SocketService {
     _offerAcceptedController.close();
     _offerNotSelectedController.close();
     _offerCancelledController.close();
+    _offerWithdrawnController.close();
     _providerProfileUpdatedController.close();
     _orderStatusController.close();
     _deliveryConfirmationRequestedController.close();

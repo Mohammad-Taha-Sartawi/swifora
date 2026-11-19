@@ -375,6 +375,27 @@ router.post('/orders/:orderId/reject', async (req, res) => {
   }
 });
 
+// The driver takes back a price offer the customer has not answered yet.
+// The order returns to the driver's open orders, where they may offer again.
+router.post('/orders/:orderId/withdraw-offer', async (req, res) => {
+  try {
+    const result = await lifecycle.withdrawOffer({ orderId: req.params.orderId, providerId: req.userId });
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${result.customerId}`).emit('offer_withdrawn', {
+        orderId: result.orderId,
+        offerId: result.offerId,
+        orderStatus: result.orderStatus,
+      });
+    }
+    return res.json({ success: true, orderStatus: result.orderStatus });
+  } catch (err) {
+    if (err instanceof lifecycle.LifecycleConflict) return res.status(409).json(lifecycle.conflictResponse(err));
+    if (lifecycle.isTransactionUnavailable(err)) return res.status(503).json({ error: 'Order service is temporarily unavailable' });
+    return sendInternalServerError(res);
+  }
+});
+
 router.get('/rejected-orders', async (req, res) => {
   try {
     const [rejections, deliveredOrders, notSelectedOffers] = await Promise.all([

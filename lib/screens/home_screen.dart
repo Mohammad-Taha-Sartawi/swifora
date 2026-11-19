@@ -74,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen>
   StreamSubscription? _newOfferSub;
   StreamSubscription? _deliveryConfirmationSub;
   StreamSubscription? _offerCancelledSub;
+  StreamSubscription? _offerWithdrawnSub;
   StreamSubscription? _socketConnectedSub;
   StreamSubscription? _orderStatusSub;
   StreamSubscription? _offerAcceptedSub;
@@ -176,6 +177,10 @@ class _HomeScreenState extends State<HomeScreen>
           );
           unawaited(_openDeliveryConfirmation());
         });
+
+    _offerWithdrawnSub = SocketService.instance.onOfferWithdrawn.listen((_) {
+      if (mounted) _loadOrderCounts();
+    });
 
     _offerCancelledSub = SocketService.instance.onOfferCancelled.listen((data) {
       if (!mounted) return;
@@ -499,6 +504,7 @@ class _HomeScreenState extends State<HomeScreen>
     _newOfferSub?.cancel();
     _deliveryConfirmationSub?.cancel();
     _offerCancelledSub?.cancel();
+    _offerWithdrawnSub?.cancel();
     _socketConnectedSub?.cancel();
     _orderStatusSub?.cancel();
     _offerAcceptedSub?.cancel();
