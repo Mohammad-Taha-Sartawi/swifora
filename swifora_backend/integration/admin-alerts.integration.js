@@ -13,6 +13,8 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'swifora-integration-jwt-secret-2026-11-alerts';
 process.env.SESSION_SECRET = 'swifora-integration-session-secret-2026-11-alerts';
 process.env.PASSWORD_RECOVERY_SECRET = 'swifora-integration-recovery-secret-2026-11-alerts';
+// Test addresses use example.test, which has no mail server.
+process.env.EMAIL_DOMAIN_CHECK = 'off';
 process.env.WEB_PUSH_VAPID_PUBLIC_KEY = 'BTestPublicKeyForIntegrationOnly_abcdefghijklmnopqrstuvwxyz0123456789';
 process.env.WEB_PUSH_VAPID_PRIVATE_KEY = 'test-private-key-integration-only';
 
