@@ -7,6 +7,7 @@ const ChatMessage = require('../models/ChatMessage');
 const ContactRequest = require('../models/ContactRequest');
 const User = require('../models/User');
 const { sendPushToUser, supportReplyPush } = require('../services/pushNotifications');
+const { alertAdmins } = require('../services/adminAlerts');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 const requireAdminSession = require('../middleware/requireAdminSession');
@@ -120,6 +121,7 @@ router.post('/send', auth, requireRole('customer', 'provider'), chatSendLimiter,
       sender: 'user',
       text,
     });
+    alertAdmins('support');
 
     await ChatMessage.updateMany(
       {
@@ -506,6 +508,7 @@ router.post('/contact', publicContactLimiter, async (req, res) => {
     });
     const conversationId = contactConversationId(contact._id);
     const formattedText = formatContactMessage(contact);
+    alertAdmins('support');
 
     const io = req.app.get('io');
 
@@ -579,6 +582,7 @@ router.post('/contact/:id/messages', guestFollowUpLimiter, async (req, res) => {
     contact.resolvedAt = null;
     await contact.save();
     const saved = contact.messages[contact.messages.length - 1];
+    alertAdmins('support');
 
     const io = req.app.get('io');
     if (io) {

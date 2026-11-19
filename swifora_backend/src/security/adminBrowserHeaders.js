@@ -94,7 +94,7 @@ function createAdminBrowserHeaders() {
           "'none'",
         ],
         workerSrc: [
-          "'none'",
+          "'self'",
         ],
       },
     },

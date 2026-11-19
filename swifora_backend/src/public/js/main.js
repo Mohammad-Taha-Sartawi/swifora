@@ -239,6 +239,528 @@ function switchPage(pageId) {
   else pages.dashboard.classList.add('active-page');
 }
 
+// ================================================
+// Alerts: a new support message, driver sign-up, report or deletion
+// request shows in the tab title and icon, on the installed app's icon,
+// with a short sound and, when allowed, as a notification on this device.
+// The choices are kept per device. While the dashboard is closed the
+// server sends the notification (Web Push, /admin/push, admin-sw.js).
+// ================================================
+const ALERT_SOURCES = [
+  { badge: 'chatBadge', text: 'رسالة دعم جديدة', page: 'support-chat' },
+  { badge: 'pendingBadge', text: 'سائق جديد ينتظر الموافقة', page: 'pending-providers' },
+  { badge: 'driverReportsBadge', text: 'بلاغ جديد عن سائق', page: 'driver-reports' },
+  { badge: 'userReportsBadge', text: 'بلاغ جديد عن زبون', page: 'user-reports' },
+  { badge: 'deletionRequestsBadge', text: 'طلب حذف حساب جديد', page: 'deletion-requests' },
+];
+const ALERT_SETTINGS_KEY = 'swifora.admin.alerts';
+const ALERT_SOUND_GAP_MS = 3000;
+// Counts read before the first data load finishes are the starting point,
+// not news; after this long alerts start anyway.
+const ALERT_ARM_FALLBACK_MS = 15000;
+
+const adminAlertState = {
+  baseTitle: document.title,
+  counts: new Map(),
+  total: 0,
+  armed: false,
+  ready: new Set(),
+  flashTimer: null,
+  flashOn: false,
+  flashText: '',
+  iconLink: null,
+  iconHref: '',
+  iconImage: null,
+  audio: null,
+  lastSoundAt: 0,
+  registration: null,
+  pushConfig: null,
+  pushActive: false,
+  scheduled: false,
+};
+
+function readAlertSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ALERT_SETTINGS_KEY) || '{}') || {};
+    return { sound: raw.sound !== false, notify: raw.notify === true };
+  } catch (_) {
+    return { sound: true, notify: false };
+  }
+}
+
+function saveAlertSettings(settings) {
+  try {
+    localStorage.setItem(ALERT_SETTINGS_KEY, JSON.stringify(settings));
+  } catch (_) {}
+}
+
+function alertBadgeCount(badge) {
+  if (!badge || badge.classList.contains('csp-hidden')) return 0;
+  if (getComputedStyle(badge).display === 'none') return 0;
+  return Math.max(0, Number(badge.textContent) || 0);
+}
+
+/** The page title without the alert count (set by updatePageTitle). */
+function setBaseDocumentTitle(title) {
+  adminAlertState.baseTitle = title;
+  renderAlertTitle();
+}
+
+function renderAlertTitle() {
+  const { baseTitle, total, flashOn, flashText } = adminAlertState;
+  if (flashOn && flashText) document.title = `● ${flashText}`;
+  else document.title = total > 0 ? `(${total}) ${baseTitle}` : baseTitle;
+}
+
+function startTitleFlash(text) {
+  adminAlertState.flashText = text;
+  if (adminAlertState.flashTimer) return;
+  adminAlertState.flashTimer = setInterval(() => {
+    adminAlertState.flashOn = !adminAlertState.flashOn;
+    renderAlertTitle();
+  }, 1500);
+}
+
+function stopTitleFlash() {
+  clearInterval(adminAlertState.flashTimer);
+  adminAlertState.flashTimer = null;
+  adminAlertState.flashOn = false;
+  adminAlertState.flashText = '';
+  renderAlertTitle();
+}
+
+function renderAlertIcon() {
+  const state = adminAlertState;
+  if (!state.iconLink) {
+    state.iconLink = document.querySelector('link[rel="icon"]');
+    state.iconHref = state.iconLink ? state.iconLink.href : '';
+  }
+  const link = state.iconLink;
+  if (!link) return;
+  if (state.total <= 0) {
+    link.href = state.iconHref;
+    return;
+  }
+  const draw = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(state.iconImage, 0, 0, 64, 64);
+    ctx.beginPath();
+    ctx.arc(44, 20, 20, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#0b0e14';
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(state.total > 9 ? '9+' : String(state.total), 44, 21);
+    link.href = canvas.toDataURL('image/png');
+  };
+  if (state.iconImage && state.iconImage.complete) {
+    draw();
+    return;
+  }
+  if (!state.iconImage) {
+    state.iconImage = new Image();
+    state.iconImage.addEventListener('load', () => renderAlertIcon());
+    state.iconImage.src = state.iconHref || '/icons/icon-192.png';
+  }
+}
+
+function renderAppBadge() {
+  try {
+    if (adminAlertState.total > 0 && navigator.setAppBadge) {
+      navigator.setAppBadge(adminAlertState.total).catch(() => {});
+    } else if (navigator.clearAppBadge) {
+      navigator.clearAppBadge().catch(() => {});
+    }
+  } catch (_) {}
+}
+
+function renderAlertBell() {
+  const count = document.getElementById('alertsToggleCount');
+  if (!count) return;
+  count.textContent = adminAlertState.total > 99 ? '99+' : String(adminAlertState.total);
+  count.hidden = adminAlertState.total <= 0;
+}
+
+function alertAudioContext() {
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) return null;
+  if (!adminAlertState.audio) adminAlertState.audio = new Context();
+  return adminAlertState.audio;
+}
+
+/** A short two-note chime (no sound file needed). */
+function playAlertSound({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - adminAlertState.lastSoundAt < ALERT_SOUND_GAP_MS) return;
+  adminAlertState.lastSoundAt = now;
+  try {
+    const ctx = alertAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const start = ctx.currentTime + 0.02;
+    [[880, 0], [1318.5, 0.17]].forEach(([frequency, offset]) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, start + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, start + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.4);
+      oscillator.connect(gain).connect(ctx.destination);
+      oscillator.start(start + offset);
+      oscillator.stop(start + offset + 0.45);
+    });
+  } catch (_) {}
+}
+
+function showLocalAlertNotification(source, { body = 'اضغط لفتح الصفحة.' } = {}) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const options = {
+    body,
+    tag: `swifora-admin-${source.page}`,
+    renotify: true,
+    icon: '/icons/icon-192.png',
+    lang: 'ar',
+    dir: 'rtl',
+    data: { page: source.page },
+  };
+  if (adminAlertState.registration) {
+    adminAlertState.registration.showNotification(source.text, options).catch(() => {});
+    return;
+  }
+  try {
+    const notification = new Notification(source.text, options);
+    notification.addEventListener('click', () => {
+      window.focus();
+      navigateTo(source.page);
+      notification.close();
+    });
+  } catch (_) {}
+}
+
+function announceAlerts(fresh) {
+  const settings = readAlertSettings();
+  const away = document.hidden || !document.hasFocus();
+  if (settings.sound) playAlertSound();
+  if (away) startTitleFlash(fresh[0].text);
+  // With Web Push on this device the server's notification arrives instead.
+  if (settings.notify && away && !adminAlertState.pushActive) {
+    fresh.forEach((source) => showLocalAlertNotification(source));
+  }
+}
+
+function checkAlertBadges() {
+  adminAlertState.scheduled = false;
+  const fresh = [];
+  let total = 0;
+  ALERT_SOURCES.forEach((source) => {
+    const count = alertBadgeCount(document.getElementById(source.badge));
+    const before = adminAlertState.counts.get(source.badge);
+    if (adminAlertState.armed && before !== undefined && count > before) fresh.push(source);
+    adminAlertState.counts.set(source.badge, count);
+    total += count;
+  });
+  adminAlertState.total = total;
+  renderAlertTitle();
+  renderAlertIcon();
+  renderAppBadge();
+  renderAlertBell();
+  if (fresh.length) announceAlerts(fresh);
+}
+
+function scheduleAlertCheck() {
+  if (adminAlertState.scheduled) return;
+  adminAlertState.scheduled = true;
+  setTimeout(checkAlertBadges, 60);
+}
+
+/** Called once the first stats ('stats') and chat ('chat') loads are done. */
+function adminAlertsReady(part) {
+  adminAlertState.ready.add(part);
+  if (adminAlertState.ready.has('stats') && adminAlertState.ready.has('chat')) {
+    setTimeout(() => {
+      checkAlertBadges();
+      adminAlertState.armed = true;
+    }, 100);
+  }
+}
+
+function base64UrlToBytes(value) {
+  const padded = value + '='.repeat((4 - (value.length % 4)) % 4);
+  const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+function isAppleMobile() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isInstalledApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+async function loadPushConfig() {
+  if (adminAlertState.pushConfig) return adminAlertState.pushConfig;
+  try {
+    const res = await adminFetch('/admin/push/config');
+    const data = await res.json();
+    adminAlertState.pushConfig = {
+      enabled: data.enabled === true && typeof data.publicKey === 'string' && data.publicKey !== '',
+      publicKey: data.publicKey || '',
+    };
+  } catch (_) {
+    adminAlertState.pushConfig = { enabled: false, publicKey: '' };
+  }
+  return adminAlertState.pushConfig;
+}
+
+/** Subscribes this device to the server's alerts; false when it cannot. */
+async function startPushAlerts() {
+  const registration = adminAlertState.registration;
+  if (!registration || !pushSupported() || Notification.permission !== 'granted') return false;
+  const config = await loadPushConfig();
+  if (!config.enabled) return false;
+  try {
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlToBytes(config.publicKey),
+      });
+    }
+    const res = await adminFetch('/admin/push/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subscription.toJSON()),
+    });
+    adminAlertState.pushActive = res.ok;
+    return res.ok;
+  } catch (_) {
+    adminAlertState.pushActive = false;
+    return false;
+  }
+}
+
+async function stopPushAlerts() {
+  adminAlertState.pushActive = false;
+  const registration = adminAlertState.registration;
+  if (!registration || !pushSupported()) return;
+  try {
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return;
+    await adminFetch('/admin/push/subscriptions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: subscription.endpoint }),
+    }).catch(() => {});
+    await subscription.unsubscribe();
+  } catch (_) {}
+}
+
+function setAlertsStatus(text) {
+  const status = document.getElementById('alertsStatus');
+  if (status) status.textContent = text;
+}
+
+async function describeNotifyState() {
+  const hint = document.getElementById('alertsNotifyHint');
+  if (!hint) return;
+  const config = await loadPushConfig();
+  if (!('Notification' in window)) {
+    hint.textContent = isAppleMobile() && !isInstalledApp()
+      ? 'على iPhone: أضف اللوحة إلى الشاشة الرئيسية أولاً (مشاركة ← إضافة إلى الشاشة الرئيسية).'
+      : 'هذا المتصفح لا يدعم الإشعارات.';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    hint.textContent = 'الإشعارات محظورة لهذا الموقع في إعدادات المتصفح.';
+    return;
+  }
+  hint.textContent = config.enabled && pushSupported()
+    ? 'تصل حتى واللوحة مغلقة.'
+    : 'تظهر ما دامت اللوحة مفتوحة، ولو في الخلفية.';
+}
+
+async function setNotifyEnabled(enabled) {
+  const box = document.getElementById('alertsNotify');
+  const settings = readAlertSettings();
+  if (!enabled) {
+    saveAlertSettings({ ...settings, notify: false });
+    await stopPushAlerts();
+    setAlertsStatus('أُوقفت الإشعارات على هذا الجهاز.');
+    return;
+  }
+  if (!('Notification' in window)) {
+    if (box) box.checked = false;
+    await describeNotifyState();
+    setAlertsStatus('لا يمكن تشغيل الإشعارات في هذا المتصفح.');
+    return;
+  }
+  const permission = Notification.permission === 'granted'
+    ? 'granted'
+    : await Notification.requestPermission();
+  if (permission !== 'granted') {
+    if (box) box.checked = false;
+    saveAlertSettings({ ...settings, notify: false });
+    await describeNotifyState();
+    setAlertsStatus('لم يُسمح بالإشعارات. يمكن السماح بها من إعدادات المتصفح لهذا الموقع.');
+    return;
+  }
+  saveAlertSettings({ ...settings, notify: true });
+  const pushed = await startPushAlerts();
+  await describeNotifyState();
+  setAlertsStatus(pushed
+    ? 'تم. ستصلك الإشعارات على هذا الجهاز حتى واللوحة مغلقة.'
+    : 'تم. ستصلك الإشعارات ما دامت اللوحة مفتوحة.');
+}
+
+async function testAlert() {
+  const settings = readAlertSettings();
+  playAlertSound({ force: true });
+  if (!settings.notify) {
+    setAlertsStatus(settings.sound ? 'هذا صوت التنبيه. شغّل «إشعارات الجهاز» لتجربة الإشعار أيضاً.' : 'الصوت والإشعارات متوقفة على هذا الجهاز.');
+    return;
+  }
+  if (adminAlertState.pushActive) {
+    try {
+      const res = await adminFetch('/admin/push/test', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.sent > 0) {
+        setAlertsStatus('أُرسل إشعار تجريبي إلى أجهزتك.');
+        return;
+      }
+      if (data.throttled) {
+        setAlertsStatus('انتظر قليلاً قبل التجربة مرة أخرى.');
+        return;
+      }
+    } catch (_) {}
+  }
+  showLocalAlertNotification({ text: 'تجربة تنبيه سويفورا', page: 'dashboard' }, { body: 'التنبيهات تعمل على هذا الجهاز.' });
+  setAlertsStatus('ظهر إشعار تجريبي على هذا الجهاز.');
+}
+
+function setUpAlertsPanel() {
+  const toggle = document.getElementById('alertsToggle');
+  const panel = document.getElementById('alertsPanel');
+  const sound = document.getElementById('alertsSound');
+  const notify = document.getElementById('alertsNotify');
+  const test = document.getElementById('alertsTest');
+  if (!toggle || !panel) return;
+
+  const settings = readAlertSettings();
+  if (sound) sound.checked = settings.sound;
+  if (notify) {
+    notify.checked = settings.notify
+      && 'Notification' in window && Notification.permission === 'granted';
+  }
+
+  function setOpen(open) {
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+      setAlertsStatus('');
+      describeNotifyState();
+      (sound || panel).focus();
+    }
+  }
+  toggle.addEventListener('click', () => setOpen(panel.hidden));
+  document.addEventListener('click', (event) => {
+    if (!panel.hidden && !panel.contains(event.target) && !toggle.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !panel.hidden) {
+      setOpen(false);
+      toggle.focus();
+    }
+  });
+  sound?.addEventListener('change', () => {
+    saveAlertSettings({ ...readAlertSettings(), sound: sound.checked });
+    if (sound.checked) playAlertSound({ force: true });
+    setAlertsStatus(sound.checked ? 'سيُسمع صوت عند وصول جديد.' : 'أُوقف الصوت على هذا الجهاز.');
+  });
+  notify?.addEventListener('change', () => {
+    notify.disabled = true;
+    setNotifyEnabled(notify.checked).finally(() => { notify.disabled = false; });
+  });
+  test?.addEventListener('click', () => testAlert());
+}
+
+(function setUpAdminAlerts() {
+  ALERT_SOURCES.forEach((source) => {
+    const badge = document.getElementById(source.badge);
+    if (!badge) return;
+    new MutationObserver(scheduleAlertCheck).observe(badge, {
+      attributes: true, childList: true, characterData: true, subtree: true,
+    });
+  });
+  setTimeout(() => {
+    adminAlertsReady('stats');
+    adminAlertsReady('chat');
+  }, ALERT_ARM_FALLBACK_MS);
+
+  // Browsers allow sound only after the first click or key press.
+  const unlockAudio = () => {
+    const ctx = alertAudioContext();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+  };
+  document.addEventListener('pointerdown', unlockAudio, { once: true });
+  document.addEventListener('keydown', unlockAudio, { once: true });
+
+  const back = () => {
+    if (!document.hidden && document.hasFocus()) stopTitleFlash();
+  };
+  document.addEventListener('visibilitychange', back);
+  window.addEventListener('focus', back);
+
+  setUpAlertsPanel();
+
+  // Signing out stops this device's notifications first.
+  document.querySelector('.sidebar-logout')?.addEventListener('submit', function stopAlertsThenSignOut(event) {
+    if (!adminAlertState.pushActive) return;
+    event.preventDefault();
+    const form = this;
+    const leave = () => form.submit();
+    Promise.race([stopPushAlerts(), new Promise((resolve) => setTimeout(resolve, 2500))]).then(leave, leave);
+  });
+
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type === 'swifora-open-page' && typeof data.page === 'string' && pages[data.page]) {
+      navigateTo(data.page);
+    }
+  });
+  navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin' })
+    .then(async (registration) => {
+      adminAlertState.registration = registration;
+      const settings = readAlertSettings();
+      if (!settings.notify) return;
+      if (!('Notification' in window) || Notification.permission !== 'granted') {
+        saveAlertSettings({ ...settings, notify: false });
+        const box = document.getElementById('alertsNotify');
+        if (box) box.checked = false;
+        return;
+      }
+      // Renews this device's link to the signed-in admin.
+      await startPushAlerts();
+    })
+    .catch(() => {});
+})();
+
 /** The app bar shows the title and subtitle of the page on screen. */
 function updatePageTitle(pageId) {
   const section = pages[pageId] || pages.dashboard;
@@ -254,7 +776,7 @@ function updatePageTitle(pageId) {
     .trim();
   titleEl.textContent = title;
   subtitleEl.textContent = subtitle ? subtitle.textContent.trim() : '';
-  document.title = `${title} — سويفورا`;
+  setBaseDocumentTitle(`${title} — سويفورا`);
 }
 
 function markActiveNavigation(pageId) {
@@ -1756,6 +2278,7 @@ async function loadDashboardStats() {
       pendingBadge.textContent = pendingData.length;
       setInlineDisplay(pendingBadge, pendingData.length > 0);
     } catch (_) {}
+    adminAlertsReady('stats');
 
     const topRes = await adminFetch('/admin/api/top-driver');
     const topData = await topRes.json();
@@ -1763,6 +2286,7 @@ async function loadDashboardStats() {
     document.getElementById('topDriverEarn').textContent =
       (Number(topData.earnings) || 0).toLocaleString('en-US');
   } catch (err) {
+    adminAlertsReady('stats');
     console.error('Error loading stats:', err);
   }
 }
@@ -4717,7 +5241,11 @@ async function loadConversations() {
     conversations = await res.json();
     renderConversations();
     updateSupportBadge();
-  } catch (err) { console.error('Load conversations:', err); }
+    adminAlertsReady('chat');
+  } catch (err) {
+    adminAlertsReady('chat');
+    console.error('Load conversations:', err);
+  }
 }
 
 function updateSupportBadge() {

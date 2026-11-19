@@ -27,6 +27,7 @@ const {
 } = require('../security/locationValidation');
 const { isReservedGuestEmail } = require('../services/contactRequest');
 const { newAccountEmailProblem } = require('../services/emailCheck');
+const { alertAdmins } = require('../services/adminAlerts');
 const {
   normalizeMobileEmail,
   isValidMobileEmail,
@@ -841,6 +842,7 @@ router.post('/deletion-request', deletionRequestLimiter, async (req, res) => {
         email: user.email || '',
         publicId: user.publicId || '',
       });
+      alertAdmins('deletion-request');
     } catch (err) {
       // Two taps at once: the other one created it.
       if (err?.code !== 11000) throw err;

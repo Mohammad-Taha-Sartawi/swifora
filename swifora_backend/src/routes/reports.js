@@ -1,4 +1,5 @@
 const { sendInternalServerError } = require('../security/errorResponse');
+const { alertAdmins } = require('../services/adminAlerts');
 const express = require('express');
 const Report = require('../models/Report');
 const User = require('../models/User');
@@ -63,6 +64,7 @@ router.post('/', reportCreateLimiter, reportCreateIpLimiter, async (req, res) =>
       category: normalizedReportType === 'driver' ? 'الابلاغ عن سائق' : 'الابلاغ عن زبون',
       content,
     });
+    alertAdmins(normalizedReportType === 'driver' ? 'driver-report' : 'user-report');
 
     res.status(201).json({ success: true, report });
   } catch (err) {

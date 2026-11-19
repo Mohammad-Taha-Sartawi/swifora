@@ -59,6 +59,7 @@ const adminBroadcastRoutes = require('./routes/adminBroadcast');
 const adminChatRoutes = require('./routes/adminChat');
 const adminOrderRoutes = require('./routes/adminOrders');
 const adminDeletionRequestRoutes = require('./routes/adminDeletionRequests');
+const adminPushRoutes = require('./routes/adminPush');
 const adminApiRoutes = require('./routes/adminApi');
 const legalRoutes = require('./routes/legal');
 const adminAdRoutes = require('./routes/adminAds');
@@ -580,6 +581,7 @@ app.use('/admin/chat', requireAdminSession, adminCsrfProtection, adminChatRoutes
 app.use('/admin/orders', requireAdminSession, adminCsrfProtection, adminOrderRoutes);
 app.use('/admin/ads', requireAdminSession, adminCsrfProtection, adminAdRoutes);
 app.use('/admin/deletion-requests', requireAdminSession, adminCsrfProtection, adminDeletionRequestRoutes);
+app.use('/admin/push', requireAdminSession, adminCsrfProtection, adminPushRoutes);
 app.use('/admin/api', requireAdminSession, adminCsrfProtection, adminApiRoutes);
 
 app.get('/admin', requireAdminSession, adminCsrfProtection, (req, res) => {

@@ -32,6 +32,17 @@
         <p id="pageSubtitle">التحكم بالعمولات والإحصائيات</p>
       </div>
       <div class="live-clock" aria-hidden="true"><i class="fas fa-clock"></i> <span id="clockDisplay">--:--</span></div>
+      <div class="alerts-control">
+        <button type="button" class="alerts-toggle" id="alertsToggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="alertsPanel" aria-label="التنبيهات"><i class="fas fa-bell" aria-hidden="true"></i><span class="alerts-toggle-count" id="alertsToggleCount" hidden>0</span></button>
+        <div class="alerts-panel" id="alertsPanel" role="dialog" aria-labelledby="alertsPanelTitle" tabindex="-1" hidden>
+          <h2 id="alertsPanelTitle">التنبيهات على هذا الجهاز</h2>
+          <p class="alerts-panel-intro">عند وصول رسالة دعم، أو طلب تسجيل سائق، أو بلاغ، أو طلب حذف حساب.</p>
+          <label class="alerts-option"><input type="checkbox" id="alertsSound"><span><strong>صوت التنبيه</strong><small>نغمة قصيرة عند وصول جديد.</small></span></label>
+          <label class="alerts-option"><input type="checkbox" id="alertsNotify"><span><strong>إشعارات الجهاز</strong><small id="alertsNotifyHint">تظهر ما دامت اللوحة مفتوحة، ولو في الخلفية.</small></span></label>
+          <button type="button" class="alerts-test" id="alertsTest"><i class="fas fa-bell" aria-hidden="true"></i> تجربة التنبيه</button>
+          <p class="alerts-status" id="alertsStatus" role="status" aria-live="polite"></p>
+        </div>
+      </div>
     </header>
 
     <!-- الرئيسية - Dashboard -->

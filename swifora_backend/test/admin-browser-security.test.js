@@ -502,7 +502,7 @@ test('admin Helmet boundary emits strict CSP and existing safe headers', async (
     ],
     [
       'worker-src',
-      ["'none'"],
+      ["'self'"],
     ],
   ]);
 

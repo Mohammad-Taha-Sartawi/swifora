@@ -34,6 +34,7 @@ const {
 } = require('../services/mobileSession');
 const { governorateKey, isValidAreaForGovernorate } = require('../services/registrationLocation');
 const { findActiveAccountByEmail } = require('../services/accountRelease');
+const { alertAdmins } = require('../services/adminAlerts');
 const {
   isGoogleSignInConfigured,
   verifyGoogleIdToken,
@@ -142,6 +143,7 @@ router.post('/register', mobileRegistrationLimiter, async (req, res) => {
         governorate: registrationGovernorate,
         serviceTypes,
       });
+      alertAdmins('pending-driver');
 
       return res.status(201).json({
         pending: true,
@@ -525,6 +527,7 @@ router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
         governorate,
         serviceTypes,
       });
+      alertAdmins('pending-driver');
       return res.status(201).json({
         pending: true,
         message: 'تم تقديم طلب التسجيل بنجاح. حسابك قيد المراجعة من قبل الإدارة.',
