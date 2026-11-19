@@ -735,6 +735,28 @@ body { background: #0b0e14; color: #e5e9f0; display: flex; height: 100vh; overfl
 .app-topbar .live-clock { padding: 8px 16px; font-size: 14px; white-space: nowrap; }
 .app-topbar .nav-toggle { display: none; flex-shrink: 0; }
 
+/* Alerts: bell in the app bar and its settings panel */
+.alerts-control { position: relative; flex-shrink: 0; }
+.alerts-toggle { position: relative; width: 44px; height: 44px; border: 1px solid #2a3546; border-radius: 12px; background: #1e2733; color: #00d4ff; font-size: 19px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.alerts-toggle:hover, .alerts-toggle[aria-expanded="true"] { background: #243042; }
+.alerts-toggle-count { position: absolute; top: -6px; left: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #e74c3c; color: #fff; font-size: 11px; font-weight: 800; line-height: 20px; text-align: center; border: 2px solid #0f141c; }
+.alerts-toggle-count[hidden] { display: none; }
+.alerts-panel { position: absolute; top: calc(100% + 10px); left: 0; z-index: 900; width: min(340px, calc(100vw - 24px)); padding: 16px; border-radius: 16px; border: 1px solid #2a3546; background: #151c27; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); }
+.alerts-panel[hidden] { display: none; }
+.alerts-panel h2 { margin: 0 0 4px; font-size: 16px; font-weight: 800; color: #fff; }
+/* The app bar's one-line title rules do not apply inside the panel. */
+.app-topbar .alerts-panel p { white-space: normal; overflow: visible; text-overflow: clip; }
+.alerts-panel-intro { margin: 0 0 12px; font-size: 13px; color: #8892a8; line-height: 1.6; }
+.alerts-option { display: flex; align-items: flex-start; gap: 12px; padding: 10px 4px; min-height: 44px; border-top: 1px solid #1e2733; cursor: pointer; }
+.alerts-option input { width: 20px; height: 20px; margin: 2px 0 0; flex-shrink: 0; accent-color: #00d4ff; cursor: pointer; }
+.alerts-option span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.alerts-option strong { font-size: 14px; color: #fff; }
+.alerts-option small { font-size: 12px; color: #8892a8; line-height: 1.5; }
+.alerts-test { width: 100%; min-height: 44px; margin-top: 8px; border-radius: 12px; border: 1px solid #2a3546; background: #1e2733; color: #00d4ff; font: inherit; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.alerts-test:hover { background: #243042; }
+.alerts-status { margin: 10px 0 0; font-size: 13px; color: #b8c2d6; line-height: 1.6; }
+.alerts-status:empty { display: none; }
+
 /* Grouped menu */
 .sidebar { padding: 20px 12px; }
 .sidebar .logo { display: flex; align-items: center; gap: 12px; margin: 0 6px 18px; text-align: start; }
