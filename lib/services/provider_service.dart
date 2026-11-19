@@ -78,6 +78,27 @@ class ProviderService {
     }
   }
 
+  /// Takes back this driver's price offer on [orderId]; the order returns
+  /// to the open orders, where a new offer can be sent.
+  Future<void> withdrawOffer(String token, String orderId) async {
+    try {
+      await _dio.post(
+        '/provider/orders/$orderId/withdraw-offer',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['code'] == 'OFFER_NOT_AVAILABLE') {
+        throw const OfferNoLongerOpen();
+      }
+      throw Exception(
+        data is Map
+            ? (data['error'] ?? 'Failed to withdraw offer')
+            : 'Failed to withdraw offer',
+      );
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getRejectedOrders(String token) async {
     try {
       final response = await _dio.get('/provider/rejected-orders',
@@ -137,4 +158,9 @@ class ProviderService {
       throw Exception(e.response?.data?['error'] ?? 'Failed to complete');
     }
   }
+}
+
+/// The offer was already accepted, expired or withdrawn.
+class OfferNoLongerOpen implements Exception {
+  const OfferNoLongerOpen();
 }

@@ -619,6 +619,51 @@ async function submitOffer({ orderId, providerId, price, estimatedTime }) {
   });
 }
 
+/**
+ * The driver takes back their price offer while the customer has not
+ * chosen yet. The offer is removed (not marked rejected), so the order is
+ * back in the driver's open orders and they may offer again. With no other
+ * live offer left, the order returns to "pending" for the customer.
+ */
+async function withdrawOffer({ orderId, providerId }) {
+  return inTransaction(async (session) => {
+    const now = new Date();
+    const live = {
+      status: 'pending',
+      $or: [{ expiresAt: { $gt: now } }, { expiresAt: null }, { expiresAt: { $exists: false } }],
+    };
+    const offer = await Offer.findOne({ orderId, providerId, ...live })
+      .select('_id')
+      .session(session)
+      .lean();
+    if (!offer) throw new LifecycleConflict('OFFER_NOT_AVAILABLE', orderId);
+
+    const order = await Order.findOne({ _id: orderId, status: { $in: ACCEPTABLE_ORDER_STATUSES } })
+      .select('_id customerId')
+      .session(session)
+      .lean();
+    if (!order) throw new LifecycleConflict('ORDER_NOT_AVAILABLE', orderId);
+
+    const removed = await Offer.deleteOne({ _id: offer._id, status: 'pending' }, { session });
+    if (removed.deletedCount !== 1) throw new LifecycleConflict('OFFER_NOT_AVAILABLE', orderId);
+
+    const otherOffer = await Offer.exists({ orderId, ...live }).session(session);
+    if (!otherOffer) {
+      await Order.updateOne(
+        { _id: orderId, status: 'offered' },
+        { $set: { status: 'pending', offerWindowExpiredAt: null, offerSuspendedUntil: null } },
+        { session },
+      );
+    }
+    return {
+      orderId: order._id,
+      customerId: order.customerId,
+      offerId: offer._id,
+      orderStatus: otherOffer ? 'offered' : 'pending',
+    };
+  });
+}
+
 async function resetOrder({ orderId, customerId }) {
   return inTransaction(async (session) => {
     const updated = await Order.findOneAndUpdate({ _id: orderId, customerId, status: { $in: ACCEPTABLE_ORDER_STATUSES } }, {
@@ -788,6 +833,7 @@ module.exports = {
   isTransactionUnavailable,
   acceptOffer,
   submitOffer,
+  withdrawOffer,
   expireStaleOffers,
   suspendIfUnanswered,
   finalizeExpiredOrders,

@@ -20,7 +20,8 @@ const protectedFiles = new Map([
   ['src/routes/notifications.js', 5],
   ['src/routes/offers.js', 5],
   ['src/routes/orders.js', 9],
-  ['src/routes/provider.js', 7],
+  // +1: the driver withdraws a price offer.
+  ['src/routes/provider.js', 8],
   ['src/routes/reports.js', 2],
   // +3: the account deletion request (status, send, withdraw).
   ['src/routes/users.js', 21],
@@ -103,7 +104,7 @@ test('all STARS-009A HTTP 500 sites use the safe helper', () => {
     total += calls.length;
   }
 
-  assert.equal(total, 70);
+  assert.equal(total, 71);
 });
 
 test('controlled non-500 application errors remain intact', () => {

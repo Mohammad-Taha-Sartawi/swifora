@@ -30,6 +30,12 @@ class MockApi {
   /// Trip updates sent by the driver: `/api/orders/<id>/fulfilling|complete`.
   final List<String> tripUpdates = [];
 
+  /// Offers the driver withdrew: `/api/provider/orders/<id>/withdraw-offer`.
+  final List<String> withdrawnOffers = [];
+
+  /// When true, withdrawing answers "the offer is no longer open" (409).
+  bool withdrawConflict = false;
+
   /// Broadcast pop-ups confirmed by the user (`/api/notifications/<id>/ack`).
   final List<String> acknowledgedNotifications = [];
 
@@ -67,6 +73,8 @@ class MockApi {
     activeOrders = [];
     customerOrders = [];
     tripUpdates.clear();
+    withdrawnOffers.clear();
+    withdrawConflict = false;
     acknowledgedNotifications.clear();
     contactCalls.clear();
     contactDelay = Duration.zero;
@@ -140,6 +148,18 @@ class _MockApiAdapter implements HttpClientAdapter {
         data = _api.offeredOrders;
       case '/api/provider/orders':
         data = _api.activeOrders;
+      case final p
+          when p.startsWith('/api/provider/orders/') &&
+              p.endsWith('/withdraw-offer'):
+        final orderId = p.split('/')[4];
+        if (_api.withdrawConflict) {
+          status = 409;
+          data = {'conflict': true, 'code': 'OFFER_NOT_AVAILABLE'};
+        } else {
+          _api.withdrawnOffers.add(orderId);
+          _api.offeredOrders.removeWhere((o) => o['_id'] == orderId);
+          data = {'success': true, 'orderStatus': 'pending'};
+        }
       case final p
           when p.startsWith('/api/notifications/') && p.endsWith('/ack'):
         _api.acknowledgedNotifications.add(p.split('/')[3]);

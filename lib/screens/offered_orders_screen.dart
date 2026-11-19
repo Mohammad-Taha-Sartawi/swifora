@@ -10,6 +10,9 @@ import '../services/localization_service.dart';
 import '../services/provider_service.dart';
 import '../services/responsive.dart';
 import '../services/socket_service.dart';
+import '../services/theme_service.dart';
+import '../widgets/ui/app_button_loading_indicator.dart';
+import '../widgets/ui/app_confirm_dialog.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/app_notification_bell.dart';
 import '../widgets/ui/app_status_chip.dart';
@@ -41,6 +44,7 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
   StreamSubscription? _offerAcceptedSub;
   Timer? _refreshTimer;
   bool _refreshing = false;
+  final Set<String> _withdrawing = {};
 
   @override
   void initState() {
@@ -317,34 +321,8 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
               ],
             ),
             const SizedBox(height: 16),
-            if (description.isNotEmpty) ...[
-              Text(
-                AppLocalization.get(context, 'description'),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    color: scheme.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
+            // Who the order is for comes first, then what, where, and how
+            // to reach them.
             _buildInfoRow(
               context,
               icon: Icons.person_outline,
@@ -395,6 +373,47 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
                 noRatingsKey: 'customer_no_ratings',
               ),
             ),
+            if (description.isNotEmpty) ...[
+              Text(
+                AppLocalization.get(context, 'description'),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            if (area.isNotEmpty)
+              _buildInfoRow(
+                context,
+                icon: Icons.location_on_outlined,
+                label: AppLocalization.get(context, 'area_region'),
+                value: Text(
+                  area,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             _buildInfoRow(
               context,
               icon: Icons.phone_outlined,
@@ -409,24 +428,75 @@ class _OfferedOrdersScreenState extends State<OfferedOrdersScreen>
                 ),
               ),
             ),
-            if (area.isNotEmpty)
-              _buildInfoRow(
-                context,
-                icon: Icons.location_on_outlined,
-                label: AppLocalization.get(context, 'area_region'),
-                value: Text(
-                  area,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
             _buildOfferHighlight(context, scheme, offeredPrice, offeredTime),
+            _buildWithdrawButton(context, scheme, (o['_id'] ?? '').toString()),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildWithdrawButton(
+    BuildContext context,
+    ColorScheme scheme,
+    String orderId,
+  ) {
+    final busy = _withdrawing.contains(orderId);
+    return SizedBox(
+      width: double.infinity,
+      height: AppSizes.buttonHeight,
+      child: OutlinedButton.icon(
+        key: Key('withdrawOffer:$orderId'),
+        onPressed: busy || orderId.isEmpty ? null : () => _withdraw(orderId),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.error,
+          side: BorderSide(color: scheme.error.withValues(alpha: 0.6)),
+        ),
+        icon: busy ? const SizedBox.shrink() : const Icon(Icons.undo),
+        label: busy
+            ? const AppButtonLoadingIndicator()
+            : Text(AppLocalization.get(context, 'withdraw_offer')),
+      ),
+    );
+  }
+
+  Future<void> _withdraw(String orderId) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: AppLocalization.get(context, 'withdraw_offer_confirm_title'),
+      message: AppLocalization.get(context, 'withdraw_offer_confirm'),
+      confirmLabel: AppLocalization.get(context, 'withdraw_offer'),
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _withdrawing.add(orderId));
+    try {
+      await _providerService.withdrawOffer(widget.token, orderId);
+      if (!mounted) return;
+      setState(
+        () => _orders.removeWhere((o) => o['_id']?.toString() == orderId),
+      );
+      AppFeedback.success(
+        context,
+        AppLocalization.get(context, 'withdraw_offer_done'),
+      );
+    } on OfferNoLongerOpen {
+      if (!mounted) return;
+      AppFeedback.warning(
+        context,
+        AppLocalization.get(context, 'withdraw_offer_gone'),
+      );
+      unawaited(_refresh());
+    } catch (_) {
+      if (!mounted) return;
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'something_went_wrong'),
+      );
+    } finally {
+      if (mounted) setState(() => _withdrawing.remove(orderId));
+    }
+    widget.onRefresh?.call();
   }
 
   Widget _buildInfoRow(
