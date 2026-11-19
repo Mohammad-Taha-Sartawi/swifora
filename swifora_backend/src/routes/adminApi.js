@@ -2,6 +2,7 @@ const { sendInternalServerError } = require('../security/errorResponse');
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Admin = require('../models/Admin');
 const Order = require('../models/Order');
 const Report = require('../models/Report');
 const AccountDeletionRequest = require('../models/AccountDeletionRequest');
@@ -234,6 +235,25 @@ router.get('/top-driver', async (req, res) => {
 });
 
 // Driver app: show or hide the "commission due" card.
+// This admin's own display choices (the time format).
+router.get('/preferences', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ timeFormat: req.adminUser?.timeFormat === '24h' ? '24h' : '12h' });
+});
+
+router.put('/preferences', async (req, res) => {
+  try {
+    const timeFormat = req.body?.timeFormat;
+    if (timeFormat !== '12h' && timeFormat !== '24h') {
+      return res.status(400).json({ success: false, message: 'اختر نظام 12 ساعة أو 24 ساعة.' });
+    }
+    await Admin.updateOne({ _id: req.adminUser.id }, { $set: { timeFormat } });
+    return res.json({ success: true, timeFormat });
+  } catch (err) {
+    return sendInternalServerError(res);
+  }
+});
+
 router.get('/driver-display-settings', async (req, res) => {
   try {
     res.json(await getDriverDisplaySettings());

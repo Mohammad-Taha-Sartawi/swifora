@@ -23,7 +23,7 @@ async function loadAdminById(id) {
     status: 'active',
     deleted: { $ne: true },
   })
-    .select('_id email fullName role status deleted sessionVersion')
+    .select('_id email fullName role status deleted sessionVersion timeFormat')
     .lean();
 }
 
@@ -107,6 +107,7 @@ function createRequireAdminSession({
         fullName: admin.fullName || '',
         role: 'admin',
         sessionVersion: admin.sessionVersion,
+        timeFormat: admin.timeFormat === '24h' ? '24h' : '12h',
       };
 
       return next();

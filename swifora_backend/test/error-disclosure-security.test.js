@@ -264,7 +264,8 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
       'src/routes/adminApi.js',
       // +2: driver display settings (commission card) get/put.
       // +2: privacy policy / terms of use get/put.
-      { error: 9, failure: 0 },
+      // +1: the admin's own time format (12/24-hour).
+      { error: 10, failure: 0 },
     ],
     [
       'src/routes/adminAreas.js',
@@ -344,11 +345,11 @@ test('all STARS-009B admin 500 sites preserve their response shapes through safe
     failureTotal += failureCalls.length;
   }
 
-  assert.equal(errorTotal, 28);
+  assert.equal(errorTotal, 29);
   assert.equal(failureTotal, 27);
   assert.equal(
     errorTotal + failureTotal,
-    55,
+    56,
   );
 });
 
