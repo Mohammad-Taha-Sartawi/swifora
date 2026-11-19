@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../bloc/app/app_bloc.dart';
-import '../../bloc/app/app_event.dart';
 import '../../bloc/notification/notification_bloc.dart';
 import '../../bloc/notification/notification_state.dart';
 import '../../screens/notifications_screen.dart';
@@ -99,6 +97,7 @@ Future<void> showSwiforaAccountSheet(
   required String fullName,
   required VoidCallback onProfile,
   required Future<void> Function() onLogout,
+  VoidCallback? onDeleteAccount,
   List<Widget> extraTiles = const [],
 }) {
   return showModalBottomSheet<void>(
@@ -108,9 +107,6 @@ Future<void> showSwiforaAccountSheet(
     builder: (sheetContext) {
       final theme = Theme.of(sheetContext);
       final scheme = theme.colorScheme;
-      final appBloc = context.read<AppBloc>();
-      final isDark = theme.brightness == Brightness.dark;
-      final isAr = Localizations.localeOf(sheetContext).languageCode == 'ar';
 
       Widget tile({
         required IconData icon,
@@ -167,24 +163,9 @@ Future<void> showSwiforaAccountSheet(
                 },
               ),
               ...extraTiles,
+              // Language and appearance are changed in Settings only.
               tile(
-                icon: isDark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
-                label: AppLocalization.get(sheetContext, 'theme'),
-                trailing: AppLocalization.get(
-                  sheetContext,
-                  isDark ? 'theme_day' : 'theme_dark',
-                ),
-                onTap: () => appBloc.add(ToggleTheme()),
-              ),
-              tile(
-                icon: Icons.translate,
-                label: AppLocalization.get(sheetContext, 'language'),
-                trailing: isAr ? 'English' : 'العربية',
-                onTap: () => appBloc.add(ToggleLocale()),
-              ),
-              tile(
+                key: const Key('accountSettings'),
                 icon: Icons.settings_outlined,
                 label: AppLocalization.get(sheetContext, 'settings'),
                 onTap: () {
@@ -213,6 +194,16 @@ Future<void> showSwiforaAccountSheet(
                   LegalDocumentScreen.open(context, LegalService.terms);
                 },
               ),
+              if (onDeleteAccount != null)
+                tile(
+                  key: const Key('accountDeleteAccount'),
+                  icon: Icons.person_remove_outlined,
+                  label: AppLocalization.get(sheetContext, 'delete_account'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onDeleteAccount();
+                  },
+                ),
               const Divider(),
               Tooltip(
                 message: AppLocalization.get(sheetContext, 'logout'),

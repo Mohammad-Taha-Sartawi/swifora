@@ -12,13 +12,13 @@
 
 // Dashboard pages (data-page names) to refresh when a collection changes.
 const COLLECTION_TOPICS = Object.freeze({
-  orders: ['dashboard', 'orders', 'commissions', 'drivers', 'users'],
+  orders: ['dashboard', 'orders', 'commissions', 'drivers', 'users', 'deletion-requests'],
   offers: ['dashboard', 'orders'],
   rejectedorders: ['orders'],
   users: ['dashboard', 'drivers', 'users', 'areas'],
   pendingproviders: ['dashboard', 'pending-providers'],
   reports: ['dashboard', 'driver-reports', 'user-reports'],
-  commissionpayments: ['dashboard', 'commissions', 'drivers'],
+  commissionpayments: ['dashboard', 'commissions', 'drivers', 'deletion-requests'],
   commissionsettings: ['commissions'],
   ratings: ['drivers'],
   customerratings: ['users'],
@@ -26,6 +26,7 @@ const COLLECTION_TOPICS = Object.freeze({
   contactrequests: ['support-chat'],
   broadcastmessages: ['broadcast-drivers', 'broadcast-users'],
   ads: ['ads'],
+  accountdeletionrequests: ['dashboard', 'deletion-requests'],
   adstats: ['ads'],
 });
 

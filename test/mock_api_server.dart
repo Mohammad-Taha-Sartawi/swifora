@@ -24,6 +24,9 @@ class MockApi {
   /// The driver's own orders (accepted / fulfilling), `/api/provider/orders`.
   List<Map<String, dynamic>> activeOrders = [];
 
+  /// The customer's own orders, `GET /api/orders`.
+  List<Map<String, dynamic>> customerOrders = [];
+
   /// Trip updates sent by the driver: `/api/orders/<id>/fulfilling|complete`.
   final List<String> tripUpdates = [];
 
@@ -62,6 +65,7 @@ class MockApi {
     notifications = [];
     availabilityCalls.clear();
     activeOrders = [];
+    customerOrders = [];
     tripUpdates.clear();
     acknowledgedNotifications.clear();
     contactCalls.clear();
@@ -113,17 +117,20 @@ class _MockApiAdapter implements HttpClientAdapter {
       } catch (_) {}
     }
 
-    return _respondFor(options.uri.path, decoded);
+    return _respondFor(options.uri.path, decoded, options.method);
   }
 
   Future<ResponseBody> _respondFor(
     String path,
     Map<String, dynamic>? decoded,
+    String method,
   ) async {
     Object? data;
     int status = 200;
 
     switch (path) {
+      case '/api/orders' when method == 'GET':
+        data = _api.customerOrders;
       case '/api/provider/stats':
         _api.statsRequests++;
         data = _api.statsJson;

@@ -19,6 +19,7 @@ class OrderService {
     String description,
     String phone, {
     String? area,
+    String? governorate,
     String? location,
   }) async {
     try {
@@ -29,6 +30,8 @@ class OrderService {
           'description': description,
           'phone': phone,
           if (area != null) 'area': area,
+          // Only for a customer choosing a place for the first time.
+          'governorate': ?governorate,
           if (location != null) 'location': location,
         },
         options: Options(headers: {'Authorization': 'Bearer $token'}),

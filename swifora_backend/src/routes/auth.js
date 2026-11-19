@@ -32,7 +32,7 @@ const {
   mobileSessionVersion,
   mobileSessionRotationFilter,
 } = require('../services/mobileSession');
-const { governorateKey } = require('../services/registrationLocation');
+const { governorateKey, isValidAreaForGovernorate } = require('../services/registrationLocation');
 const { findActiveAccountByEmail } = require('../services/accountRelease');
 const {
   isGoogleSignInConfigured,
@@ -452,20 +452,35 @@ router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
     }
 
     const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
-    const fullName = text(req.body.fullName, 80) || text(claims.name, 80);
+    const isDriver = claims.role === 'provider';
+    // The name Google gave (or the corrected one); the email's first part
+    // when Google has no usable name.
+    const fullName = personName(req.body.fullName)
+      || personName(claims.name)
+      || personName(String(claims.email || '').split('@')[0])
+      || '';
     const phone = normalizePhoneNumber(text(req.body.phone, 30));
     const governorate = text(req.body.governorate, 100);
     const area = text(req.body.area, 100);
-    const serviceTypes = claims.role === 'provider'
+    const serviceTypes = isDriver
       ? normalizeServiceTypes(req.body.serviceTypes)
       : [];
 
+    // A driver's request goes to admin review with every detail. A customer
+    // goes straight in: phone and place are asked with the first order
+    // (orders.js) and saved then. When a customer does send them, they
+    // must be right.
     const missing = [];
     if (fullName.length < 2) missing.push('fullName');
-    if (!isValidPhoneNumber(phone)) missing.push('phone');
-    if (!governorate) missing.push('governorate');
-    if (!area) missing.push('area');
-    if (claims.role === 'provider' && serviceTypes.length === 0) missing.push('serviceTypes');
+    if (isDriver || phone) {
+      if (!isValidPhoneNumber(phone)) missing.push('phone');
+    }
+    if (isDriver || governorate || area) {
+      if (!governorate) missing.push('governorate');
+      if (!area) missing.push('area');
+      if (governorate && area && !isValidAreaForGovernorate(governorate, area)) missing.push('area');
+    }
+    if (isDriver && serviceTypes.length === 0) missing.push('serviceTypes');
     if (missing.length > 0) {
       return res.status(400).json({
         error: missing.length === 1 && missing[0] === 'phone'
@@ -526,7 +541,7 @@ router.post('/google/complete', mobileRegistrationLimiter, async (req, res) => {
       governorate,
       governorateLevel: false,
       publicId: await generatePublicId(),
-      phoneNumbers: [{ number: cleanPhone, primary: true }],
+      phoneNumbers: cleanPhone ? [{ number: cleanPhone, primary: true }] : [],
       privacyPolicy: true,
     });
     return res.status(201).json(issueMobileSession(user));

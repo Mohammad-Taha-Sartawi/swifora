@@ -8,11 +8,20 @@ const PushToken = require('../models/PushToken');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 const {
+  createActionLimiter,
   locationUpdateLimiter,
   locationUpdateIpLimiter,
   pushTokenLimiter,
   pushTokenIpLimiter,
 } = require('../security/actionRateLimit');
+const AccountDeletionRequest = require('../models/AccountDeletionRequest');
+
+// Sending and withdrawing a deletion request: a few times an hour is plenty.
+const deletionRequestLimiter = createActionLimiter({
+  prefix: 'account-deletion-request',
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+});
 const {
   validateLocationUpdate,
 } = require('../security/locationValidation');
@@ -794,6 +803,67 @@ router.put('/phones/primary', async (req, res) => {
     user.markModified('phoneNumbers');
     await user.save();
     res.json({ phones: user.phoneNumbers });
+  } catch (err) {
+    sendInternalServerError(res);
+  }
+});
+
+// ---- Account deletion request (reviewed in the dashboard) ----
+
+const deletionRequestView = (request) => (request
+  ? { id: request._id.toString(), status: request.status, requestedAt: request.requestedAt }
+  : null);
+
+/** The open request of this account, or null. */
+router.get('/deletion-request', async (req, res) => {
+  try {
+    const request = await AccountDeletionRequest.findOne({ userId: req.userId, status: 'pending' }).lean();
+    res.json({ request: deletionRequestView(request) });
+  } catch (err) {
+    sendInternalServerError(res);
+  }
+});
+
+/** Asks the admins to delete this account (once; sending again is harmless). */
+router.post('/deletion-request', deletionRequestLimiter, async (req, res) => {
+  try {
+    const user = req.authUser || await User.findById(req.userId).lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const existing = await AccountDeletionRequest.findOne({ userId: user._id, status: 'pending' }).lean();
+    if (existing) return res.json({ request: deletionRequestView(existing) });
+
+    let request;
+    try {
+      request = await AccountDeletionRequest.create({
+        userId: user._id,
+        role: user.role,
+        fullName: user.fullName || '',
+        email: user.email || '',
+        publicId: user.publicId || '',
+      });
+    } catch (err) {
+      // Two taps at once: the other one created it.
+      if (err?.code !== 11000) throw err;
+      request = await AccountDeletionRequest.findOne({ userId: user._id, status: 'pending' }).lean();
+    }
+    res.status(201).json({ request: deletionRequestView(request) });
+  } catch (err) {
+    sendInternalServerError(res);
+  }
+});
+
+/** Withdraws the open request; the dashboard then shows it as cancelled. */
+router.delete('/deletion-request', deletionRequestLimiter, async (req, res) => {
+  try {
+    const request = await AccountDeletionRequest.findOneAndUpdate(
+      { userId: req.userId, status: 'pending' },
+      { $set: { status: 'cancelled', cancelledAt: new Date() } },
+      { new: true },
+    ).lean();
+    if (!request) {
+      return res.status(404).json({ error: 'لا يوجد طلب حذف قيد المراجعة.', code: 'NO_DELETION_REQUEST' });
+    }
+    res.json({ request: null });
   } catch (err) {
     sendInternalServerError(res);
   }

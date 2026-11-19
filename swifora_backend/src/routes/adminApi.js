@@ -4,6 +4,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Report = require('../models/Report');
+const AccountDeletionRequest = require('../models/AccountDeletionRequest');
 const CommissionSetting = require('../models/CommissionSetting');
 const mongoose = require('mongoose');
 const LegalDocument = require('../models/LegalDocument');
@@ -179,6 +180,7 @@ router.get('/stats', async (req, res) => {
 
     const driverReportsPending = await Report.countDocuments({ reportType: 'driver', status: { $in: ['in-review', 'in-progress'] } });
     const userReportsPending = await Report.countDocuments({ reportType: 'user', status: { $in: ['in-review', 'in-progress'] } });
+    const deletionRequestsPending = await AccountDeletionRequest.countDocuments({ status: 'pending' });
 
     res.json({
       totalDrivers, activeDrivers, inactiveDrivers,
@@ -193,7 +195,7 @@ router.get('/stats', async (req, res) => {
         day: commissionToday.day,
         timeZone: commissionToday.timeZone,
       },
-      driverReportsPending, userReportsPending,
+      driverReportsPending, userReportsPending, deletionRequestsPending,
       orderTypeCounts,
     });
   } catch (err) {

@@ -1,6 +1,6 @@
 // "Continue with Google" on the sign-in screen: hidden until configured; a
-// driver under review sees that state; someone new completes phone,
-// governorate, city and (drivers) services, and agrees to the terms first.
+// driver under review sees that state; a new driver completes phone,
+// governorate, city and services, and agrees to the terms first.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';

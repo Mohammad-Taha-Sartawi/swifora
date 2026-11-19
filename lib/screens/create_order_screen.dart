@@ -6,6 +6,7 @@ import '../bloc/order/order_state.dart';
 import '../models/user_model.dart';
 import '../services/responsive.dart';
 import '../services/localization_service.dart';
+import '../services/location_catalog.dart';
 import '../services/api_config.dart';
 import '../services/theme_service.dart';
 import '../services/validators.dart';
@@ -13,10 +14,13 @@ import '../widgets/brand/swifora_brand.dart';
 import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
 
-/// M-CREATE-ORDER (owner-approved layout). Submission is unchanged: one
-/// step, the same fields and the same API call. The approved image also
-/// shows a review step and photo attachments; those need separate feature
-/// approval and are not part of this screen yet.
+/// M-CREATE-ORDER (owner-approved layout). Submission is one step. The
+/// approved image also shows a review step and photo attachments; those
+/// need separate feature approval and are not part of this screen yet.
+///
+/// A customer who has not chosen a place yet (signed up with Google) also
+/// picks the governorate and city/village here, once: the order goes to
+/// the drivers there and the place is saved on the account.
 class CreateOrderScreen extends StatefulWidget {
   final UserModel user;
   final String token;
@@ -34,6 +38,72 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   late final _phoneController = TextEditingController(text: widget.user.phone);
   final _locationController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _cityFieldKey = GlobalKey<FormFieldState<String>>();
+
+  List<GovernorateOption> _governorates = [];
+  bool _placeLoading = false;
+  bool _placeFailed = false;
+  bool _needsPlace = false;
+  bool _triedToSend = false;
+  String? _governorate;
+  String? _area;
+
+  GovernorateOption? get _currentGovernorate {
+    for (final option in _governorates) {
+      if (option.name == _governorate) return option;
+    }
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.user.governorate.trim().isEmpty) _loadPlaces();
+  }
+
+  static bool _isGovernorate(GovernorateOption option, String value) =>
+      value.isNotEmpty &&
+      (value == option.name ||
+          value == option.nativeName ||
+          value == option.areaValue);
+
+  /// No governorate on the account: the place is needed unless an older
+  /// account already has a city/village. The phone's location (only a
+  /// governorate) preselects the governorate.
+  Future<void> _loadPlaces() async {
+    setState(() {
+      _placeLoading = true;
+      _placeFailed = false;
+    });
+    final area = widget.user.area.trim();
+    try {
+      final options = await LocationCatalog.load();
+      if (!mounted) return;
+      final hasCity =
+          area.isNotEmpty && !options.any((o) => _isGovernorate(o, area));
+      final hint = area.isNotEmpty ? area : (ApiConfig.detectedArea ?? '');
+      setState(() {
+        _governorates = options;
+        _placeLoading = false;
+        _needsPlace = !hasCity;
+        if (_needsPlace && _governorate == null) {
+          for (final option in options) {
+            if (_isGovernorate(option, hint)) {
+              _governorate = option.name;
+              break;
+            }
+          }
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _placeLoading = false;
+        _placeFailed = true;
+        _needsPlace = area.isEmpty;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -161,6 +231,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 ),
                 child: Form(
                   key: _formKey,
+                  // After a refused send, each message goes away as soon
+                  // as its field is fixed.
+                  autovalidateMode: _triedToSend
+                      ? AutovalidateMode.always
+                      : AutovalidateMode.disabled,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -272,6 +347,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                             ? AppLocalization.get(context, 'required')
                             : null,
                       ),
+                      if (_needsPlace || _placeLoading)
+                        ..._placeFields(context),
                       _fieldLabel(
                         context,
                         AppLocalization.get(context, 'delivery_location_label'),
@@ -394,13 +471,120 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     );
   }
 
+  /// Governorate and city/village, for a customer with no place yet.
+  List<Widget> _placeFields(BuildContext context) {
+    final theme = Theme.of(context);
+    final isAr = AppLocalization.isArabic(context);
+    final required = AppLocalization.get(context, 'required');
+    final governorate = _currentGovernorate;
+    return [
+      _fieldLabel(context, AppLocalization.get(context, 'order_place_label')),
+      Text(
+        AppLocalization.get(context, 'order_place_hint'),
+        style: theme.textTheme.bodySmall,
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      if (_placeLoading)
+        const LinearProgressIndicator()
+      else if (_placeFailed && _governorates.isEmpty)
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            key: const Key('orderPlaceRetry'),
+            onPressed: _loadPlaces,
+            icon: const Icon(Icons.refresh),
+            label: Text(AppLocalization.get(context, 'profile_areas_failed')),
+          ),
+        )
+      else ...[
+        DropdownButtonFormField<String>(
+          key: const Key('orderGovernorateField'),
+          initialValue: _governorate,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: AppLocalization.get(context, 'governorate'),
+            prefixIcon: const Icon(Icons.map_outlined),
+          ),
+          items: _governorates
+              .map(
+                (option) => DropdownMenuItem(
+                  value: option.name,
+                  child: Text(isAr ? option.nativeName : option.displayName),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            _cityFieldKey.currentState?.didChange(null);
+            setState(() {
+              _governorate = value;
+              _area = null;
+            });
+          },
+          validator: (value) => value == null ? required : null,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DropdownButtonFormField<String>(
+          key: _cityFieldKey,
+          initialValue: _area,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: AppLocalization.get(context, 'city_village'),
+            prefixIcon: const Icon(Icons.location_city_outlined),
+          ),
+          items: governorate == null
+              ? const <DropdownMenuItem<String>>[]
+              : [
+                  DropdownMenuItem(
+                    value: governorate.areaValue,
+                    child: Text(
+                      AppLocalization.get(
+                        context,
+                        'profile_whole_governorate',
+                      ).replaceFirst(
+                        '%s',
+                        isAr ? governorate.nativeName : governorate.displayName,
+                      ),
+                    ),
+                  ),
+                  ...governorate
+                      .citiesSortedFor(arabic: isAr)
+                      .map(
+                        (city) => DropdownMenuItem(
+                          value: city,
+                          child: Text(
+                            governorate.cityLabel(city, arabic: isAr),
+                          ),
+                        ),
+                      ),
+                ],
+          onChanged: governorate == null
+              ? null
+              : (value) => setState(() => _area = value),
+          validator: (value) => value == null ? required : null,
+        ),
+      ],
+    ];
+  }
+
   Future<void> _submit() async {
+    // Still finding out whether a place is needed.
+    if (_placeLoading) return;
+    if (_needsPlace && _governorates.isEmpty) {
+      AppFeedback.error(
+        context,
+        AppLocalization.get(context, 'profile_areas_failed'),
+      );
+      return;
+    }
     final typeChosen = _selectedType != null;
     final formValid = _formKey.currentState!.validate();
-    if (!typeChosen) {
-      setState(() => _typeMissing = true);
+    if (!typeChosen || !formValid) {
+      setState(() {
+        _typeMissing = !typeChosen;
+        _triedToSend = true;
+      });
+      return;
     }
-    if (!typeChosen || !formValid) return;
 
     context.read<OrderBloc>().add(
       CreateOrderEvent(
@@ -408,7 +592,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         type: _selectedType!,
         description: _descController.text.trim(),
         phone: Validators.normalizePhone(_phoneController.text),
-        area: ApiConfig.detectedArea,
+        area: _needsPlace ? _area : ApiConfig.detectedArea,
+        governorate: _needsPlace ? _governorate : null,
         location: _locationController.text.trim(),
       ),
     );

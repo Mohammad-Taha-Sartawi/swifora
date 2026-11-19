@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/legal_defaults.dart';
 import '../../services/legal_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/theme_service.dart';
@@ -28,6 +29,24 @@ Future<bool> showLegalConsentDialog(
     ),
   );
   return agreed == true;
+}
+
+/// The agreements every new account accepts, in order: the terms of use,
+/// then the privacy policy. True only when both were accepted.
+Future<bool> confirmSignUpAgreements(BuildContext context) async {
+  final termsAccepted = await showLegalConsentDialog(
+    context,
+    title: AppLocalization.get(context, 'legal_terms_title'),
+    documentKey: LegalService.terms,
+    fallbackText: LegalDefaults.terms,
+  );
+  if (!termsAccepted || !context.mounted) return false;
+  return showLegalConsentDialog(
+    context,
+    title: AppLocalization.get(context, 'legal_privacy_title'),
+    documentKey: LegalService.privacy,
+    fallbackText: LegalDefaults.privacy,
+  );
 }
 
 /// Right-to-left when the text is mostly Arabic, otherwise left-to-right.

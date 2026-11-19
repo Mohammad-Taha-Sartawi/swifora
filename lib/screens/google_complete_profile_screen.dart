@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../services/validators.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_api.dart';
-import '../services/legal_defaults.dart';
-import '../services/legal_service.dart';
 import '../services/localization_service.dart';
 import '../services/location_catalog.dart';
 import '../services/responsive.dart';
@@ -13,11 +11,12 @@ import '../widgets/ui/app_button_loading_indicator.dart';
 import '../widgets/ui/app_feedback.dart';
 import '../widgets/ui/legal_consent_dialog.dart';
 
-/// After "Continue with Google" for someone new: the details every account
-/// needs and Google does not give us. Customers: phone, governorate and
-/// city. Drivers also choose their service types (the request then goes to
-/// admin review, like any driver sign-up). The name comes from Google and
-/// can be corrected; the email is the Google account's.
+/// After "Continue with Google" for a new driver: the details the admin
+/// review needs and Google does not give us (phone, governorate, city and
+/// service types). A new customer does not see this screen: they go
+/// straight in and give phone and place with their first order. The name
+/// comes from Google and can be corrected; the email is the Google
+/// account's.
 ///
 /// Pops with the server's session-shaped reply (signed in, or pending).
 class GoogleCompleteProfileScreen extends StatefulWidget {
@@ -111,20 +110,7 @@ class _GoogleCompleteProfileScreenState
     }
 
     // The same agreements as the email sign-up, in the same order.
-    final termsAccepted = await showLegalConsentDialog(
-      context,
-      title: AppLocalization.get(context, 'legal_terms_title'),
-      documentKey: LegalService.terms,
-      fallbackText: LegalDefaults.terms,
-    );
-    if (!termsAccepted || !mounted) return;
-    final privacyAccepted = await showLegalConsentDialog(
-      context,
-      title: AppLocalization.get(context, 'legal_privacy_title'),
-      documentKey: LegalService.privacy,
-      fallbackText: LegalDefaults.privacy,
-    );
-    if (!privacyAccepted || !mounted) return;
+    if (!await confirmSignUpAgreements(context) || !mounted) return;
 
     setState(() => _submitting = true);
     try {
