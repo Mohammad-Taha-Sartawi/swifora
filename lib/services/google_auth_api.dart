@@ -64,13 +64,14 @@ class GoogleAuthApi {
   }
 
   /// Creates the account (customer: signed in) or the driver's sign-up
-  /// request; returns the session-shaped reply.
+  /// request; returns the session-shaped reply. A customer may leave phone
+  /// and place empty: they are asked with the first order.
   Future<Map<String, dynamic>> complete({
     required String registrationToken,
     required String fullName,
-    required String phone,
-    required String governorate,
-    required String area,
+    String phone = '',
+    String governorate = '',
+    String area = '',
     List<String> serviceTypes = const [],
   }) {
     return _post('/auth/google/complete', {

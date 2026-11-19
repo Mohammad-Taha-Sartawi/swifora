@@ -23,6 +23,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
         event.description,
         event.phone,
         area: event.area,
+        governorate: event.governorate,
         location: event.location,
       );
       emit(OrderSuccess(order: OrderModel.fromJson(data)));

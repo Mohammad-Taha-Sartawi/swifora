@@ -350,6 +350,58 @@ class AppLocalization {
     'nav_earnings': {'ar': 'الأرباح', 'en': 'Earnings'},
     'nav_notifications': {'ar': 'الإشعارات', 'en': 'Notifications'},
     'nav_account': {'ar': 'حسابي', 'en': 'Account'},
+    'delete_account': {'ar': 'حذف الحساب', 'en': 'Delete account'},
+    'delete_account_title': {
+      'ar': 'طلب حذف الحساب',
+      'en': 'Request account deletion',
+    },
+    'delete_account_explain_driver': {
+      'ar':
+          'يصل طلبك إلى فريق سويفورا للمراجعة. نتحقق أولاً من أي عمولة مستحقة للمنصة لم تُدفع بعد، ثم يُحذف حسابك وبياناتك الشخصية نهائياً.',
+      'en':
+          'Your request goes to the Swifora team for review. We first check for any platform commission still unpaid; then your account and personal data are deleted for good.',
+    },
+    'delete_account_explain_customer': {
+      'ar':
+          'يصل طلبك إلى فريق سويفورا للمراجعة. إن كانت لديك طلبات لم تكتمل بعد ننتظر انتهاءها، ثم يُحذف حسابك وبياناتك الشخصية نهائياً.',
+      'en':
+          'Your request goes to the Swifora team for review. If you have orders not finished yet we wait for them; then your account and personal data are deleted for good.',
+    },
+    'delete_account_explain_withdraw': {
+      'ar': 'يمكنك التراجع عن الطلب ما دام قيد المراجعة.',
+      'en': 'You can withdraw the request while it is under review.',
+    },
+    'delete_account_send': {
+      'ar': 'إرسال طلب الحذف',
+      'en': 'Send deletion request',
+    },
+    'delete_account_confirm_title': {
+      'ar': 'حذف حسابك؟',
+      'en': 'Delete your account?',
+    },
+    'delete_account_confirm': {
+      'ar':
+          'سيُرسل طلب حذف حسابك إلى الإدارة. بعد الموافقة عليه لا يمكن استرجاع الحساب.',
+      'en':
+          'Your deletion request will be sent to the admins. Once approved, the account cannot be restored.',
+    },
+    'delete_account_sent': {
+      'ar': 'تم إرسال طلب حذف الحساب',
+      'en': 'Deletion request sent',
+    },
+    'delete_account_pending': {
+      'ar': 'طلب حذف حسابك قيد المراجعة',
+      'en': 'Your deletion request is under review',
+    },
+    'delete_account_sent_on': {'ar': 'أُرسل في %s', 'en': 'Sent on %s'},
+    'delete_account_withdraw': {
+      'ar': 'التراجع عن طلب الحذف',
+      'en': 'Withdraw the request',
+    },
+    'delete_account_withdrawn': {
+      'ar': 'تم إلغاء طلب حذف الحساب',
+      'en': 'Deletion request withdrawn',
+    },
     'home_greeting': {'ar': 'أهلاً بعودتك', 'en': 'Welcome back'},
     'home_subtitle': {
       'ar': 'كل ما تحتاجه لتوصيل أسهل وأسرع',
@@ -424,6 +476,12 @@ class AppLocalization {
           'مثال: دواء من صيدلية، أو طلب بقالة… أخبر السائق ماذا يحتاج أن يحضر لك',
       'en':
           'E.g. medicine from a pharmacy, or groceries… tell the driver what to bring',
+    },
+    'order_place_label': {'ar': 'منطقتك', 'en': 'Your area'},
+    'order_place_hint': {
+      'ar': 'نرسل طلبك إلى السائقين في منطقتك، ونحفظها لطلباتك القادمة.',
+      'en':
+          'Your order goes to drivers in your area. We remember it for next time.',
     },
     'delivery_location_label': {
       'ar': 'موقع التوصيل',

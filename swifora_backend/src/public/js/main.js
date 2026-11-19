@@ -224,6 +224,7 @@ const pages = {
   'pending-providers': document.getElementById('page-pending-providers'),
   'driver-reports': document.getElementById('page-driver-reports'),
   'user-reports': document.getElementById('page-user-reports'),
+  'deletion-requests': document.getElementById('page-deletion-requests'),
   'support-chat': document.getElementById('page-support-chat'),
   'broadcast-drivers': document.getElementById('page-broadcast-drivers'),
   'broadcast-users': document.getElementById('page-broadcast-users'),
@@ -317,6 +318,7 @@ function loadPageData(page) {
     }
     if (page === 'driver-reports') loadDriverReports();
       if (page === 'user-reports') loadUserReports();
+      if (page === 'deletion-requests') loadDeletionRequests();
       if (page === 'support-chat') initSupportChat();
       if (page === 'areas') loadAreas();
       if (page === 'ads') loadAds();
@@ -420,7 +422,7 @@ document.addEventListener('keydown', (event) => {
   const chatBadge = document.getElementById('chatBadge');
   const bottomChatBadge = document.getElementById('bottomChatBadge');
   const moreDot = document.getElementById('bottomMoreDot');
-  const otherBadges = ['pendingBadge', 'driverReportsBadge', 'userReportsBadge']
+  const otherBadges = ['pendingBadge', 'driverReportsBadge', 'userReportsBadge', 'deletionRequestsBadge']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
   const visible = (badge) => badge && !badge.classList.contains('csp-hidden')
@@ -554,6 +556,7 @@ const adminActionHandlers = Object.freeze({
   openResetPassword,
   rejectProvider,
   resolveReport,
+  approveDeletionRequest,
   selectGovernorate,
   sendBroadcast,
   sendChatMessage,
@@ -1738,6 +1741,13 @@ async function loadDashboardStats() {
     if (data.userReportsPending > 0) { userBadge.textContent = data.userReportsPending; setInlineDisplay(userBadge, true); }
     else { setInlineDisplay(userBadge, false); }
 
+    const deletionBadge = document.getElementById('deletionRequestsBadge');
+    if (deletionBadge) {
+      const pendingDeletions = Number(data.deletionRequestsPending) || 0;
+      deletionBadge.textContent = pendingDeletions;
+      setInlineDisplay(deletionBadge, pendingDeletions > 0);
+    }
+
     // Load pending provider count
     try {
       const pendingRes = await adminFetch('/admin/drivers/pending');
@@ -2521,6 +2531,82 @@ async function deleteReport(type, reportId) {
     if (type === 'driver') loadDriverReports(); else loadUserReports();
     loadDashboardStats();
     adminAlert('تم حذف الإبلاغ بنجاح.');
+  } catch (err) { adminAlert('حدث خطأ'); }
+}
+
+// ================================================
+// طلبات حذف الحسابات
+// ================================================
+function deletionStatusBadge(status) {
+  const map = {
+    pending: '<span class="report-status-badge in-review">قيد المراجعة</span>',
+    cancelled: '<span class="report-status-badge rejected">تم إلغاء الطلب</span>',
+    approved: '<span class="report-status-badge resolved">تمت الموافقة وحُذف الحساب</span>',
+  };
+  return map[status] || escapeHtml(status);
+}
+
+/** What to check before approving: debt (driver), unfinished orders. */
+function deletionCheckText(request) {
+  if (request.status !== 'pending') return '—';
+  if (request.accountExists === false) return 'الحساب غير موجود';
+  const parts = [];
+  if (request.role === 'provider') {
+    const owed = Number(request.unpaidCommission) || 0;
+    parts.push(owed > 0
+      ? `عليه عمولة غير مدفوعة: ${owed.toLocaleString('en-US')} ₪`
+      : 'لا توجد عليه عمولة غير مدفوعة');
+  }
+  const open = Number(request.openOrders) || 0;
+  const inProgress = Number(request.inProgressOrders) || 0;
+  if (open > 0) parts.push(`${open} طلب بانتظار العروض أو القبول`);
+  if (inProgress > 0) parts.push(`${inProgress} طلب قيد التنفيذ (يمنع الحذف)`);
+  if (open === 0 && inProgress === 0) parts.push('لا توجد طلبات جارية');
+  return parts.map(escapeHtml).join('<br>');
+}
+
+let deletionRequestsById = new Map();
+
+async function loadDeletionRequests() {
+  const container = document.getElementById('deletionRequestsContent');
+  if (!container) return;
+  try {
+    const res = await adminFetch('/admin/deletion-requests');
+    const data = await res.json();
+    const requests = Array.isArray(data.requests) ? data.requests : [];
+    deletionRequestsById = new Map(requests.map((request) => [request.id, request]));
+    if (requests.length === 0) {
+      container.innerHTML = '<div class="commissions-table-container"><h3>لا توجد طلبات حذف حسابات</h3></div>';
+      return;
+    }
+    const rows = requests.map((request) => {
+      const role = request.role === 'provider' ? 'سائق' : 'زبون';
+      const action = request.status === 'pending'
+        ? `<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="approveDeletionRequest" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(request.id)}" data-presentation="p020">موافقة وحذف الحساب</button>`
+        : deletionStatusBadge(request.status);
+      return `<tr><td><strong>${escapeHtml(request.fullName || '')}</strong><br><small>${escapeHtml(request.email || '')}</small></td><td>${role}</td><td>ID ${escapeHtml(request.publicId || '')}</td><td>${escapeHtml(formatDisplayDate(request.requestedAt))}</td><td>${deletionStatusBadge(request.status)}</td><td>${deletionCheckText(request)}</td><td>${action}</td></tr>`;
+    }).join('');
+    container.innerHTML = `<div class="commissions-table-container"><h3>قائمة طلبات حذف الحسابات</h3><table class="commissions-table"><thead><tr><th>صاحب الحساب</th><th>النوع</th><th>ID</th><th>تاريخ الطلب</th><th>الحالة</th><th>قبل الموافقة</th><th>الإجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  } catch (err) { console.error('Error loading deletion requests:', err); }
+}
+
+async function approveDeletionRequest(requestId) {
+  const request = deletionRequestsById.get(requestId) || {};
+  const warnings = [];
+  if (Number(request.unpaidCommission) > 0) {
+    warnings.push(`على السائق عمولة غير مدفوعة (${Number(request.unpaidCommission).toLocaleString('en-US')} ₪).`);
+  }
+  if (Number(request.openOrders) > 0) {
+    warnings.push(`لديه ${request.openOrders} طلب لم يكتمل بعد وسيُلغى.`);
+  }
+  const question = `${warnings.length ? `${warnings.join('\n')}\n\n` : ''}سيُحذف حساب ${request.fullName || ''} نهائياً ولا يمكن التراجع. هل تريد المتابعة؟`;
+  if (!await adminConfirm(question)) return;
+  try {
+    const res = await adminFetch(`/admin/deletion-requests/${encodeURIComponent(requestId)}/approve`, { method: 'POST' });
+    const data = await res.json();
+    adminAlert(data.message || (data.success ? 'تم حذف الحساب' : 'تعذر حذف الحساب'));
+    loadDeletionRequests();
+    loadDashboardStats();
   } catch (err) { adminAlert('حدث خطأ'); }
 }
 
@@ -4535,6 +4621,7 @@ const LIVE_PAGE_LOADERS = {
   'pending-providers': () => loadPendingProviders(),
   'driver-reports': () => loadDriverReports(),
   'user-reports': () => loadUserReports(),
+  'deletion-requests': () => loadDeletionRequests(),
   areas: () => loadAreas(),
   'support-chat': () => loadConversations(),
   'broadcast-drivers': () => loadBroadcastArchive('drivers'),
@@ -4547,7 +4634,7 @@ const LIVE_PAGE_LOADERS = {
 };
 
 // Topics whose changes move the sidebar badges or the main counters.
-const LIVE_BADGE_TOPICS = ['dashboard', 'pending-providers', 'driver-reports', 'user-reports'];
+const LIVE_BADGE_TOPICS = ['dashboard', 'pending-providers', 'driver-reports', 'user-reports', 'deletion-requests'];
 
 let liveTopics = new Set();
 let liveConnectedBefore = false;

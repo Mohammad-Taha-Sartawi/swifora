@@ -12,6 +12,7 @@ class CreateOrderEvent extends OrderEvent {
   final String description;
   final String phone;
   final String? area;
+  final String? governorate;
   final String? location;
 
   const CreateOrderEvent({
@@ -20,9 +21,18 @@ class CreateOrderEvent extends OrderEvent {
     required this.description,
     required this.phone,
     this.area,
+    this.governorate,
     this.location,
   });
 
   @override
-  List<Object?> get props => [token, type, description, phone, area, location];
+  List<Object?> get props => [
+    token,
+    type,
+    description,
+    phone,
+    area,
+    governorate,
+    location,
+  ];
 }

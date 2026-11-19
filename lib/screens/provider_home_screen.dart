@@ -46,6 +46,7 @@ import 'profile_screen.dart';
 import 'report_screen.dart';
 import 'support_chat_screen.dart';
 import '../services/list_screen_navigation.dart';
+import 'account_deletion_screen.dart';
 
 class ProviderHomeScreen extends StatefulWidget {
   final UserModel user;
@@ -849,6 +850,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
       fullName: _user.fullName,
       onProfile: _openProfile,
       onLogout: _logout,
+      onDeleteAccount: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              AccountDeletionScreen(token: widget.token, role: 'provider'),
+        ),
+      ),
     );
   }
 
@@ -988,6 +996,14 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     );
   }
 
+  /// [cards] side by side with equal widths and a small gap between them.
+  static List<Widget> _withGaps(List<Widget> cards) => [
+    for (var i = 0; i < cards.length; i++) ...[
+      if (i > 0) const SizedBox(width: AppSpacing.sm),
+      Expanded(child: cards[i]),
+    ],
+  ];
+
   int _pendingWorkCount(ProviderStats s) =>
       s.pendingOrdersCount + s.offeredOrdersCount + s.activeOrdersCount;
 
@@ -1087,64 +1103,62 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                                 ),
                               ),
                             ),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: _buildStatCard(
-                                  context,
-                                  key: const Key('statPendingOrders'),
-                                  count: s.pendingOrdersCount,
-                                  label: AppLocalization.get(
+                          // Only what is under way: each card only while it
+                          // has something in it, none when all are empty.
+                          if (pendingWorkCount > 0)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: _withGaps([
+                                if (s.pendingOrdersCount > 0)
+                                  _buildStatCard(
                                     context,
-                                    'stat_new_requests',
+                                    key: const Key('statPendingOrders'),
+                                    count: s.pendingOrdersCount,
+                                    label: AppLocalization.get(
+                                      context,
+                                      'stat_new_requests',
+                                    ),
+                                    semanticTitle: AppLocalization.get(
+                                      context,
+                                      'pending_orders_btn',
+                                    ),
+                                    tone: AppTone.primary,
+                                    onTap: _openPendingOrders,
                                   ),
-                                  semanticTitle: AppLocalization.get(
+                                if (s.offeredOrdersCount > 0)
+                                  _buildStatCard(
                                     context,
-                                    'pending_orders_btn',
+                                    key: const Key('statOfferedOrders'),
+                                    count: s.offeredOrdersCount,
+                                    label: AppLocalization.get(
+                                      context,
+                                      'stat_my_offers',
+                                    ),
+                                    semanticTitle: AppLocalization.get(
+                                      context,
+                                      'offered_orders_btn',
+                                    ),
+                                    tone: AppTone.warning,
+                                    onTap: _openOfferedOrders,
                                   ),
-                                  tone: AppTone.primary,
-                                  onTap: _openPendingOrders,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: _buildStatCard(
-                                  context,
-                                  key: const Key('statOfferedOrders'),
-                                  count: s.offeredOrdersCount,
-                                  label: AppLocalization.get(
+                                if (s.activeOrdersCount > 0)
+                                  _buildStatCard(
                                     context,
-                                    'stat_my_offers',
+                                    key: const Key('statActiveOrders'),
+                                    count: s.activeOrdersCount,
+                                    label: AppLocalization.get(
+                                      context,
+                                      'stat_active_delivery',
+                                    ),
+                                    semanticTitle: AppLocalization.get(
+                                      context,
+                                      'active_orders_btn',
+                                    ),
+                                    tone: AppTone.success,
+                                    onTap: _openActiveOrders,
                                   ),
-                                  semanticTitle: AppLocalization.get(
-                                    context,
-                                    'offered_orders_btn',
-                                  ),
-                                  tone: AppTone.warning,
-                                  onTap: _openOfferedOrders,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: _buildStatCard(
-                                  context,
-                                  key: const Key('statActiveOrders'),
-                                  count: s.activeOrdersCount,
-                                  label: AppLocalization.get(
-                                    context,
-                                    'stat_active_delivery',
-                                  ),
-                                  semanticTitle: AppLocalization.get(
-                                    context,
-                                    'active_orders_btn',
-                                  ),
-                                  tone: AppTone.success,
-                                  onTap: _openActiveOrders,
-                                ),
-                              ),
-                            ],
-                          ),
+                              ]),
+                            ),
                           if (s.activeOrdersCount > 0) ...[
                             const SizedBox(height: AppSpacing.md),
                             _buildActiveDeliveryCard(context),

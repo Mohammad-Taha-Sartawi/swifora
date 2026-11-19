@@ -74,7 +74,8 @@ test('status badge fallbacks encode unknown status values', () => {
       )
       || []
     ).length,
-    3,
+    // The three earlier status badges plus the account-deletion one.
+    4,
   );
 
   assert.doesNotMatch(

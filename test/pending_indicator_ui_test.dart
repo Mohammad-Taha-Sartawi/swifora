@@ -6,7 +6,7 @@ void main() {
   test('customer home shows a pending orders indicator and offers badge', () {
     final source = File('lib/screens/home_screen.dart').readAsStringSync();
 
-    expect(source, contains('_pendingOrdersCount'));
+    expect(source, contains('_ordersWithOffersCount'));
 
     expect(source, contains("'pending_items_alert'"));
 

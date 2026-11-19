@@ -38,6 +38,7 @@ import 'support_chat_screen.dart';
 import '../services/socket_service.dart';
 import '../services/mobile_session_failure.dart';
 import '../services/list_screen_navigation.dart';
+import 'account_deletion_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final UserModel user;
@@ -57,7 +58,12 @@ class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, BroadcastPopupHost {
   final OrderService _orderService = OrderService();
   Timer? _notifTimer;
-  int _pendingOrdersCount = 0;
+
+  /// Orders not taken by a driver yet (waiting for or with offers).
+  int _openOrdersCount = 0;
+
+  /// Orders with at least one driver's price waiting for an answer.
+  int _ordersWithOffersCount = 0;
   int _inProgressOrdersCount = 0;
   int _onTheWayCount = 0;
   int? _availableDriversCount;
@@ -327,7 +333,8 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
 
-      var pending = 0;
+      var open = 0;
+      var withOffers = 0;
       var inProgress = 0;
       var onTheWay = 0;
 
@@ -335,7 +342,9 @@ class _HomeScreenState extends State<HomeScreen>
         final status = order['status']?.toString();
 
         if (status == 'pending' || status == 'offered') {
-          pending += 1;
+          open += 1;
+          // At least one driver's price is waiting for the customer.
+          if (status == 'offered') withOffers += 1;
         } else if (status == 'accepted' || status == 'fulfilling') {
           inProgress += 1;
           if (status == 'fulfilling') onTheWay += 1;
@@ -343,7 +352,8 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       setState(() {
-        _pendingOrdersCount = pending;
+        _openOrdersCount = open;
+        _ordersWithOffersCount = withOffers;
         _inProgressOrdersCount = inProgress;
         _onTheWayCount = onTheWay;
       });
@@ -628,52 +638,56 @@ class _HomeScreenState extends State<HomeScreen>
                         refreshTick: _adRefreshTick,
                         events: _adEvents,
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                      SwiforaSectionTitle(
-                        title: AppLocalization.get(
-                          context,
-                          'my_orders_section',
+                      // Only what is under way: the section while the
+                      // customer has orders not finished yet, each row only
+                      // while it has something in it.
+                      if (_openOrdersCount + _inProgressOrdersCount > 0) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        SwiforaSectionTitle(
+                          title: AppLocalization.get(
+                            context,
+                            'my_orders_section',
+                          ),
+                          actionLabel: AppLocalization.get(
+                            context,
+                            'view_all_orders',
+                          ),
+                          onAction: _openOrdersReport,
                         ),
-                        actionLabel: AppLocalization.get(
-                          context,
-                          'view_all_orders',
+                      ],
+                      if (_ordersWithOffersCount > 0)
+                        SwiforaActionRow(
+                          tapKey: const Key('offersRow'),
+                          icon: Icons.sell_outlined,
+                          tone: AppTone.warning,
+                          title: AppLocalization.get(context, 'offers_title'),
+                          subtitle: AppLocalization.get(
+                            context,
+                            'pending_items_alert',
+                          ).replaceAll('%d', '$_ordersWithOffersCount'),
+                          count: _ordersWithOffersCount,
+                          emphasized: true,
+                          onTap: _openMyOrders,
                         ),
-                        onAction: _openOrdersReport,
-                      ),
-                      SwiforaActionRow(
-                        tapKey: const Key('offersRow'),
-                        icon: Icons.sell_outlined,
-                        tone: AppTone.warning,
-                        title: AppLocalization.get(context, 'offers_title'),
-                        subtitle: _pendingOrdersCount > 0
-                            ? AppLocalization.get(
-                                context,
-                                'pending_items_alert',
-                              ).replaceAll('%d', '$_pendingOrdersCount')
-                            : AppLocalization.get(
-                                context,
-                                'offers_none_waiting',
-                              ),
-                        count: _pendingOrdersCount,
-                        emphasized: _pendingOrdersCount > 0,
-                        onTap: _openMyOrders,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      SwiforaActionRow(
-                        tapKey: const Key('inProgressRow'),
-                        icon: Icons.local_shipping_outlined,
-                        tone: AppTone.success,
-                        title: AppLocalization.get(
-                          context,
-                          'in_progress_orders_btn',
+                      if (_ordersWithOffersCount > 0 &&
+                          _inProgressOrdersCount > 0)
+                        const SizedBox(height: AppSpacing.md),
+                      if (_inProgressOrdersCount > 0)
+                        SwiforaActionRow(
+                          tapKey: const Key('inProgressRow'),
+                          icon: Icons.local_shipping_outlined,
+                          tone: AppTone.success,
+                          title: AppLocalization.get(
+                            context,
+                            'in_progress_orders_btn',
+                          ),
+                          subtitle: AppLocalization.get(
+                            context,
+                            'track_orders_live',
+                          ),
+                          count: _inProgressOrdersCount,
+                          onTap: _openInProgressOrders,
                         ),
-                        subtitle: AppLocalization.get(
-                          context,
-                          'track_orders_live',
-                        ),
-                        count: _inProgressOrdersCount,
-                        onTap: _openInProgressOrders,
-                      ),
                       if (_onTheWayCount > 0) ...[
                         const SizedBox(height: AppSpacing.md),
                         SwiforaActionRow(
@@ -749,7 +763,13 @@ class _HomeScreenState extends State<HomeScreen>
           child: CreateOrderScreen(user: _user, token: widget.token),
         ),
       ),
-    ).then((_) => _loadOrderCounts());
+    ).then((_) {
+      _loadOrderCounts();
+      // The first order saves the place and the phone on the account.
+      if (_user.governorate.trim().isEmpty || _user.phone.trim().isEmpty) {
+        _refreshCurrentUser();
+      }
+    });
   }
 
   void _openOrdersReport() {
@@ -810,6 +830,13 @@ class _HomeScreenState extends State<HomeScreen>
       fullName: _user.fullName,
       onProfile: _openProfile,
       onLogout: _logout,
+      onDeleteAccount: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              AccountDeletionScreen(token: widget.token, role: 'customer'),
+        ),
+      ),
     );
   }
 

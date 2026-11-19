@@ -888,8 +888,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   /// Google for the selected role (customer or driver). Existing accounts
-  /// sign in; someone new completes phone, governorate, city (and, for a
-  /// driver, the services) first.
+  /// sign in. A new customer only agrees to the terms and the privacy
+  /// policy and is in (phone and place come with the first order); a new
+  /// driver completes phone, governorate, city and services for review.
   Future<void> _continueWithGoogle() async {
     if (_googleLoading) return;
     setState(() => _googleLoading = true);
@@ -900,7 +901,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final result = await _googleAuthApi.signIn(idToken: idToken, role: role);
       if (!mounted) return;
       var session = result.session;
-      if (result.needsProfile) {
+      if (result.needsProfile && role == 'customer') {
+        if (!await confirmSignUpAgreements(context) || !mounted) return;
+        session = await _googleAuthApi.complete(
+          registrationToken: result.registrationToken!,
+          fullName: result.fullName,
+        );
+        if (!mounted) return;
+      } else if (result.needsProfile) {
         session = await Navigator.of(context).push<Map<String, dynamic>>(
           MaterialPageRoute(
             builder: (_) => GoogleCompleteProfileScreen(

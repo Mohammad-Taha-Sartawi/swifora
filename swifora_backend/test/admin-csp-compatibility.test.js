@@ -82,10 +82,11 @@ test('presentation tokens preserve all migrated inline styles externally', () =>
   // commissions dash placeholder was replaced by a reset action. The guest
   // chat note became a styled reply note (guest replies are now possible).
   // The per-page clocks were replaced by one clock in the app bar. The
-  // support list has a "no conversation matches the search" note.
+  // support list has a "no conversation matches the search" note. The
+  // account deletion requests have a sidebar badge and an approve button.
   assert.equal(
     tokenMatches.length,
-    73,
+    75,
   );
 
   const tokens = new Set(
@@ -134,10 +135,11 @@ test('delegated browser actions replace legacy inline handlers', () => {
   // per-ad countdown toggle. Driver and customer cards can clear the
   // reports from the profile. Commission "paid"/"reset" and "reset all"
   // can be undone. A search that finds several drivers or customers
-  // lists them, each with a "view" action.
+  // lists them, each with a "view" action. An account deletion request
+  // can be approved.
   assert.equal(
     clickActions.length,
-    84,
+    85,
   );
 
   assert.equal(
@@ -192,12 +194,12 @@ test('delegated admin actions require the admin session capability', () => {
 
   assert.equal(
     generatedActions.length,
-    53,
+    54,
   );
 
   assert.equal(
     generatedCapabilities.length,
-    53,
+    54,
   );
 
   const generatedActionLines = browserSource

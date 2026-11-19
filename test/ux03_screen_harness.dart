@@ -122,6 +122,8 @@ class Ux03Harness {
     phone: '0501234567',
     role: 'customer',
     area: 'Jerusalem',
+    // Every sign-up form saves the governorate with the area.
+    governorate: 'القدس',
     publicId: 'CUS-1',
   );
 

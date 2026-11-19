@@ -20,7 +20,9 @@ const {
   optionalBoundedTrimmedString,
 } = require('../security/requestInput');
 const {
+  canonicalGovernorate,
   governorateKey,
+  isValidAreaForGovernorate,
   resolveRegistrationLocation,
 } = require('../services/registrationLocation');
 const {
@@ -55,10 +57,18 @@ router.post('/', auth, requireRole('customer'), orderCreateLimiter, orderCreateI
       ? normalizePhoneNumber(req.body.phone)
       : '';
     const area = optionalBoundedTrimmedString(req.body?.area, 100);
+    // Sent once by a customer who has not chosen a place yet (a Google
+    // sign-up): the governorate and the city/village, saved on the account.
+    const chosenGovernorate = optionalBoundedTrimmedString(req.body?.governorate, 100);
     const requestedLocation = optionalBoundedTrimmedString(req.body?.location, MAX_ORDER_LOCATION);
 
     const invalid = (error, code) => res.status(400).json({ error, code });
-    if (!type || !['product', 'people', 'goods'].includes(type) || area === null) {
+    if (
+      !type
+      || !['product', 'people', 'goods'].includes(type)
+      || area === null
+      || chosenGovernorate === null
+    ) {
       return invalid('بيانات الطلب غير صالحة.', 'INVALID_ORDER_INPUT');
     }
     if (!description) {
@@ -83,9 +93,31 @@ router.post('/', auth, requireRole('customer'), orderCreateLimiter, orderCreateI
       return res.status(403).json({ error: 'تم تجميد حسابك. يرجى التواصل مع الدعم.' });
     }
 
+    // The place this customer chose now, when the account has none yet.
+    const hasChosenPlace = Boolean(String(user.governorate || '').trim());
+    if (!hasChosenPlace && chosenGovernorate) {
+      if (!isValidAreaForGovernorate(chosenGovernorate, area)) {
+        return invalid('اختر المحافظة والمدينة أو القرية.', 'LOCATION_REQUIRED');
+      }
+      user.governorate = canonicalGovernorate(chosenGovernorate) || chosenGovernorate;
+      user.area = area;
+    }
+
     // Registered area is authoritative; GPS-detected area is a fallback only
     const orderArea = user.area || area || '';
+    if (!orderArea) {
+      // No driver room to send it to: the app asks for the place first.
+      return invalid('اختر المحافظة والمدينة أو القرية.', 'LOCATION_REQUIRED');
+    }
     const orderGovernorate = governorateKey(user);
+
+    // The first number a customer gives becomes the account's number.
+    const hasPhone = Array.isArray(user.phoneNumbers)
+      && user.phoneNumbers.some((entry) => entry?.number);
+    if (!hasPhone) {
+      user.phoneNumbers = [{ number: phone, primary: true }];
+    }
+    if (user.isModified()) await user.save();
     // Scope is the driver's choice; customers no longer have a governorate
     // setting, so new orders never carry one.
     const orderGovernorateLevel = false;
