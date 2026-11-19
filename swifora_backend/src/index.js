@@ -585,7 +585,10 @@ app.use('/admin/push', requireAdminSession, adminCsrfProtection, adminPushRoutes
 app.use('/admin/api', requireAdminSession, adminCsrfProtection, adminApiRoutes);
 
 app.get('/admin', requireAdminSession, adminCsrfProtection, (req, res) => {
-  res.render('index', { page: 'dashboard' });
+  res.render('index', {
+    page: 'dashboard',
+    adminTimeFormat: req.adminUser?.timeFormat === '24h' ? '24h' : '12h',
+  });
 });
 
 let lastDatabaseUnavailableLogAt = 0;

@@ -189,13 +189,99 @@ function adminFetch(input, init = {}) {
   );
 }
 
+// Every date and time in the dashboard is Palestine time, whatever the
+// clock of the computer showing it. Times follow this admin's choice in
+// Settings: 12-hour with AM/PM, or 24-hour.
+const PALESTINE_TIME_ZONE = 'Asia/Hebron';
+let adminTimeFormat =
+  document.querySelector('meta[name="admin-time-format"]')?.content === '24h' ? '24h' : '12h';
+let palestineFormatter = null;
+
+function palestineParts(date) {
+  if (!palestineFormatter) {
+    try {
+      palestineFormatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: PALESTINE_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      });
+    } catch (_) {
+      palestineFormatter = false;
+    }
+  }
+  if (palestineFormatter === false) {
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+    };
+  }
+  const parts = {};
+  palestineFormatter.formatToParts(date).forEach((part) => { parts[part.type] = part.value; });
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour) % 24,
+    minute: Number(parts.minute),
+  };
+}
+
+function isCalendarDate(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function formatDisplayDate(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  // "2026-11-19" is already a calendar day; anything else is a moment.
+  const { year, month, day } = isCalendarDate(value)
+    ? { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() }
+    : palestineParts(date);
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+}
+
+/** The time of a moment in Palestine, "10:17 PM" or "22:17"; '' when unknown. */
+function formatDisplayTime(value) {
+  if (value === null || value === undefined || value === '' || isCalendarDate(value)) return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const { hour, minute } = palestineParts(date);
+  const minutes = String(minute).padStart(2, '0');
+  if (adminTimeFormat === '24h') return `${String(hour).padStart(2, '0')}:${minutes}`;
+  // The leading left-to-right mark keeps "10:17 PM" in this order inside
+  // Arabic (right-to-left) text, instead of "PM 10:17".
+  return `\u200E${hour % 12 || 12}:${minutes} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+/** The "time" column of a table: the time, or a dash when unknown. */
+function timeCell(value) {
+  return `<td class="time-cell">${escapeHtml(formatDisplayTime(value) || '—')}</td>`;
+}
+
+function formatDisplayDateTime(value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (isCalendarDate(value)) return formatDisplayDate(value);
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const time = formatDisplayTime(date);
+  return time ? `${formatDisplayDate(date)} ${time}` : formatDisplayDate(value);
+}
+
 // ================================================
 // 1. الساعة الحية
 // ================================================
 function updateClocks() {
   const el = document.getElementById('clockDisplay');
   if (!el) return;
-  el.textContent = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  el.textContent = formatDisplayTime(new Date());
 }
 setInterval(updateClocks, 15000);
 updateClocks();
@@ -834,6 +920,7 @@ function loadPageData(page) {
     if (page === 'users') loadUsersList();
     if (page === 'commissions') loadCommissions();
     if (page === 'settings') {
+      renderTimeFormatSettings();
       loadCommissionSettings();
       loadDriverDisplaySettings();
       loadLegalDocuments();
@@ -2166,7 +2253,7 @@ function renderChatMessages(messages, name) {
     const div = document.createElement('div');
     div.className = `chat-msg ${msg.sender === 'admin' ? 'admin' : 'other'}`;
     const senderName = msg.sender === 'admin' ? 'المدير' : (name || 'الطرف الآخر');
-    div.innerHTML = `<div class="sender-name">${escapeHtml(senderName)}</div>${escapeHtml(msg.text)}<span class="time">${escapeHtml(msg.time)}</span>`;
+    div.innerHTML = `<div class="sender-name">${escapeHtml(senderName)}</div>${escapeHtml(msg.text)}<span class="time">${escapeHtml(msg.at ? formatDisplayDateTime(msg.at) : msg.time)}</span>`;
     container.appendChild(div);
   });
   container.scrollTop = container.scrollHeight;
@@ -2407,6 +2494,46 @@ async function saveDriverDisplaySettings(event) {
     message.className = 'settings-message error';
   }
 }
+
+function renderTimeFormatSettings() {
+  const select = document.getElementById('timeFormatSelect');
+  const preview = document.getElementById('timeFormatPreview');
+  if (select) select.value = adminTimeFormat;
+  if (preview) preview.textContent = `الوقت الآن في فلسطين: ${formatDisplayTime(new Date())}`;
+}
+
+async function saveTimeFormat(event) {
+  event.preventDefault();
+  const select = document.getElementById('timeFormatSelect');
+  const message = document.getElementById('timeFormatMessage');
+  if (!select || !message) return;
+  try {
+    const res = await adminFetch('/admin/api/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeFormat: select.value }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      message.textContent = data.message || 'تعذر حفظ الإعداد.';
+      message.className = 'settings-message error';
+      return;
+    }
+    adminTimeFormat = data.timeFormat === '24h' ? '24h' : '12h';
+    renderTimeFormatSettings();
+    updateClocks();
+    message.textContent = adminTimeFormat === '24h'
+      ? 'تم. تظهر الأوقات بنظام 24 ساعة.'
+      : 'تم. تظهر الأوقات بنظام 12 ساعة مع AM و PM.';
+    message.className = 'settings-message success';
+  } catch (err) {
+    message.textContent = 'تعذر حفظ الإعداد.';
+    message.className = 'settings-message error';
+  }
+}
+
+document.getElementById('timeFormatForm')?.addEventListener('submit', saveTimeFormat);
+renderTimeFormatSettings();
 
 const driverDisplaySettingsForm = document.getElementById('driverDisplaySettingsForm');
 if (driverDisplaySettingsForm) {
@@ -3008,7 +3135,7 @@ function renderChatThread(report) {
     const div = document.createElement('div');
     div.className = `chat-msg ${msg.sender === 'admin' ? 'admin' : 'other'}`;
     const senderName = msg.sender === 'admin' ? 'المدير' : (report.reporter || 'المرسل');
-    div.innerHTML = `<div class="sender-name">${escapeHtml(senderName)}</div>${escapeHtml(msg.text)}<span class="time">${escapeHtml(msg.time)}</span>`;
+    div.innerHTML = `<div class="sender-name">${escapeHtml(senderName)}</div>${escapeHtml(msg.text)}<span class="time">${escapeHtml(msg.at ? formatDisplayDateTime(msg.at) : msg.time)}</span>`;
     threadDiv.appendChild(div);
   });
   threadDiv.scrollTop = threadDiv.scrollHeight;
@@ -5492,15 +5619,7 @@ function appendChatMessage(sender, text, time) {
 
   const timeEl = document.createElement('div');
   timeEl.className = 'chat-time';
-  timeEl.textContent = time
-    ? new Date(time).toLocaleTimeString(
-        'ar-EG',
-        {
-          hour: '2-digit',
-          minute: '2-digit',
-        },
-      )
-    : '';
+  timeEl.textContent = time ? formatDisplayTime(time) : '';
 
   div.appendChild(body);
   div.appendChild(timeEl);
@@ -5572,40 +5691,6 @@ function toDisplayDateValue(value) {
     return new Date(year, month - 1, day);
   }
   return new Date(value);
-}
-
-function formatDisplayDate(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const date = toDisplayDateValue(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${day}/${month}/${date.getFullYear()}`;
-}
-
-/** HH:mm of a moment; '' for a date without a time (e.g. "2026-11-19"). */
-function formatDisplayTime(value) {
-  if (value === null || value === undefined || value === '') return '';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
-  const date = toDisplayDateValue(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
-
-/** The "time" column of a table: HH:mm, or a dash when unknown. */
-function timeCell(value) {
-  return `<td class="time-cell">${escapeHtml(formatDisplayTime(value) || '—')}</td>`;
-}
-
-function formatDisplayDateTime(value) {
-  if (value === null || value === undefined || value === '') return '';
-  const date = toDisplayDateValue(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${formatDisplayDate(date)} ${hours}:${minutes}`;
 }
 
 function escapeHtml(value) {

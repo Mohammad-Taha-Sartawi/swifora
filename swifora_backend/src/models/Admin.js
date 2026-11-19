@@ -32,6 +32,9 @@ const adminSchema = new mongoose.Schema(
     // Last accepted authenticator time step: each code works only once.
     adminTotpLastStep: { type: Number, default: null, select: false },
     lastLoginAt: { type: Date, default: null },
+    // How this admin reads times in the dashboard: 12-hour with AM/PM, or
+    // 24-hour. Always in Palestine time.
+    timeFormat: { type: String, enum: ['12h', '24h'], default: '12h' },
   },
   {
     collection: 'admins',

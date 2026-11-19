@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="csrf-token" content="<%= csrfToken %>">
+  <meta name="admin-time-format" content="<%= typeof adminTimeFormat === 'string' && adminTimeFormat === '24h' ? '24h' : '12h' %>">
   <title>سويفورا — لوحة التحكم</title>
   <meta name="theme-color" content="#0b0e14">
   <meta name="color-scheme" content="dark">
@@ -369,6 +370,20 @@
       <div class="settings-grid">
         <div class="settings-card"><div class="icon"><i class="fas fa-key"></i></div><h3>إعادة تعيين كلمة المرور</h3><p>تغيير كلمة المرور الخاصة بحساب المدير.</p><button class="btn-action reset" data-admin-action="openResetPassword" data-admin-arg-count="0"><i class="fas fa-undo-alt"></i> إعادة تعيين كلمة المرور</button></div>
         <div class="settings-card"><div class="icon"><i class="fas fa-shield-alt"></i></div><h3>المصادقة الثنائية</h3><p>أضف طبقة حماية ثانية بحساب مصادقة (TOTP) ورموز استرداد.</p><button class="btn-action reset" data-admin-action="manageTwoFactor" data-admin-arg-count="0"><i class="fas fa-shield-alt"></i> إدارة المصادقة الثنائية</button></div>
+        <div class="settings-card">
+          <div class="icon"><i class="fas fa-clock"></i></div>
+          <h3>طريقة عرض الوقت</h3>
+          <p>كيف تظهر الأوقات لك في لوحة التحكم. الأوقات كلها بتوقيت فلسطين. الإعداد خاص بحسابك.</p>
+          <form id="timeFormatForm">
+            <select id="timeFormatSelect" aria-label="طريقة عرض الوقت">
+              <option value="12h">12 ساعة (مثال: &lrm;10:17 PM)</option>
+              <option value="24h">24 ساعة (مثال: 22:17)</option>
+            </select>
+            <button type="submit" class="btn-action reset"><i class="fas fa-save"></i> حفظ</button>
+          </form>
+          <p id="timeFormatPreview" class="settings-message" aria-live="polite"></p>
+          <p id="timeFormatMessage" class="settings-message" role="status"></p>
+        </div>
         <div class="settings-card">
           <div class="icon"><i class="fas fa-percent"></i></div>
           <h3>عمولة المنصة</h3>

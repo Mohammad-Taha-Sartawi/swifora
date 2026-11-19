@@ -120,7 +120,7 @@ test('legacy chat, report detail, and report replies encode message text', () =>
 
   for (const marker of [
     '${escapeHtml(senderName)}',
-    '${escapeHtml(msg.time)}',
+    '${escapeHtml(msg.at ? formatDisplayDateTime(msg.at) : msg.time)}',
     '${escapeHtml(report.reporter)}',
     '${escapeHtml(report.category)}',
     '${escapeHtml(formatDisplayDate(report.date))}',

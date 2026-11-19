@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const replySchema = new mongoose.Schema({
   sender: { type: String, enum: ['admin', 'reporter'], required: true },
   text: { type: String, required: true },
-  time: { type: String, default: () => new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) }
+  time: { type: String, default: () => new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) },
+  at: { type: Date, default: Date.now },
 }, { _id: false });
 
 const reportSchema = new mongoose.Schema({
