@@ -2956,9 +2956,9 @@ async function loadDriverReports() {
       const replyCount = report.replies ? report.replies.length : 0;
       const reporterName = report.reporterId?.fullName || report.reporter || 'غير معروف';
       const targetId = report.reportedPublicId || '';
-      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
+      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.createdAt || report.date))}</td>${timeCell(report.createdAt)}<td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="driver" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
     });
-    document.getElementById('driverReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات السائقين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID السائق</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    document.getElementById('driverReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات السائقين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID السائق</th><th>النوع</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading driver reports:', err); }
 }
 
@@ -2971,9 +2971,9 @@ async function loadUserReports() {
       const replyCount = report.replies ? report.replies.length : 0;
       const reporterName = report.reporterId?.fullName || report.reporter || 'غير معروف';
       const targetId = report.reportedPublicId || '';
-      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.date))}</td><td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
+      rows += `<tr><td><strong>${escapeHtml(report.reportId)}</strong></td><td>${escapeHtml(reporterName)}</td><td>ID ${escapeHtml(targetId)}</td><td>${escapeHtml(report.category)}</td><td>${escapeHtml(formatDisplayDate(report.createdAt || report.date))}</td>${timeCell(report.createdAt)}<td>${getReportStatusBadge(report.status)}</td><td>${escapeHtml(report.content.substring(0, 40))}${report.content.length > 40 ? '...' : ''}</td><td><button class="action-btn info" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="viewReportDetail" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">عرض</button><button class="action-btn reply" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openReplyModal" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">رد (${replyCount})</button>${report.status !== 'resolved' ? `<button class="action-btn success" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="resolveReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حل</button>` : ''}<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="deleteReport" data-admin-arg-count="2" data-admin-arg-1="user" data-admin-arg-2="${escapeHtml(String(report.reportId))}" data-presentation="p020">حذف</button></td></tr>`;
     });
-    document.getElementById('userReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات المستخدمين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID المستخدم</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    document.getElementById('userReportsContent').innerHTML = `<div class="commissions-table-container"><h3>قائمة إبلاغات المستخدمين</h3><table class="commissions-table"><thead><tr><th>رقم الإبلاغ</th><th>المبلغ</th><th>ID المستخدم</th><th>النوع</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>المحتوى</th><th>الإجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading user reports:', err); }
 }
 
@@ -3108,9 +3108,9 @@ async function loadDeletionRequests() {
       const action = request.status === 'pending'
         ? `<button class="action-btn danger" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="approveDeletionRequest" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(request.id)}" data-presentation="p020">موافقة وحذف الحساب</button>`
         : deletionStatusBadge(request.status);
-      return `<tr><td><strong>${escapeHtml(request.fullName || '')}</strong><br><small>${escapeHtml(request.email || '')}</small></td><td>${role}</td><td>ID ${escapeHtml(request.publicId || '')}</td><td>${escapeHtml(formatDisplayDate(request.requestedAt))}</td><td>${deletionStatusBadge(request.status)}</td><td>${deletionCheckText(request)}</td><td>${action}</td></tr>`;
+      return `<tr><td><strong>${escapeHtml(request.fullName || '')}</strong><br><small>${escapeHtml(request.email || '')}</small></td><td>${role}</td><td>ID ${escapeHtml(request.publicId || '')}</td><td>${escapeHtml(formatDisplayDate(request.requestedAt))}</td>${timeCell(request.requestedAt)}<td>${deletionStatusBadge(request.status)}</td><td>${deletionCheckText(request)}</td><td>${action}</td></tr>`;
     }).join('');
-    container.innerHTML = `<div class="commissions-table-container"><h3>قائمة طلبات حذف الحسابات</h3><table class="commissions-table"><thead><tr><th>صاحب الحساب</th><th>النوع</th><th>ID</th><th>تاريخ الطلب</th><th>الحالة</th><th>قبل الموافقة</th><th>الإجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    container.innerHTML = `<div class="commissions-table-container"><h3>قائمة طلبات حذف الحسابات</h3><table class="commissions-table"><thead><tr><th>صاحب الحساب</th><th>النوع</th><th>ID</th><th>تاريخ الطلب</th><th>وقت الطلب</th><th>الحالة</th><th>قبل الموافقة</th><th>الإجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } catch (err) { console.error('Error loading deletion requests:', err); }
 }
 
@@ -3722,11 +3722,11 @@ async function viewDriverOrdersViaDB(driverId) {
     if (driver.financial && driver.financial.transactions && driver.financial.transactions.length > 0) {
       let rows = '';
       driver.financial.transactions.forEach(t => {
-        rows += `<tr><td>${escapeHtml(t.id.slice(-8))}</td><td>${escapeHtml(t.desc)}</td><td>${escapeHtml(formatDisplayDate(t.date))}</td><td class="amount">${escapeHtml(t.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(t.id))}">عرض</button></td></tr>`;
+        rows += `<tr><td>${escapeHtml(t.id.slice(-8))}</td><td>${escapeHtml(t.desc)}</td><td>${escapeHtml(formatDisplayDate(t.at || t.date))}</td>${timeCell(t.at)}<td class="amount">${escapeHtml(t.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(t.id))}">عرض</button></td></tr>`;
       });
       content.innerHTML = `
         <div class="invoice-box">
-          <table class="invoice-table"><thead><tr><th>رقم المعاملة</th><th>الوصف</th><th>التاريخ</th><th>المبلغ</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table>
+          <table class="invoice-table"><thead><tr><th>رقم المعاملة</th><th>الوصف</th><th>التاريخ</th><th>الوقت</th><th>المبلغ</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table>
           <div class="invoice-total"><span class="total-label">صافي الأرباح</span><span class="total-value">${escapeHtml(netProfit)} </span></div>
           <div data-presentation="p029"><span>آخر 30 يوم: ${escapeHtml(last30Profit)} </span><span>عمولة المنصة: ${escapeHtml(totalCommission || 0)} </span></div>
         </div>`;
@@ -3748,9 +3748,9 @@ async function viewUserOrdersViaDB(userId) {
     if (user.orders && user.orders.length > 0) {
       let rows = '';
       user.orders.forEach(o => {
-        rows += `<tr><td>${escapeHtml(o.orderId)}</td><td>${escapeHtml(o.type)}</td><td>${escapeHtml(formatDisplayDate(o.date))}</td><td>${escapeHtml(o.status)}</td><td class="amount">${escapeHtml(o.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(o.fullId || ''))}">عرض</button></td></tr>`;
+        rows += `<tr><td>${escapeHtml(o.orderId)}</td><td>${escapeHtml(o.type)}</td><td>${escapeHtml(formatDisplayDate(o.at || o.date))}</td>${timeCell(o.at)}<td>${escapeHtml(o.status)}</td><td class="amount">${escapeHtml(o.amount)} </td><td><button class="order-action-btn details" data-admin-capability="${escapeHtml(adminActionCapability || '')}" data-admin-action="openOrderDetails" data-admin-arg-count="1" data-admin-arg-1="${escapeHtml(String(o.fullId || ''))}">عرض</button></td></tr>`;
       });
-      content.innerHTML = `<div class="invoice-box"><table class="invoice-table"><thead><tr><th>رقم الطلب</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>المبلغ</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      content.innerHTML = `<div class="invoice-box"><table class="invoice-table"><thead><tr><th>رقم الطلب</th><th>النوع</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>المبلغ</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     } else {
       content.innerHTML = '<p data-presentation="p030">لا توجد طلبات مسجلة.</p>';
     }
@@ -3876,12 +3876,13 @@ async function loadOrders() {
         <td>${escapeHtml(order.area || '')}</td>
         <td>${adminOrderStatusBadge(order.status)}${suspended ? `<br><small class="order-meta">معلق حتى ${escapeHtml(adminOrderDate(order.offerSuspendedUntil))}</small>` : ''}</td>
         <td>${escapeHtml(String(order.price || 0))}</td>
-        <td>${escapeHtml(adminOrderDate(order.createdAt))}</td>
+        <td>${escapeHtml(formatDisplayDate(order.createdAt))}</td>
+        ${timeCell(order.createdAt)}
         <td><div class="order-actions">${actions}</div></td>
       </tr>`;
     }).join('');
 
-    container.innerHTML = `<div data-presentation="p002"><table class="orders-table"><thead><tr><th>الطلب</th><th>النوع</th><th>الزبون</th><th>السائق</th><th>المنطقة</th><th>الحالة</th><th>السعر</th><th>التاريخ</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    container.innerHTML = `<div data-presentation="p002"><table class="orders-table"><thead><tr><th>الطلب</th><th>النوع</th><th>الزبون</th><th>السائق</th><th>المنطقة</th><th>الحالة</th><th>السعر</th><th>التاريخ</th><th>الوقت</th><th>إجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     container.classList.add('show');
   } catch (err) {
     container.innerHTML = '<p data-presentation="p030">حدث خطأ في تحميل الطلبات.</p>';
@@ -5582,6 +5583,22 @@ function formatDisplayDate(value) {
   return `${day}/${month}/${date.getFullYear()}`;
 }
 
+/** HH:mm of a moment; '' for a date without a time (e.g. "2026-11-19"). */
+function formatDisplayTime(value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+  const date = toDisplayDateValue(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+/** The "time" column of a table: HH:mm, or a dash when unknown. */
+function timeCell(value) {
+  return `<td class="time-cell">${escapeHtml(formatDisplayTime(value) || '—')}</td>`;
+}
+
 function formatDisplayDateTime(value) {
   if (value === null || value === undefined || value === '') return '';
   const date = toDisplayDateValue(value);
@@ -5771,6 +5788,7 @@ async function loadPendingProviders() {
           + `<td>${escapeHtml(provider.governorate || 'غير محدد')}</td>`
           + `<td>${escapeHtml(provider.city || provider.area || 'غير محدد')}</td>`
           + `<td>${escapeHtml(formatDisplayDate(provider.createdAt))}</td>`
+          + timeCell(provider.createdAt)
           + `<td><span class="${statusClass}">${escapeHtml(documentStatusText)}</span></td>`
           + `<td>`
           + `<button class="action-btn info" `
@@ -5810,6 +5828,7 @@ async function loadPendingProviders() {
         + `<th>المحافظة</th>`
         + `<th>المدينة / القرية</th>`
         + `<th>تاريخ التسجيل</th>`
+        + `<th>وقت التسجيل</th>`
         + `<th>الوثائق</th>`
         + `<th>الإجراءات</th>`
         + `</tr></thead>`

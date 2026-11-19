@@ -331,7 +331,8 @@ router.get('/search', async (req, res) => {
           id: o._id.toString(),
           desc: `طلب #${o._id.toString().slice(-8)}`,
           amount: o.providerEarning || 0,
-          date: o.createdAt.toISOString().split('T')[0]
+          date: o.createdAt.toISOString().split('T')[0],
+          at: o.createdAt,
         }))
       }
     };
